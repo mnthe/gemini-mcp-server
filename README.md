@@ -109,10 +109,11 @@ export VERTEX_MCP_SERVERS='[
 ]'
 ```
 
-### Claude Desktop Integration
+### MCP Client Integration
 
-**macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+Add to your MCP client configuration:
 
+**Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
 ```json
 {
   "mcpServers": {
@@ -128,6 +129,32 @@ export VERTEX_MCP_SERVERS='[
     }
   }
 }
+```
+
+**Claude Code** (`.claude.json` in project root):
+```json
+{
+  "mcpServers": {
+    "gemini": {
+      "command": "npx",
+      "args": ["-y", "github:mnthe/vertex-mcp-server"],
+      "env": {
+        "GOOGLE_CLOUD_PROJECT": "your-gcp-project-id",
+        "GOOGLE_CLOUD_LOCATION": "us-central1",
+        "VERTEX_MODEL": "gemini-1.5-flash-002"
+      }
+    }
+  }
+}
+```
+
+**Other MCP Clients** (Generic stdio):
+```bash
+# Command to run
+npx -y github:mnthe/vertex-mcp-server
+
+# Or direct execution
+node /path/to/vertex-mcp-server/build/index.js
 ```
 
 ## Available Tools
