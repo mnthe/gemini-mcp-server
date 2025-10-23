@@ -1,13 +1,13 @@
 /**
  * VertexAIService - Handles communication with Google Cloud Vertex AI
- * Provides a clean interface for making predictions with thinking mode support
+ * Uses @google/genai unified SDK with Vertex AI mode
  */
 import { VertexAIConfig } from '../types/index.js';
 export interface QueryOptions {
     enableThinking?: boolean;
 }
 export declare class VertexAIService {
-    private vertexAI;
+    private client;
     private config;
     constructor(config: VertexAIConfig);
     /**
