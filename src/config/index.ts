@@ -20,10 +20,11 @@ export function loadConfig(): VertexAIConfig {
   }
 
   // Get location from standard Vertex AI SDK env vars or fallback
-  const location = 
-    process.env.GOOGLE_CLOUD_LOCATION || 
-    process.env.VERTEX_LOCATION || 
-    "us-central1";
+  // Note: @google/genai with Vertex AI mode requires 'global' for proper authentication
+  const location =
+    process.env.GOOGLE_CLOUD_LOCATION ||
+    process.env.VERTEX_LOCATION ||
+    "global";
 
   // Agent configuration - model and parameters from environment
   const model = process.env.VERTEX_MODEL || "gemini-1.5-flash-002";

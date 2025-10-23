@@ -11,10 +11,14 @@
  * - schemas/: Zod validation schemas
  * - managers/: Business logic managers (conversations, MCP clients)
  * - services/: External service integrations (Vertex AI)
- * - agents/: AI agent logic (prompt analysis, reasoning, delegation)
+ * - agentic/: Agentic loop components (AgenticLoop, RunState, ResponseProcessor)
+ * - mcp/: MCP client implementation
+ * - tools/: Tool implementations (WebFetch, ToolRegistry)
  * - handlers/: Tool request handlers (query, search, fetch)
  * - server/: MCP server orchestration
  */
+// Load .env file for local development
+import 'dotenv/config';
 import { loadConfig } from './config/index.js';
 import { VertexAIMCPServer } from './server/VertexAIMCPServer.js';
 // Load configuration

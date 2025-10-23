@@ -20,7 +20,11 @@
     "watch": "tsc --watch",
     "dev": "tsx src/index.ts",
     "start": "node build/index.js",
-    "clean": "rm -rf build"
+    "clean": "rm -rf build",
+    "test:mcp": "npx @modelcontextprotocol/inspector node build/index.js",
+    "test:list": "echo '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\",\"params\":{}}' | node build/index.js",
+    "test:query": "echo '{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"query\",\"arguments\":{\"prompt\":\"Hello\"}}}' | node build/index.js 2>&1",
+    "test:env": "node -e 'console.log(\"Project:\", process.env.GOOGLE_CLOUD_PROJECT); console.log(\"Location:\", process.env.GOOGLE_CLOUD_LOCATION); console.log(\"Model:\", process.env.VERTEX_MODEL || \"gemini-1.5-flash-002\")'"
   },
   "keywords": [
     "mcp",
@@ -32,8 +36,9 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@google-cloud/vertexai": "^1.10.0",
+    "@google/genai": "1.25.0",
     "@modelcontextprotocol/sdk": "^1.20.1",
+    "dotenv": "^17.2.3",
     "zod": "^3.25.76"
   },
   "devDependencies": {
