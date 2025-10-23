@@ -1,14 +1,15 @@
 # vertex-mcp-server
 
-An MCP (Model Context Protocol) server that enables AI assistants like Claude to query Google Cloud Vertex AI models (Gemini) for cross-validation and alternative perspectives.
+An MCP (Model Context Protocol) server that enables AI assistants like Claude to query Google Cloud Vertex AI models for cross-validation and alternative perspectives.
 
 ## Purpose
 
 This server allows AI systems to:
-- Send queries to Vertex AI's Gemini models (gemini-1.5-pro, gemini-1.5-flash, etc.)
+- Send queries to Vertex AI models (Gemini, PaLM, Codey, etc.)
 - Cross-validate responses by comparing outputs from different AI models
 - Get alternative perspectives on questions or problems
-- Leverage Google's Gemini models alongside other AI assistants
+- Leverage Google's Vertex AI models alongside other AI assistants
+- Search and fetch information similar to ChatGPT's browsing capability
 
 ## Prerequisites
 
@@ -51,14 +52,35 @@ export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account-key.json"
 
 ### 2. Set Environment Variables
 
-Set your Google Cloud project ID and location:
+Set your Google Cloud project ID and location (using standard Vertex AI SDK environment variables):
+
+```bash
+export GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
+export GOOGLE_CLOUD_LOCATION="us-central1"  # Optional, defaults to us-central1
+```
+
+Or use custom environment variables (backward compatibility):
 
 ```bash
 export VERTEX_PROJECT_ID="your-gcp-project-id"
-export VERTEX_LOCATION="us-central1"  # Optional, defaults to us-central1
+export VERTEX_LOCATION="us-central1"
 ```
 
-### 3. Enable Vertex AI API
+### 3. Configure Model and Agent Settings
+
+The server operates as an agent with configurable model parameters:
+
+```bash
+export VERTEX_MODEL="gemini-1.5-flash-002"  # Model to use
+export VERTEX_TEMPERATURE="1.0"             # Temperature (0.0-2.0)
+export VERTEX_MAX_TOKENS="8192"             # Max output tokens
+export VERTEX_TOP_P="0.95"                  # Top-p sampling
+export VERTEX_TOP_K="40"                    # Top-k sampling
+```
+
+These settings apply to all queries made through the MCP server.
+
+### 4. Enable Vertex AI API
 
 Ensure the Vertex AI API is enabled in your Google Cloud project:
 
@@ -95,8 +117,13 @@ Add this to your Claude Desktop configuration file:
       "command": "node",
       "args": ["/absolute/path/to/vertex-mcp-server/build/index.js"],
       "env": {
-        "VERTEX_PROJECT_ID": "your-gcp-project-id",
-        "VERTEX_LOCATION": "us-central1"
+        "GOOGLE_CLOUD_PROJECT": "your-gcp-project-id",
+        "GOOGLE_CLOUD_LOCATION": "us-central1",
+        "VERTEX_MODEL": "gemini-1.5-flash-002",
+        "VERTEX_TEMPERATURE": "1.0",
+        "VERTEX_MAX_TOKENS": "8192",
+        "VERTEX_TOP_P": "0.95",
+        "VERTEX_TOP_K": "40"
       }
     }
   }
@@ -110,8 +137,9 @@ Or if installed globally:
     "vertex-ai": {
       "command": "vertex-mcp-server",
       "env": {
-        "VERTEX_PROJECT_ID": "your-gcp-project-id",
-        "VERTEX_LOCATION": "us-central1"
+        "GOOGLE_CLOUD_PROJECT": "your-gcp-project-id",
+        "GOOGLE_CLOUD_LOCATION": "us-central1",
+        "VERTEX_MODEL": "gemini-1.5-flash-002"
       }
     }
   }
@@ -120,41 +148,55 @@ Or if installed globally:
 
 ## Available Tools
 
-### query_vertex_ai
+### query
 
-Query Google Cloud Vertex AI with a prompt using Gemini models.
+Query Google Cloud Vertex AI with a prompt. The model and parameters are configured via environment variables.
 
 **Parameters:**
 - `prompt` (string, required): The prompt to send to Vertex AI
-- `model` (string, optional): The Gemini model to use
-  - Default: `gemini-1.5-flash-002`
-  - Options: `gemini-1.5-pro-002`, `gemini-1.5-flash-002`, `gemini-1.0-pro`, etc.
-- `maxTokens` (number, optional): Maximum tokens in response (default: 8192)
-- `temperature` (number, optional): Response randomness 0.0-2.0 (default: 1.0)
-- `topP` (number, optional): Nucleus sampling parameter (default: 0.95)
-- `topK` (number, optional): Top-k sampling parameter (default: 40)
+
+**Configuration (via environment variables):**
+- `VERTEX_MODEL`: The model to use (default: `gemini-1.5-flash-002`)
+  - Supports: Gemini models, PaLM 2, Codey, and other Vertex AI models
+- `VERTEX_TEMPERATURE`: Response randomness 0.0-2.0 (default: 1.0)
+- `VERTEX_MAX_TOKENS`: Maximum tokens in response (default: 8192)
+- `VERTEX_TOP_P`: Nucleus sampling parameter (default: 0.95)
+- `VERTEX_TOP_K`: Top-k sampling parameter (default: 40)
 
 **Example Usage in Claude:**
 
 ```
-Can you use the query_vertex_ai tool to ask Gemini: "What are the key differences between Python and JavaScript?"
+Can you use the query tool to ask: "What are the key differences between Python and JavaScript?"
+```
+
+### search
+
+Search for information using Vertex AI. This tool provides search/fetch capabilities similar to ChatGPT's web browsing.
+
+**Parameters:**
+- `query` (string, required): The search query
+
+**Example Usage in Claude:**
+
+```
+Use the search tool to find information about "latest developments in quantum computing"
 ```
 
 ## Example Use Cases
 
-1. **Cross-Validation**: Ask Claude to compare its response with Gemini's response
+1. **Cross-Validation**: Ask Claude to compare its response with Vertex AI's response
    ```
-   Please answer this question, then use query_vertex_ai to get Gemini's perspective and compare the answers.
+   Please answer this question, then use the query tool to get Vertex AI's perspective and compare the answers.
    ```
 
 2. **Alternative Viewpoints**: Get multiple AI perspectives on a problem
    ```
-   Use query_vertex_ai to get Gemini's opinion on [topic], then provide your own analysis.
+   Use the query tool to get another AI's opinion on [topic], then provide your own analysis.
    ```
 
-3. **Specialized Tasks**: Leverage Gemini's strengths for specific tasks
+3. **Information Retrieval**: Use the search tool for finding information
    ```
-   Use query_vertex_ai to process this image description with Gemini's vision capabilities.
+   Use the search tool to find recent research papers on machine learning optimization.
    ```
 
 ## Development

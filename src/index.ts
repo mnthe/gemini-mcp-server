@@ -10,41 +10,27 @@ import {
 import { PredictionServiceClient } from "@google-cloud/aiplatform";
 import { z } from "zod";
 
-// Input schema for the query tool
-const QueryVertexAISchema = z.object({
+// Input schema for the query tool - prompt only
+const QuerySchema = z.object({
   prompt: z.string().describe("The prompt to send to Vertex AI"),
-  model: z
-    .string()
-    .optional()
-    .default("gemini-1.5-flash-002")
-    .describe("The Gemini model to use (e.g., gemini-1.5-pro-002, gemini-1.5-flash-002)"),
-  maxTokens: z
-    .number()
-    .optional()
-    .default(8192)
-    .describe("Maximum number of tokens in the response"),
-  temperature: z
-    .number()
-    .optional()
-    .default(1.0)
-    .describe("Temperature for response generation (0.0 to 2.0)"),
-  topP: z
-    .number()
-    .optional()
-    .default(0.95)
-    .describe("Top-p for nucleus sampling"),
-  topK: z
-    .number()
-    .optional()
-    .default(40)
-    .describe("Top-k for sampling"),
 });
 
-type QueryVertexAIInput = z.infer<typeof QueryVertexAISchema>;
+// Input schema for search/fetch tool
+const SearchSchema = z.object({
+  query: z.string().describe("The search query"),
+});
+
+type QueryInput = z.infer<typeof QuerySchema>;
+type SearchInput = z.infer<typeof SearchSchema>;
 
 interface VertexAIConfig {
   projectId: string;
   location: string;
+  model: string;
+  temperature: number;
+  maxTokens: number;
+  topP: number;
+  topK: number;
 }
 
 class VertexAIMCPServer {
@@ -54,14 +40,20 @@ class VertexAIMCPServer {
 
   constructor() {
     // Initialize configuration from environment variables
+    // Support both standard Vertex AI SDK env vars and custom ones
     this.config = {
-      projectId: process.env.VERTEX_PROJECT_ID || "",
-      location: process.env.VERTEX_LOCATION || "us-central1",
+      projectId: process.env.GOOGLE_CLOUD_PROJECT || process.env.VERTEX_PROJECT_ID || "",
+      location: process.env.GOOGLE_CLOUD_LOCATION || process.env.VERTEX_LOCATION || "us-central1",
+      model: process.env.VERTEX_MODEL || "gemini-1.5-flash-002",
+      temperature: parseFloat(process.env.VERTEX_TEMPERATURE || "1.0"),
+      maxTokens: parseInt(process.env.VERTEX_MAX_TOKENS || "8192", 10),
+      topP: parseFloat(process.env.VERTEX_TOP_P || "0.95"),
+      topK: parseInt(process.env.VERTEX_TOP_K || "40", 10),
     };
 
     if (!this.config.projectId) {
       console.error(
-        "Error: VERTEX_PROJECT_ID environment variable is required"
+        "Error: GOOGLE_CLOUD_PROJECT or VERTEX_PROJECT_ID environment variable is required"
       );
       process.exit(1);
     }
@@ -92,10 +84,10 @@ class VertexAIMCPServer {
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
       const tools: Tool[] = [
         {
-          name: "query_vertex_ai",
+          name: "query",
           description:
-            "Query Google Cloud Vertex AI with a prompt using Gemini models. " +
-            "This tool allows you to send prompts to Gemini models (like gemini-1.5-pro or gemini-1.5-flash) " +
+            "Query Google Cloud Vertex AI with a prompt. " +
+            "This tool allows you to send prompts to Vertex AI models " +
             "for tasks such as cross-validation, comparison, or getting alternative perspectives.",
           inputSchema: {
             type: "object",
@@ -104,35 +96,24 @@ class VertexAIMCPServer {
                 type: "string",
                 description: "The prompt to send to Vertex AI",
               },
-              model: {
-                type: "string",
-                description:
-                  "The Gemini model to use (e.g., gemini-1.5-pro-002, gemini-1.5-flash-002)",
-                default: "gemini-1.5-flash-002",
-              },
-              maxTokens: {
-                type: "number",
-                description: "Maximum number of tokens in the response",
-                default: 8192,
-              },
-              temperature: {
-                type: "number",
-                description:
-                  "Temperature for response generation (0.0 to 2.0)",
-                default: 1.0,
-              },
-              topP: {
-                type: "number",
-                description: "Top-p for nucleus sampling",
-                default: 0.95,
-              },
-              topK: {
-                type: "number",
-                description: "Top-k for sampling",
-                default: 40,
-              },
             },
             required: ["prompt"],
+          },
+        },
+        {
+          name: "search",
+          description:
+            "Search for information using Vertex AI. " +
+            "This tool can be used to fetch and search for information, similar to ChatGPT's web browsing capability.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              query: {
+                type: "string",
+                description: "The search query",
+              },
+            },
+            required: ["query"],
           },
         },
       ];
@@ -142,23 +123,25 @@ class VertexAIMCPServer {
 
     // Handle tool calls
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      if (request.params.name === "query_vertex_ai") {
-        return await this.handleQueryVertexAI(request.params.arguments || {});
+      if (request.params.name === "query") {
+        return await this.handleQuery(request.params.arguments || {});
+      } else if (request.params.name === "search") {
+        return await this.handleSearch(request.params.arguments || {});
       }
 
       throw new Error(`Unknown tool: ${request.params.name}`);
     });
   }
 
-  private async handleQueryVertexAI(
+  private async handleQuery(
     args: Record<string, unknown>
   ): Promise<{ content: Array<{ type: string; text: string }> }> {
     try {
       // Validate input
-      const input = QueryVertexAISchema.parse(args);
+      const input = QuerySchema.parse(args);
 
-      // Construct the endpoint
-      const endpoint = `projects/${this.config.projectId}/locations/${this.config.location}/publishers/google/models/${input.model}`;
+      // Construct the endpoint using config
+      const endpoint = `projects/${this.config.projectId}/locations/${this.config.location}/publishers/google/models/${this.config.model}`;
 
       // Prepare the request - Vertex AI expects a specific format
       const instance = {
@@ -166,10 +149,10 @@ class VertexAIMCPServer {
       };
 
       const parameters = {
-        temperature: input.temperature,
-        maxOutputTokens: input.maxTokens,
-        topP: input.topP,
-        topK: input.topK,
+        temperature: this.config.temperature,
+        maxOutputTokens: this.config.maxTokens,
+        topP: this.config.topP,
+        topK: this.config.topK,
       };
 
       const request = {
@@ -221,6 +204,83 @@ class VertexAIMCPServer {
           {
             type: "text",
             text: `Error querying Vertex AI: ${errorMessage}`,
+          },
+        ],
+      };
+    }
+  }
+
+  private async handleSearch(
+    args: Record<string, unknown>
+  ): Promise<{ content: Array<{ type: string; text: string }> }> {
+    try {
+      // Validate input
+      const input = SearchSchema.parse(args);
+
+      // Construct a search-oriented prompt
+      const searchPrompt = `Search and provide information about: ${input.query}`;
+
+      // Use the same prediction client but with a search-oriented approach
+      const endpoint = `projects/${this.config.projectId}/locations/${this.config.location}/publishers/google/models/${this.config.model}`;
+
+      const instance = {
+        content: searchPrompt,
+      };
+
+      const parameters = {
+        temperature: this.config.temperature,
+        maxOutputTokens: this.config.maxTokens,
+        topP: this.config.topP,
+        topK: this.config.topK,
+      };
+
+      const request = {
+        endpoint,
+        instances: [instance],
+        parameters,
+      };
+
+      // Make the prediction
+      const [response] = await this.predictionClient.predict(request as any);
+
+      // Extract the response text
+      let responseText = "No search results found";
+
+      if (response.predictions && response.predictions.length > 0) {
+        const prediction = response.predictions[0];
+        
+        if (typeof prediction === 'object' && prediction !== null) {
+          const pred = prediction as Record<string, unknown>;
+          
+          if (pred.content && typeof pred.content === "string") {
+            responseText = pred.content;
+          } else if (pred.candidates && Array.isArray(pred.candidates)) {
+            const firstCandidate = pred.candidates[0] as Record<string, unknown>;
+            if (firstCandidate?.content) {
+              responseText = JSON.stringify(firstCandidate.content);
+            }
+          } else {
+            responseText = JSON.stringify(prediction);
+          }
+        }
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: responseText,
+          },
+        ],
+      };
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error searching with Vertex AI: ${errorMessage}`,
           },
         ],
       };
