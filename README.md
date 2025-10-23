@@ -161,11 +161,19 @@ Or if installed globally:
 
 ### query
 
-Query Google Cloud Vertex AI with a prompt. The model and parameters are configured via environment variables. Supports multi-turn conversations when Agent Mode is enabled.
+Query Google Cloud Vertex AI with a prompt. This is the main entry point tool that acts as an intelligent agent.
+
+**Agent Capabilities:**
+The `query` tool internally handles:
+1. **Chain-of-Thought Reasoning**: Automatically applies multi-step reasoning for complex problems (when `VERTEX_ENABLE_REASONING=true`)
+2. **Delegation**: Automatically delegates to other MCP servers when appropriate (configured via `VERTEX_MCP_SERVERS`)
+3. **Multi-turn Conversations**: Maintains conversation context across queries (when `VERTEX_ENABLE_CONVERSATIONS=true`)
+
+The agent intelligently decides when to use reasoning or delegation based on the prompt.
 
 **Parameters:**
 - `prompt` (string, required): The prompt to send to Vertex AI
-- `sessionId` (string, optional): Conversation session ID for multi-turn conversations (when `VERTEX_ENABLE_CONVERSATIONS=true`)
+- `sessionId` (string, optional): Conversation session ID for multi-turn conversations
 
 **Configuration (via environment variables):**
 - `VERTEX_MODEL`: The model to use (default: `gemini-1.5-flash-002`)
@@ -175,15 +183,25 @@ Query Google Cloud Vertex AI with a prompt. The model and parameters are configu
 - `VERTEX_TOP_P`: Nucleus sampling parameter (default: 0.95)
 - `VERTEX_TOP_K`: Top-k sampling parameter (default: 40)
 
-**Agent Mode (Conversations):**
+**Agent Mode Configuration:**
 - `VERTEX_ENABLE_CONVERSATIONS`: Enable multi-turn conversations (default: false)
 - `VERTEX_SESSION_TIMEOUT`: Session timeout in seconds (default: 3600)
 - `VERTEX_MAX_HISTORY`: Maximum messages in history (default: 10)
+- `VERTEX_ENABLE_REASONING`: Enable internal chain-of-thought reasoning (default: false)
+- `VERTEX_MAX_REASONING_STEPS`: Maximum reasoning steps (default: 5)
+- `VERTEX_MCP_SERVERS`: JSON array of MCP server configurations for delegation
 
 **Example Usage in Claude:**
 
 ```
-Can you use the query tool to ask: "What are the key differences between Python and JavaScript?"
+# Simple query
+"Use the query tool to ask: What are the key differences between Python and JavaScript?"
+
+# Complex query (triggers internal reasoning if enabled)
+"Use the query tool to analyze: What are the trade-offs between microservices and monolithic architecture?"
+
+# Query mentioning external sources (triggers delegation if configured)
+"Use the query tool: Search the web for latest AI research and summarize findings"
 ```
 
 ### search
@@ -226,46 +244,9 @@ A JSON object containing:
 First use search to find documents, then use fetch with the document ID to get full contents
 ```
 
-### reason
-
-Engage in chain-of-thought reasoning to solve complex problems. Breaks down problems into steps and reasons through each one.
-
-**Parameters:**
-- `prompt` (string, required): The complex problem or question to reason about
-- `steps` (number, optional): Number of reasoning steps (default: 3, max: configurable)
-- `sessionId` (string, optional): Conversation session ID
-
-**Configuration:**
-- `VERTEX_ENABLE_REASONING`: Enable reasoning capability (default: false)
-- `VERTEX_MAX_REASONING_STEPS`: Maximum reasoning steps (default: 5)
-
-**Example Usage in Claude:**
-
-```
-Use the reason tool to think through: "How can we optimize database performance for a high-traffic web application?"
-```
-
-### delegate
-
-Delegate a task to another MCP server. Allows this server to connect to and use tools from other MCP servers.
-
-**Parameters:**
-- `serverName` (string, required): Name of the MCP server to delegate to
-- `toolName` (string, required): Name of the tool to call on the target server
-- `arguments` (object, required): Arguments to pass to the tool
-
-**Configuration:**
-- `VERTEX_MCP_SERVERS`: JSON array of server configurations
-
-**Example Usage in Claude:**
-
-```
-Use the delegate tool to call the 'search_web' tool on the 'web-search-server' with query "latest AI research"
-```
-
 ## Agent Mode
 
-The server supports advanced Agent mode features for enhanced capabilities:
+The server operates as an intelligent agent with the `query` tool as the main entry point. The agent internally handles reasoning and delegation based on the prompt.
 
 ### Multi-turn Conversations (Phase 1 ✅)
 
@@ -286,15 +267,16 @@ When `VERTEX_ENABLE_CONVERSATIONS=true`, the server maintains conversation conte
 
 The server automatically includes session IDs in responses when conversation mode is enabled. Sessions expire after the configured timeout period (`VERTEX_SESSION_TIMEOUT`).
 
-### Chain of Thought Reasoning (Phase 2 ✅)
+### Internal Chain of Thought Reasoning (Phase 2 ✅)
 
-When `VERTEX_ENABLE_REASONING=true`, the server can engage in multi-step reasoning:
+When `VERTEX_ENABLE_REASONING=true`, the `query` tool automatically engages in multi-step reasoning for complex problems:
 
 **How it works:**
-1. Breaks down complex problems into reasoning steps
-2. Processes each step with internal thinking
-3. Synthesizes insights into a final answer
-4. Shows the complete reasoning process
+1. Analyzes the prompt to detect if it needs reasoning (keywords: "analyze", "compare", "evaluate", "trade-offs", etc.)
+2. Automatically breaks down complex problems into reasoning steps
+3. Processes each step with internal thinking
+4. Synthesizes insights into a final answer
+5. Shows the complete reasoning process in the response
 
 **Configuration:**
 ```bash
@@ -304,18 +286,21 @@ VERTEX_MAX_REASONING_STEPS=5
 
 **Usage Example:**
 ```
-Use the reason tool to solve: "What are the trade-offs between microservices and monolithic architecture?"
+# Simply ask complex questions - reasoning is applied automatically
+query: "What are the trade-offs between microservices and monolithic architecture?"
+
+# The agent will internally apply chain-of-thought reasoning
 ```
 
-### MCP-to-MCP Connectivity (Phase 3 ✅)
+### Internal MCP-to-MCP Delegation (Phase 3 ✅)
 
-Connect to other MCP servers for task delegation and orchestration:
+The `query` tool can automatically delegate to other MCP servers when appropriate:
 
 **How it works:**
-- Configure external MCP servers via environment variable
-- Use the `delegate` tool to call tools on other servers
-- Aggregate results from multiple sources
-- Enable complex multi-server workflows
+- Analyzes the prompt to detect delegation needs (keywords: "web search", "search the web", "latest information", etc.)
+- Automatically delegates to configured external MCP servers
+- Synthesizes results from external tools with Vertex AI's own analysis
+- Returns a comprehensive answer combining multiple sources
 
 **Configuration:**
 ```bash
@@ -331,7 +316,10 @@ VERTEX_MCP_SERVERS='[
 
 **Usage Example:**
 ```
-Use delegate to call the search tool on web-search server, then reason about the results
+# Simply mention web search in your query - delegation is automatic
+query: "Search the web for latest AI research and summarize the findings"
+
+# The agent will internally delegate to the web-search server
 ```
 
 See `AGENT_MODE_PLAN.md` for detailed implementation information.
@@ -353,14 +341,16 @@ See `AGENT_MODE_PLAN.md` for detailed implementation information.
    Use the search tool to find recent research papers on machine learning optimization, then use fetch to get the full content of the most relevant result.
    ```
 
-4. **Complex Reasoning**: Use the reason tool for multi-step problem solving
+4. **Automatic Reasoning**: Query tool applies internal reasoning for complex questions
    ```
-   Use the reason tool to analyze: "What are the security implications of implementing OAuth 2.0 in a distributed system?"
+   query: "Analyze the security implications of implementing OAuth 2.0 in a distributed system"
+   # Reasoning is applied automatically based on keywords
    ```
 
-5. **Multi-Server Orchestration**: Delegate tasks to multiple MCP servers
+5. **Automatic Delegation**: Query tool delegates to external sources when needed
    ```
-   Use delegate to search the web, then use reason to analyze the findings, and use query to get Vertex AI's perspective on the synthesized information.
+   query: "Search the web for latest developments in quantum computing and provide a comprehensive analysis"
+   # Delegation happens automatically based on prompt analysis
    ```
 
 ## Development

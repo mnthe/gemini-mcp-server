@@ -27,25 +27,9 @@ const FetchSchema = z.object({
   id: z.string().describe("The unique identifier for the document to fetch"),
 });
 
-// Input schema for reason tool (Chain of Thought)
-const ReasonSchema = z.object({
-  prompt: z.string().describe("The complex problem or question to reason about"),
-  steps: z.number().optional().default(3).describe("Number of reasoning steps (default: 3)"),
-  sessionId: z.string().optional().describe("Optional conversation session ID"),
-});
-
-// Input schema for delegate tool (MCP-to-MCP)
-const DelegateSchema = z.object({
-  serverName: z.string().describe("Name of the MCP server to delegate to"),
-  toolName: z.string().describe("Name of the tool to call on the target server"),
-  arguments: z.record(z.unknown()).describe("Arguments to pass to the tool"),
-});
-
 type QueryInput = z.infer<typeof QuerySchema>;
 type SearchInput = z.infer<typeof SearchSchema>;
 type FetchInput = z.infer<typeof FetchSchema>;
-type ReasonInput = z.infer<typeof ReasonSchema>;
-type DelegateInput = z.infer<typeof DelegateSchema>;
 
 // Conversation management interfaces
 interface Message {
@@ -324,9 +308,12 @@ class VertexAIMCPServer {
           name: "query",
           description:
             "Query Google Cloud Vertex AI with a prompt. " +
-            "This tool allows you to send prompts to Vertex AI models " +
-            "for tasks such as cross-validation, comparison, or getting alternative perspectives. " +
-            "Supports multi-turn conversations when sessionId is provided.",
+            "This tool acts as an intelligent agent that can handle complex requests through internal reasoning and delegation. " +
+            "The agent will automatically: " +
+            "1) Use chain-of-thought reasoning for complex problems (when VERTEX_ENABLE_REASONING=true), " +
+            "2) Delegate to other MCP servers when appropriate (configured via VERTEX_MCP_SERVERS), " +
+            "3) Maintain multi-turn conversations (when VERTEX_ENABLE_CONVERSATIONS=true). " +
+            "Simply provide your query and the agent handles the rest.",
           inputSchema: {
             type: "object",
             properties: {
@@ -374,56 +361,6 @@ class VertexAIMCPServer {
             required: ["id"],
           },
         },
-        {
-          name: "reason",
-          description:
-            "Engage in chain-of-thought reasoning to solve complex problems. " +
-            "Breaks down the problem into steps and reasons through each one. " +
-            "Enabled when VERTEX_ENABLE_REASONING=true.",
-          inputSchema: {
-            type: "object",
-            properties: {
-              prompt: {
-                type: "string",
-                description: "The complex problem or question to reason about",
-              },
-              steps: {
-                type: "number",
-                description: "Number of reasoning steps (default: 3, max: configurable)",
-              },
-              sessionId: {
-                type: "string",
-                description: "Optional conversation session ID",
-              },
-            },
-            required: ["prompt"],
-          },
-        },
-        {
-          name: "delegate",
-          description:
-            "Delegate a task to another MCP server. " +
-            "Allows this server to connect to and use tools from other MCP servers. " +
-            "Servers must be configured via VERTEX_MCP_SERVERS environment variable.",
-          inputSchema: {
-            type: "object",
-            properties: {
-              serverName: {
-                type: "string",
-                description: "Name of the MCP server to delegate to",
-              },
-              toolName: {
-                type: "string",
-                description: "Name of the tool to call on the target server",
-              },
-              arguments: {
-                type: "object",
-                description: "Arguments to pass to the tool",
-              },
-            },
-            required: ["serverName", "toolName", "arguments"],
-          },
-        },
       ];
 
       return { tools };
@@ -442,12 +379,6 @@ class VertexAIMCPServer {
         
         case "fetch":
           return await this.handleFetch(request.params.arguments || {});
-        
-        case "reason":
-          return await this.handleReason(request.params.arguments || {});
-        
-        case "delegate":
-          return await this.handleDelegate(request.params.arguments || {});
         
         default:
           throw new Error(`Unknown tool: ${toolName}`);
@@ -492,57 +423,25 @@ class VertexAIMCPServer {
         });
       }
 
-      // Construct the full prompt with conversation context
-      const fullPrompt = conversationContext 
-        ? `${conversationContext}user: ${input.prompt}\nassistant:`
-        : input.prompt;
+      // Agent Decision: Determine if prompt needs special handling
+      const promptAnalysis = await this.analyzePrompt(input.prompt);
+      
+      let responseText: string;
+      let thinkingProcess = "";
 
-      // Construct the endpoint using config
-      const endpoint = `projects/${this.config.projectId}/locations/${this.config.location}/publishers/google/models/${this.config.model}`;
-
-      // Prepare the request - Vertex AI expects a specific format
-      const instance = {
-        content: fullPrompt,
-      };
-
-      const parameters = {
-        temperature: this.config.temperature,
-        maxOutputTokens: this.config.maxTokens,
-        topP: this.config.topP,
-        topK: this.config.topK,
-      };
-
-      const request = {
-        endpoint,
-        instances: [instance],
-        parameters,
-      };
-
-      // Make the prediction
-      const [response] = await this.predictionClient.predict(request as any);
-
-      // Extract the response text
-      let responseText = "No response received";
-
-      if (response.predictions && response.predictions.length > 0) {
-        const prediction = response.predictions[0];
-        
-        // Try to extract text from different possible response structures
-        if (typeof prediction === 'object' && prediction !== null) {
-          const pred = prediction as Record<string, unknown>;
-          
-          if (pred.content && typeof pred.content === "string") {
-            responseText = pred.content;
-          } else if (pred.candidates && Array.isArray(pred.candidates)) {
-            const firstCandidate = pred.candidates[0] as Record<string, unknown>;
-            if (firstCandidate?.content) {
-              responseText = JSON.stringify(firstCandidate.content);
-            }
-          } else {
-            // Fallback: stringify the entire prediction
-            responseText = JSON.stringify(prediction);
-          }
-        }
+      // Internal Agent Logic: Apply reasoning if needed
+      if (this.config.enableReasoning && promptAnalysis.needsReasoning) {
+        thinkingProcess += `[Internal: Detected complex problem, applying chain-of-thought reasoning]\n\n`;
+        responseText = await this.applyInternalReasoning(input.prompt, conversationContext);
+      }
+      // Internal Agent Logic: Check if delegation is needed
+      else if (promptAnalysis.needsDelegation && this.mcpClientManager.listServers().length > 0) {
+        thinkingProcess += `[Internal: Delegating to ${promptAnalysis.targetServer}]\n\n`;
+        responseText = await this.applyInternalDelegation(input.prompt, promptAnalysis.targetServer, conversationContext);
+      }
+      // Standard query
+      else {
+        responseText = await this.executeQuery(input.prompt, conversationContext);
       }
 
       // Add assistant response to conversation history
@@ -556,8 +455,8 @@ class VertexAIMCPServer {
 
       // Include session ID in response if conversations are enabled
       const resultText = sessionId 
-        ? `[Session: ${sessionId}]\n\n${responseText}`
-        : responseText;
+        ? `[Session: ${sessionId}]\n${thinkingProcess}${responseText}`
+        : `${thinkingProcess}${responseText}`;
 
       return {
         content: [
@@ -579,6 +478,127 @@ class VertexAIMCPServer {
         ],
       };
     }
+  }
+
+  // Analyze prompt to determine what strategy to use
+  private async analyzePrompt(prompt: string): Promise<{
+    needsReasoning: boolean;
+    needsDelegation: boolean;
+    targetServer?: string;
+  }> {
+    // Simple heuristics for now
+    const lowerPrompt = prompt.toLowerCase();
+    
+    // Check if it's a complex reasoning task
+    const reasoningKeywords = [
+      'analyze', 'compare', 'evaluate', 'trade-off', 'pros and cons',
+      'step by step', 'explain why', 'reasoning', 'think through'
+    ];
+    const needsReasoning = reasoningKeywords.some(keyword => lowerPrompt.includes(keyword));
+
+    // Check if it mentions external services (delegation targets)
+    const delegationKeywords: Record<string, string> = {
+      'web search': 'web-search',
+      'search the web': 'web-search',
+      'find online': 'web-search',
+      'latest information': 'web-search',
+    };
+    
+    let needsDelegation = false;
+    let targetServer: string | undefined;
+    
+    for (const [keyword, server] of Object.entries(delegationKeywords)) {
+      if (lowerPrompt.includes(keyword)) {
+        needsDelegation = true;
+        targetServer = server;
+        break;
+      }
+    }
+
+    return { needsReasoning, needsDelegation, targetServer };
+  }
+
+  // Internal reasoning - chain of thought
+  private async applyInternalReasoning(prompt: string, context: string): Promise<string> {
+    const steps = Math.min(3, this.config.maxReasoningSteps);
+    const reasoningSteps: ReasoningStep[] = [];
+
+    // Step 1: Break down the problem
+    const breakdownPrompt = `${context}Break down this complex problem into ${steps} logical steps: ${prompt}\n\nProvide a structured breakdown.`;
+    const breakdownResponse = await this.queryVertexAI(breakdownPrompt);
+    
+    reasoningSteps.push({
+      step: 0,
+      thought: "Problem breakdown",
+      result: breakdownResponse,
+    });
+
+    // Process each reasoning step
+    for (let i = 1; i <= steps; i++) {
+      const stepPrompt = `${context}Problem: "${prompt}"
+
+Previous reasoning:
+${reasoningSteps.map(s => `${s.thought}: ${s.result}`).join('\n\n')}
+
+Now reason through step ${i} of ${steps}.`;
+      
+      const stepResponse = await this.queryVertexAI(stepPrompt);
+      
+      reasoningSteps.push({
+        step: i,
+        thought: `Step ${i}`,
+        result: stepResponse,
+      });
+    }
+
+    // Final synthesis
+    const synthesisPrompt = `${context}Based on this reasoning, provide a final answer to: ${prompt}
+
+Reasoning steps:
+${reasoningSteps.map(s => `${s.thought}:\n${s.result}`).join('\n\n')}`;
+    
+    const finalAnswer = await this.queryVertexAI(synthesisPrompt);
+
+    // Format response with reasoning trace
+    return `## Chain-of-Thought Reasoning
+
+${reasoningSteps.map((s, idx) => `### ${s.thought}\n${s.result}`).join('\n\n')}
+
+## Final Answer
+${finalAnswer}`;
+  }
+
+  // Internal delegation to other MCP servers
+  private async applyInternalDelegation(prompt: string, targetServer: string | undefined, context: string): Promise<string> {
+    if (!targetServer) {
+      return await this.executeQuery(prompt, context);
+    }
+
+    try {
+      // Attempt to delegate
+      const result = await this.mcpClientManager.callTool(targetServer, 'search', { query: prompt });
+      
+      // Use Vertex AI to synthesize the delegated result with our own analysis
+      const synthesisPrompt = `${context}External tool provided this information: ${JSON.stringify(result)}
+
+Based on this and your knowledge, provide a comprehensive answer to: ${prompt}`;
+      
+      const synthesis = await this.queryVertexAI(synthesisPrompt);
+      
+      return `## Delegated Research\n[Used: ${targetServer}]\n\n${synthesis}`;
+    } catch (error) {
+      // Fallback to standard query if delegation fails
+      return await this.executeQuery(prompt, context);
+    }
+  }
+
+  // Execute a standard query
+  private async executeQuery(prompt: string, context: string): Promise<string> {
+    const fullPrompt = context 
+      ? `${context}user: ${prompt}\nassistant:`
+      : prompt;
+
+    return await this.queryVertexAI(fullPrompt);
   }
 
   private async handleSearch(
@@ -749,168 +769,7 @@ class VertexAIMCPServer {
     }
   }
 
-  private async handleReason(
-    args: Record<string, unknown>
-  ): Promise<{ content: Array<{ type: string; text: string }> }> {
-    try {
-      // Validate input
-      const input = ReasonSchema.parse(args);
-
-      if (!this.config.enableReasoning) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: "Reasoning is not enabled. Set VERTEX_ENABLE_REASONING=true to enable chain-of-thought reasoning.",
-            },
-          ],
-        };
-      }
-
-      // Limit steps to configured maximum
-      const steps = Math.min(input.steps || 3, this.config.maxReasoningSteps);
-      const reasoningSteps: ReasoningStep[] = [];
-
-      // Step 1: Break down the problem
-      const breakdownPrompt = `Break down this complex problem into ${steps} logical steps that need to be reasoned through: ${input.prompt}`;
-      const breakdownResponse = await this.queryVertexAI(breakdownPrompt);
-      
-      reasoningSteps.push({
-        step: 0,
-        thought: "Problem breakdown",
-        result: breakdownResponse,
-      });
-
-      // Process each reasoning step
-      for (let i = 1; i <= steps; i++) {
-        const stepPrompt = `Based on the problem: "${input.prompt}"
-        
-Previous thinking steps:
-${reasoningSteps.map(s => `Step ${s.step}: ${s.thought}\n${s.result}`).join('\n\n')}
-
-Now, reason through step ${i} of ${steps}. Think deeply and provide your reasoning.`;
-        
-        const stepResponse = await this.queryVertexAI(stepPrompt);
-        
-        reasoningSteps.push({
-          step: i,
-          thought: `Reasoning step ${i}`,
-          result: stepResponse,
-        });
-      }
-
-      // Final synthesis
-      const synthesisPrompt = `Based on all the reasoning steps below, provide a final comprehensive answer to: ${input.prompt}
-
-Reasoning steps:
-${reasoningSteps.map(s => `${s.thought}:\n${s.result}`).join('\n\n')}
-
-Synthesize these insights into a clear, concise final answer.`;
-      
-      const finalAnswer = await this.queryVertexAI(synthesisPrompt);
-
-      // Format response
-      const responseText = `# Chain of Thought Reasoning
-
-## Problem
-${input.prompt}
-
-## Reasoning Process
-${reasoningSteps.map((s, idx) => `### ${s.thought}
-${s.result}`).join('\n\n')}
-
-## Final Answer
-${finalAnswer}
-
----
-*Completed ${steps} reasoning steps*`;
-
-      // Add to conversation history if sessionId provided
-      if (this.config.enableConversations && input.sessionId) {
-        this.conversationManager.addMessage(input.sessionId, {
-          role: 'user',
-          content: `[Reasoning Request] ${input.prompt}`,
-          timestamp: new Date(),
-        });
-        this.conversationManager.addMessage(input.sessionId, {
-          role: 'assistant',
-          content: responseText,
-          timestamp: new Date(),
-        });
-      }
-
-      return {
-        content: [
-          {
-            type: "text",
-            text: responseText,
-          },
-        ],
-      };
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Error during reasoning: ${errorMessage}`,
-          },
-        ],
-      };
-    }
-  }
-
-  private async handleDelegate(
-    args: Record<string, unknown>
-  ): Promise<{ content: Array<{ type: string; text: string }> }> {
-    try {
-      // Validate input
-      const input = DelegateSchema.parse(args);
-
-      // Check if the server exists
-      const availableServers = this.mcpClientManager.listServers();
-      if (availableServers.length === 0) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: "No MCP servers configured. Configure servers via VERTEX_MCP_SERVERS environment variable.",
-            },
-          ],
-        };
-      }
-
-      // Delegate to the MCP client manager
-      const result = await this.mcpClientManager.callTool(
-        input.serverName,
-        input.toolName,
-        input.arguments
-      );
-
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(result, null, 2),
-          },
-        ],
-      };
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Error delegating to MCP server: ${errorMessage}`,
-          },
-        ],
-      };
-    }
-  }
-
-  // Helper method to query Vertex AI (used by reasoning)
+  // Helper method to query Vertex AI (used internally by agent logic)
   private async queryVertexAI(prompt: string): Promise<string> {
     const endpoint = `projects/${this.config.projectId}/locations/${this.config.location}/publishers/google/models/${this.config.model}`;
 
