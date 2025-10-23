@@ -1,61 +1,72 @@
 /**
  * VertexAIService - Handles communication with Google Cloud Vertex AI
- * Provides a clean interface for making predictions
+ * Provides a clean interface for making predictions using the Generative AI SDK
  */
-import { PredictionServiceClient } from "@google-cloud/aiplatform";
+import { VertexAI } from "@google-cloud/vertexai";
 export class VertexAIService {
-    client;
+    vertexAI;
     config;
     constructor(config) {
         this.config = config;
-        this.client = new PredictionServiceClient();
+        // Initialize Vertex AI client with project and location
+        this.vertexAI = new VertexAI({
+            project: config.projectId,
+            location: config.location,
+        });
     }
     /**
-     * Query Vertex AI with a prompt
+     * Query Vertex AI with a prompt using the Generative AI API
      */
     async query(prompt) {
-        const endpoint = `projects/${this.config.projectId}/locations/${this.config.location}/publishers/google/models/${this.config.model}`;
-        const instance = {
-            content: prompt,
-        };
-        const parameters = {
-            temperature: this.config.temperature,
-            maxOutputTokens: this.config.maxTokens,
-            topP: this.config.topP,
-            topK: this.config.topK,
-        };
-        const request = {
-            endpoint,
-            instances: [instance],
-            parameters,
-        };
-        const [response] = await this.client.predict(request);
-        return this.extractResponseText(response);
+        // Get the generative model
+        const model = this.vertexAI.getGenerativeModel({
+            model: this.config.model,
+            generationConfig: {
+                temperature: this.config.temperature,
+                maxOutputTokens: this.config.maxTokens,
+                topP: this.config.topP,
+                topK: this.config.topK,
+            },
+        });
+        // Generate content
+        const result = await model.generateContent(prompt);
+        return this.extractResponseText(result);
     }
     /**
-     * Extract text from Vertex AI response
+     * Extract text from Vertex AI Generative AI response
      */
-    extractResponseText(response) {
-        let responseText = "No response received";
-        if (response.predictions && response.predictions.length > 0) {
-            const prediction = response.predictions[0];
-            if (typeof prediction === 'object' && prediction !== null) {
-                const pred = prediction;
-                if (pred.content && typeof pred.content === "string") {
-                    responseText = pred.content;
-                }
-                else if (pred.candidates && Array.isArray(pred.candidates)) {
-                    const firstCandidate = pred.candidates[0];
-                    if (firstCandidate?.content) {
-                        responseText = JSON.stringify(firstCandidate.content);
+    extractResponseText(result) {
+        try {
+            // Get the response from the result
+            const response = result.response;
+            if (!response) {
+                return "No response received";
+            }
+            // Extract text from candidates
+            if (response.candidates && response.candidates.length > 0) {
+                const firstCandidate = response.candidates[0];
+                if (firstCandidate.content && firstCandidate.content.parts) {
+                    // Concatenate all text parts
+                    const textParts = firstCandidate.content.parts
+                        .filter((part) => part.text)
+                        .map((part) => part.text)
+                        .join('');
+                    if (textParts) {
+                        return textParts;
                     }
                 }
-                else {
-                    responseText = JSON.stringify(prediction);
-                }
             }
+            // Fallback: try to get text directly from response
+            const text = response.text?.();
+            if (text) {
+                return text;
+            }
+            return "No response text found";
         }
-        return responseText;
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            throw new Error(`Failed to extract response text: ${errorMessage}`);
+        }
     }
     /**
      * Get the current configuration
