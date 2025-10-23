@@ -31,6 +31,7 @@ Inspired by OpenAI Agents SDK, the server operates as an autonomous agent:
 
 ### 📝 Observability
 - File-based logging (`logs/general.log`, `logs/reasoning.log`)
+- Configurable log directory or disable logging for npx/containerized environments
 - Detailed execution traces for debugging
 - Turn and tool usage statistics
 
@@ -92,6 +93,10 @@ export VERTEX_TOP_K="40"
 export VERTEX_ENABLE_CONVERSATIONS="true"
 export VERTEX_SESSION_TIMEOUT="3600"
 export VERTEX_MAX_HISTORY="10"
+
+# Logging configuration
+export VERTEX_DISABLE_LOGGING="false"      # Set to 'true' to disable file-based logging
+export VERTEX_LOG_DIR="/path/to/logs"      # Custom log directory (default: ./logs)
 
 # External MCP servers (for tool delegation)
 export VERTEX_MCP_SERVERS='[
@@ -324,10 +329,20 @@ Tools from external servers are automatically discovered and made available to t
 
 ### Reasoning Traces
 
-Check logs for detailed execution traces:
+Check logs for detailed execution traces (if logging is enabled):
 ```bash
 tail -f logs/general.log     # All logs
 tail -f logs/reasoning.log   # Gemini thinking process only
+```
+
+To disable logging when running via npx or in containerized environments:
+```bash
+export VERTEX_DISABLE_LOGGING="true"
+```
+
+To use a custom log directory:
+```bash
+export VERTEX_LOG_DIR="/path/to/custom/logs"
 ```
 
 ### Custom Tool Development
@@ -377,20 +392,49 @@ npm run dev
 
 ## Troubleshooting
 
+### Log Directory Errors
+If you encounter errors like `ENOENT: no such file or directory, mkdir './logs'`:
+
+**Quick Fix:** Disable logging when running via npx:
+```bash
+export VERTEX_DISABLE_LOGGING="true"
+```
+
+**Alternative:** Set a custom log directory with write permissions:
+```bash
+export VERTEX_LOG_DIR="/tmp/vertex-logs"
+```
+
+When using Claude Desktop or other MCP clients, add the environment variable:
+```json
+{
+  "mcpServers": {
+    "vertex-ai": {
+      "command": "npx",
+      "args": ["-y", "github:mnthe/vertex-mcp-server"],
+      "env": {
+        "GOOGLE_CLOUD_PROJECT": "your-project-id",
+        "VERTEX_DISABLE_LOGGING": "true"
+      }
+    }
+  }
+}
+```
+
 ### Authentication Errors
 1. Verify credentials: `gcloud auth application-default login`
 2. Check project ID: `echo $GOOGLE_CLOUD_PROJECT`
 3. Enable Vertex AI API: `gcloud services enable aiplatform.googleapis.com`
 
 ### Tool Execution Failures
-- Check logs in `logs/general.log`
+- Check logs in `logs/general.log` (if logging is enabled)
 - Verify MCP server configurations in `VERTEX_MCP_SERVERS`
 - Ensure external servers are running (for HTTP transport)
 
 ### MaxTurns Exceeded
 - Agent returns best-effort response after 10 turns
 - Check if tools are repeatedly failing
-- Review reasoning logs to understand loop behavior
+- Review reasoning logs to understand loop behavior (if logging is enabled)
 
 ## Documentation
 

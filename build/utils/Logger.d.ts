@@ -19,7 +19,8 @@ export declare class Logger {
     private sessionId;
     private generalLogPath;
     private reasoningLogPath;
-    constructor(sessionId: string, logDir?: string);
+    private disabled;
+    constructor(sessionId: string, logDir?: string, disabled?: boolean);
     /**
      * Log info message
      */
