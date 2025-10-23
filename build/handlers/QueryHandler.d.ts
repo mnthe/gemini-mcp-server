@@ -1,24 +1,17 @@
 /**
  * QueryHandler - Handles the query tool
- * Main intelligent agent entrypoint with automatic reasoning and delegation
+ * Uses AgenticLoop for intelligent multi-turn execution with tools
  */
 import { QueryInput } from '../schemas/index.js';
-import { VertexAIConfig } from '../types/index.js';
 import { ConversationManager } from '../managers/ConversationManager.js';
-import { VertexAIService } from '../services/VertexAIService.js';
-import { PromptAnalyzer } from '../agents/PromptAnalyzer.js';
-import { ReasoningAgent } from '../agents/ReasoningAgent.js';
-import { DelegationAgent } from '../agents/DelegationAgent.js';
+import { AgenticLoop } from '../agentic/AgenticLoop.js';
 export declare class QueryHandler {
-    private config;
     private conversationManager;
-    private vertexAI;
-    private promptAnalyzer;
-    private reasoningAgent;
-    private delegationAgent;
-    constructor(config: VertexAIConfig, conversationManager: ConversationManager, vertexAI: VertexAIService, promptAnalyzer: PromptAnalyzer, reasoningAgent: ReasoningAgent, delegationAgent: DelegationAgent);
+    private agenticLoop;
+    private enableConversations;
+    constructor(conversationManager: ConversationManager, agenticLoop: AgenticLoop, enableConversations?: boolean);
     /**
-     * Handle a query tool request
+     * Handle a query tool request using AgenticLoop
      */
     handle(input: QueryInput): Promise<{
         content: Array<{
@@ -26,5 +19,9 @@ export declare class QueryHandler {
             text: string;
         }>;
     }>;
+    /**
+     * Format agentic loop result for response
+     */
+    private formatResponse;
 }
 //# sourceMappingURL=QueryHandler.d.ts.map
