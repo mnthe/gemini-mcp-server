@@ -68,13 +68,11 @@ export class VertexAIMCPServer {
             const tools = [
                 {
                     name: "query",
-                    description: "Query Google Cloud Vertex AI with a prompt. " +
-                        "This tool acts as an intelligent agent that can handle complex requests through internal reasoning and delegation. " +
-                        "The agent will automatically: " +
-                        "1) Use chain-of-thought reasoning for complex problems (when VERTEX_ENABLE_REASONING=true), " +
-                        "2) Delegate to other MCP servers when appropriate (configured via VERTEX_MCP_SERVERS), " +
-                        "3) Maintain multi-turn conversations (when VERTEX_ENABLE_CONVERSATIONS=true). " +
-                        "Simply provide your query and the agent handles the rest.",
+                    description: "Query Google Cloud Vertex AI (Gemini models) with a prompt. " +
+                        "This tool operates as an intelligent agent with multi-turn execution capabilities. " +
+                        "The agent can automatically use available tools (web fetching, external MCP servers) " +
+                        "to gather information and provide comprehensive answers. " +
+                        "Supports multi-turn conversations when sessionId is provided.",
                     inputSchema: {
                         type: "object",
                         properties: {
