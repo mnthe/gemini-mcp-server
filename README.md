@@ -19,6 +19,16 @@ This server allows AI systems to:
 
 ## Installation
 
+### Quick Start with npx (Recommended)
+
+Run directly from GitHub without installation:
+
+```bash
+npx -y github:mnthe/vertex-mcp-server
+```
+
+This is the easiest way to get started and always uses the latest version from the repository.
+
 ### From Source
 
 ```bash
@@ -121,6 +131,30 @@ Add this to your Claude Desktop configuration file:
 
 **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 
+#### Option 1: Using npx (Recommended - No installation needed)
+
+```json
+{
+  "mcpServers": {
+    "vertex-ai": {
+      "command": "npx",
+      "args": ["-y", "github:mnthe/vertex-mcp-server"],
+      "env": {
+        "GOOGLE_CLOUD_PROJECT": "your-gcp-project-id",
+        "GOOGLE_CLOUD_LOCATION": "us-central1",
+        "VERTEX_MODEL": "gemini-1.5-flash-002",
+        "VERTEX_TEMPERATURE": "1.0",
+        "VERTEX_MAX_TOKENS": "8192",
+        "VERTEX_TOP_P": "0.95",
+        "VERTEX_TOP_K": "40"
+      }
+    }
+  }
+}
+```
+
+#### Option 2: Using local build
+
 ```json
 {
   "mcpServers": {
@@ -141,7 +175,8 @@ Add this to your Claude Desktop configuration file:
 }
 ```
 
-Or if installed globally:
+#### Option 3: Global installation
+
 ```json
 {
   "mcpServers": {

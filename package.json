@@ -7,9 +7,16 @@
   "bin": {
     "vertex-mcp-server": "./build/index.js"
   },
+  "files": [
+    "build",
+    "README.md",
+    "LICENSE",
+    ".env.example"
+  ],
   "scripts": {
     "build": "tsc",
     "prepare": "npm run build",
+    "prepublishOnly": "npm run build",
     "watch": "tsc --watch",
     "dev": "tsx src/index.ts",
     "start": "node build/index.js",

@@ -1,9 +1,10 @@
 {
   "mcpServers": {
     "vertex-ai": {
-      "command": "node",
+      "command": "npx",
       "args": [
-        "/absolute/path/to/vertex-mcp-server/build/index.js"
+        "-y",
+        "github:mnthe/vertex-mcp-server"
       ],
       "env": {
         "GOOGLE_CLOUD_PROJECT": "your-gcp-project-id",
