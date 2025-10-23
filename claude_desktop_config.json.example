@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "vertex-ai": {
+      "command": "node",
+      "args": [
+        "/absolute/path/to/vertex-mcp-server/build/index.js"
+      ],
+      "env": {
+        "VERTEX_PROJECT_ID": "your-gcp-project-id",
+        "VERTEX_LOCATION": "us-central1"
+      }
+    }
+  }
+}
