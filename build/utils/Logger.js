@@ -9,13 +9,17 @@ export class Logger {
     sessionId;
     generalLogPath;
     reasoningLogPath;
-    constructor(sessionId, logDir = './logs') {
+    disabled;
+    constructor(sessionId, logDir, disabled = false) {
         this.sessionId = sessionId;
-        this.logDir = logDir;
-        this.generalLogPath = path.join(logDir, 'general.log');
-        this.reasoningLogPath = path.join(logDir, 'reasoning.log');
-        // Ensure log directory exists
-        this.ensureLogDirectory();
+        this.disabled = disabled;
+        this.logDir = logDir || './logs';
+        this.generalLogPath = path.join(this.logDir, 'general.log');
+        this.reasoningLogPath = path.join(this.logDir, 'reasoning.log');
+        // Ensure log directory exists only if logging is enabled
+        if (!this.disabled) {
+            this.ensureLogDirectory();
+        }
     }
     /**
      * Log info message
@@ -74,25 +78,37 @@ ${step.result}
         };
         const logLine = `[${entry.timestamp}] [${entry.level.toUpperCase()}] [${entry.sessionId}] ${entry.message}`;
         const fullLine = data ? `${logLine} | ${JSON.stringify(data)}\n` : `${logLine}\n`;
+        // Skip file writing if logging is disabled
+        if (this.disabled) {
+            return;
+        }
         try {
             fs.appendFileSync(this.generalLogPath, fullLine, 'utf8');
         }
         catch (error) {
-            // Fallback to console if file write fails
-            console.error('Failed to write to log file:', error);
-            console.log(fullLine);
+            // Fallback to console if file write fails (only in development)
+            if (process.env.NODE_ENV === 'development') {
+                console.error('Failed to write to log file:', error);
+                console.log(fullLine);
+            }
         }
     }
     /**
      * Write to reasoning log file (separate for easier analysis)
      */
     writeReasoning(reasoningText) {
+        // Skip file writing if logging is disabled
+        if (this.disabled) {
+            return;
+        }
         try {
             fs.appendFileSync(this.reasoningLogPath, reasoningText, 'utf8');
         }
         catch (error) {
-            console.error('Failed to write to reasoning log:', error);
-            console.log(reasoningText);
+            if (process.env.NODE_ENV === 'development') {
+                console.error('Failed to write to reasoning log:', error);
+                console.log(reasoningText);
+            }
         }
     }
     /**
@@ -105,7 +121,11 @@ ${step.result}
             }
         }
         catch (error) {
-            console.error('Failed to create log directory:', error);
+            // Silently ignore directory creation errors
+            // Logging will be skipped if directory doesn't exist
+            if (process.env.NODE_ENV === 'development') {
+                console.error('Failed to create log directory:', error);
+            }
         }
     }
     /**

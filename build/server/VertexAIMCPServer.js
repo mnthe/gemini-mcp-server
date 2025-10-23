@@ -43,18 +43,21 @@ export class VertexAIMCPServer {
         });
         // Initialize cache
         this.searchCache = new Map();
+        // Determine log directory and whether to disable logging
+        const logDir = config.logDir || './logs';
+        const disableLogging = config.disableLogging;
         // Initialize core components
-        this.logger = new Logger('server', './logs');
+        this.logger = new Logger('server', logDir, disableLogging);
         this.conversationManager = new ConversationManager(config.sessionTimeout, config.maxHistory);
         this.vertexAI = new VertexAIService(config);
         // Initialize MCP client (will be initialized async in start())
-        this.mcpClient = new EnhancedMCPClient('server', './logs');
+        this.mcpClient = new EnhancedMCPClient('server', logDir, disableLogging);
         // Initialize tool registry
         this.toolRegistry = new ToolRegistry(this.logger);
         // Initialize agentic loop
         this.agenticLoop = new AgenticLoop(this.vertexAI, this.toolRegistry);
         // Initialize handlers
-        this.queryHandler = new QueryHandler(this.conversationManager, this.agenticLoop, config.enableConversations);
+        this.queryHandler = new QueryHandler(this.conversationManager, this.agenticLoop, config.enableConversations, logDir, disableLogging);
         this.searchHandler = new SearchHandler(this.vertexAI, this.searchCache);
         this.fetchHandler = new FetchHandler(this.searchCache);
         this.setupHandlers();

@@ -6,10 +6,14 @@ export class QueryHandler {
     conversationManager;
     agenticLoop;
     enableConversations;
-    constructor(conversationManager, agenticLoop, enableConversations = true) {
+    logDir;
+    disableLogging;
+    constructor(conversationManager, agenticLoop, enableConversations = true, logDir = './logs', disableLogging = false) {
         this.conversationManager = conversationManager;
         this.agenticLoop = agenticLoop;
         this.enableConversations = enableConversations;
+        this.logDir = logDir;
+        this.disableLogging = disableLogging;
     }
     /**
      * Handle a query tool request using AgenticLoop
@@ -29,7 +33,8 @@ export class QueryHandler {
             const result = await this.agenticLoop.run(input.prompt, conversationHistory, {
                 sessionId,
                 maxTurns: 10,
-                logDir: './logs',
+                logDir: this.logDir,
+                disableLogging: this.disableLogging,
             });
             // Update conversation history with all messages from result
             if (this.enableConversations && sessionId) {

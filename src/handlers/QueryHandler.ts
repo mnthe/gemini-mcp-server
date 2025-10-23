@@ -12,15 +12,21 @@ export class QueryHandler {
   private conversationManager: ConversationManager;
   private agenticLoop: AgenticLoop;
   private enableConversations: boolean;
+  private logDir: string;
+  private disableLogging: boolean;
 
   constructor(
     conversationManager: ConversationManager,
     agenticLoop: AgenticLoop,
-    enableConversations: boolean = true
+    enableConversations: boolean = true,
+    logDir: string = './logs',
+    disableLogging: boolean = false
   ) {
     this.conversationManager = conversationManager;
     this.agenticLoop = agenticLoop;
     this.enableConversations = enableConversations;
+    this.logDir = logDir;
+    this.disableLogging = disableLogging;
   }
 
   /**
@@ -47,7 +53,8 @@ export class QueryHandler {
         {
           sessionId,
           maxTurns: 10,
-          logDir: './logs',
+          logDir: this.logDir,
+          disableLogging: this.disableLogging,
         }
       );
 

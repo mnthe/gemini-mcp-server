@@ -22,7 +22,8 @@ export class RunState {
         this.maxTurns = options.maxTurns ?? 10;
         this.sessionId = options.sessionId ?? this.generateSessionId();
         this.context = options.context ?? {};
-        this.logger = new Logger(this.sessionId, options.logDir);
+        const disableLogging = options.disableLogging ?? false;
+        this.logger = new Logger(this.sessionId, options.logDir, disableLogging);
         this.logger.info('RunState initialized', {
             maxTurns: this.maxTurns,
             sessionId: this.sessionId,

@@ -42,6 +42,10 @@ export function loadConfig(): VertexAIConfig {
   const enableReasoning = process.env.VERTEX_ENABLE_REASONING === "true";
   const maxReasoningSteps = parseInt(process.env.VERTEX_MAX_REASONING_STEPS || "5", 10);
 
+  // Logging configuration
+  const logDir = process.env.VERTEX_LOG_DIR;
+  const disableLogging = process.env.VERTEX_DISABLE_LOGGING === "true";
+
   return {
     projectId,
     location,
@@ -55,5 +59,7 @@ export function loadConfig(): VertexAIConfig {
     maxHistory,
     enableReasoning,
     maxReasoningSteps,
+    logDir,
+    disableLogging,
   };
 }
