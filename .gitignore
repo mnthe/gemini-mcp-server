@@ -140,3 +140,5 @@ vite.config.ts.timestamp-*
 
 # Build output (committed for npx support)
 # build/
+
+.claude/settings.local.json
