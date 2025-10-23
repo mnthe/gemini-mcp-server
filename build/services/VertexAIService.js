@@ -5,6 +5,7 @@
 import { VertexAI } from "@google-cloud/vertexai";
 export class VertexAIService {
     vertexAI;
+    model;
     config;
     constructor(config) {
         this.config = config;
@@ -13,23 +14,23 @@ export class VertexAIService {
             project: config.projectId,
             location: config.location,
         });
+        // Initialize the generative model in constructor
+        this.model = this.vertexAI.getGenerativeModel({
+            model: config.model,
+            generationConfig: {
+                temperature: config.temperature,
+                maxOutputTokens: config.maxTokens,
+                topP: config.topP,
+                topK: config.topK,
+            },
+        });
     }
     /**
      * Query Vertex AI with a prompt using the Generative AI API
      */
     async query(prompt) {
-        // Get the generative model
-        const model = this.vertexAI.getGenerativeModel({
-            model: this.config.model,
-            generationConfig: {
-                temperature: this.config.temperature,
-                maxOutputTokens: this.config.maxTokens,
-                topP: this.config.topP,
-                topK: this.config.topK,
-            },
-        });
-        // Generate content
-        const result = await model.generateContent(prompt);
+        // Generate content using the pre-initialized model
+        const result = await this.model.generateContent(prompt);
         return this.extractResponseText(result);
     }
     /**

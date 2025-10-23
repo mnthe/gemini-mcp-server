@@ -3,11 +3,12 @@
  * Provides a clean interface for making predictions using the Generative AI SDK
  */
 
-import { VertexAI } from "@google-cloud/vertexai";
+import { VertexAI, GenerativeModel } from "@google-cloud/vertexai";
 import { VertexAIConfig } from '../types/index.js';
 
 export class VertexAIService {
   private vertexAI: VertexAI;
+  private model: GenerativeModel;
   private config: VertexAIConfig;
 
   constructor(config: VertexAIConfig) {
@@ -17,25 +18,25 @@ export class VertexAIService {
       project: config.projectId,
       location: config.location,
     });
+    
+    // Initialize the generative model in constructor
+    this.model = this.vertexAI.getGenerativeModel({
+      model: config.model,
+      generationConfig: {
+        temperature: config.temperature,
+        maxOutputTokens: config.maxTokens,
+        topP: config.topP,
+        topK: config.topK,
+      },
+    });
   }
 
   /**
    * Query Vertex AI with a prompt using the Generative AI API
    */
   async query(prompt: string): Promise<string> {
-    // Get the generative model
-    const model = this.vertexAI.getGenerativeModel({
-      model: this.config.model,
-      generationConfig: {
-        temperature: this.config.temperature,
-        maxOutputTokens: this.config.maxTokens,
-        topP: this.config.topP,
-        topK: this.config.topK,
-      },
-    });
-
-    // Generate content
-    const result = await model.generateContent(prompt);
+    // Generate content using the pre-initialized model
+    const result = await this.model.generateContent(prompt);
     
     return this.extractResponseText(result);
   }
