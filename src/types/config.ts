@@ -17,4 +17,5 @@ export interface VertexAIConfig {
   maxReasoningSteps: number;
   logDir?: string;
   disableLogging: boolean;
+  logToStderr: boolean;
 }

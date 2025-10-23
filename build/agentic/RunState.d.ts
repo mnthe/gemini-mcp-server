@@ -29,6 +29,7 @@ export interface RunOptions {
     context?: Record<string, any>;
     logDir?: string;
     disableLogging?: boolean;
+    logToStderr?: boolean;
 }
 export declare class RunState {
     currentTurn: number;

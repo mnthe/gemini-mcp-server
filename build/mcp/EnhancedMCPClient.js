@@ -35,8 +35,8 @@ export class EnhancedMCPClient {
     httpServers = new Map();
     logger;
     discoveredTools = [];
-    constructor(sessionId, logDir, disableLogging = false) {
-        this.logger = new Logger(sessionId, logDir, disableLogging);
+    constructor(sessionId, logDir, disableLogging = false, logToStderr = false) {
+        this.logger = new Logger(sessionId, logDir, disableLogging, logToStderr);
     }
     /**
      * Initialize from MCP server configurations

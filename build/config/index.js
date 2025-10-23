@@ -32,6 +32,7 @@ export function loadConfig() {
     // Logging configuration
     const logDir = process.env.VERTEX_LOG_DIR;
     const disableLogging = process.env.VERTEX_DISABLE_LOGGING === "true";
+    const logToStderr = process.env.VERTEX_LOG_TO_STDERR === "true";
     return {
         projectId,
         location,
@@ -47,6 +48,7 @@ export function loadConfig() {
         maxReasoningSteps,
         logDir,
         disableLogging,
+        logToStderr,
     };
 }
 //# sourceMappingURL=index.js.map

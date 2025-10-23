@@ -10,14 +10,16 @@ export class Logger {
     generalLogPath;
     reasoningLogPath;
     disabled;
-    constructor(sessionId, logDir, disabled = false) {
+    logToStderr;
+    constructor(sessionId, logDir, disabled = false, logToStderr = false) {
         this.sessionId = sessionId;
         this.disabled = disabled;
+        this.logToStderr = logToStderr;
         this.logDir = logDir || './logs';
         this.generalLogPath = path.join(this.logDir, 'general.log');
         this.reasoningLogPath = path.join(this.logDir, 'reasoning.log');
-        // Ensure log directory exists only if logging is enabled
-        if (!this.disabled) {
+        // Ensure log directory exists only if logging is enabled and not logging to stderr
+        if (!this.disabled && !this.logToStderr) {
             this.ensureLogDirectory();
         }
     }
@@ -78,10 +80,16 @@ ${step.result}
         };
         const logLine = `[${entry.timestamp}] [${entry.level.toUpperCase()}] [${entry.sessionId}] ${entry.message}`;
         const fullLine = data ? `${logLine} | ${JSON.stringify(data)}\n` : `${logLine}\n`;
-        // Skip file writing if logging is disabled
+        // Skip logging if disabled
         if (this.disabled) {
             return;
         }
+        // Log to stderr if enabled
+        if (this.logToStderr) {
+            console.error(fullLine.trimEnd());
+            return;
+        }
+        // Otherwise log to file
         try {
             fs.appendFileSync(this.generalLogPath, fullLine, 'utf8');
         }
@@ -97,10 +105,16 @@ ${step.result}
      * Write to reasoning log file (separate for easier analysis)
      */
     writeReasoning(reasoningText) {
-        // Skip file writing if logging is disabled
+        // Skip logging if disabled
         if (this.disabled) {
             return;
         }
+        // Log to stderr if enabled
+        if (this.logToStderr) {
+            console.error(reasoningText.trimEnd());
+            return;
+        }
+        // Otherwise log to file
         try {
             fs.appendFileSync(this.reasoningLogPath, reasoningText, 'utf8');
         }

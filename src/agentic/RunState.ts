@@ -34,6 +34,7 @@ export interface RunOptions {
   context?: Record<string, any>;
   logDir?: string;
   disableLogging?: boolean;
+  logToStderr?: boolean;
 }
 
 export class RunState {
@@ -61,7 +62,8 @@ export class RunState {
     this.sessionId = options.sessionId ?? this.generateSessionId();
     this.context = options.context ?? {};
     const disableLogging = options.disableLogging ?? false;
-    this.logger = new Logger(this.sessionId, options.logDir, disableLogging);
+    const logToStderr = options.logToStderr ?? false;
+    this.logger = new Logger(this.sessionId, options.logDir, disableLogging, logToStderr);
 
     this.logger.info('RunState initialized', {
       maxTurns: this.maxTurns,
