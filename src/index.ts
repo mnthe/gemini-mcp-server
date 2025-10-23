@@ -9,10 +9,12 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { PredictionServiceClient } from "@google-cloud/aiplatform";
 import { z } from "zod";
+import { randomBytes } from "crypto";
 
 // Input schema for the query tool - prompt only
 const QuerySchema = z.object({
   prompt: z.string().describe("The prompt to send to Vertex AI"),
+  sessionId: z.string().optional().describe("Optional conversation session ID for multi-turn conversations"),
 });
 
 // Input schema for search tool (OpenAI MCP spec)
@@ -28,6 +30,20 @@ const FetchSchema = z.object({
 type QueryInput = z.infer<typeof QuerySchema>;
 type SearchInput = z.infer<typeof SearchSchema>;
 type FetchInput = z.infer<typeof FetchSchema>;
+
+// Conversation management interfaces
+interface Message {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: Date;
+}
+
+interface ConversationSession {
+  id: string;
+  history: Message[];
+  created: Date;
+  lastAccessed: Date;
+}
 
 // Interface for search results (OpenAI MCP spec)
 interface SearchResult {
@@ -62,6 +78,80 @@ interface VertexAIConfig {
   maxTokens: number;
   topP: number;
   topK: number;
+  enableConversations: boolean;
+  sessionTimeout: number;
+  maxHistory: number;
+}
+
+// Conversation Manager Class
+class ConversationManager {
+  private sessions: Map<string, ConversationSession>;
+  private sessionTimeout: number;
+  private maxHistory: number;
+
+  constructor(sessionTimeout: number, maxHistory: number) {
+    this.sessions = new Map();
+    this.sessionTimeout = sessionTimeout;
+    this.maxHistory = maxHistory;
+  }
+
+  createSession(): string {
+    const sessionId = `session-${Date.now()}-${randomBytes(8).toString('hex')}`;
+    const session: ConversationSession = {
+      id: sessionId,
+      history: [],
+      created: new Date(),
+      lastAccessed: new Date(),
+    };
+    this.sessions.set(sessionId, session);
+    return sessionId;
+  }
+
+  getSession(sessionId: string): ConversationSession | undefined {
+    const session = this.sessions.get(sessionId);
+    if (session) {
+      // Check if session has expired
+      const now = new Date();
+      const elapsed = (now.getTime() - session.lastAccessed.getTime()) / 1000;
+      if (elapsed > this.sessionTimeout) {
+        this.sessions.delete(sessionId);
+        return undefined;
+      }
+      session.lastAccessed = now;
+    }
+    return session;
+  }
+
+  addMessage(sessionId: string, message: Message): void {
+    const session = this.getSession(sessionId);
+    if (session) {
+      session.history.push(message);
+      // Limit history size
+      if (session.history.length > this.maxHistory) {
+        session.history = session.history.slice(-this.maxHistory);
+      }
+    }
+  }
+
+  getHistory(sessionId: string): Message[] {
+    const session = this.getSession(sessionId);
+    return session ? session.history : [];
+  }
+
+  clearSession(sessionId: string): void {
+    this.sessions.delete(sessionId);
+  }
+
+  // Cleanup expired sessions
+  cleanupExpiredSessions(): void {
+    const now = new Date();
+    for (const [sessionId, session] of this.sessions.entries()) {
+      const elapsed = (now.getTime() - session.lastAccessed.getTime()) / 1000;
+      if (elapsed > this.sessionTimeout) {
+        this.sessions.delete(sessionId);
+      }
+    }
+  }
 }
 
 class VertexAIMCPServer {
@@ -69,6 +159,7 @@ class VertexAIMCPServer {
   private predictionClient: PredictionServiceClient;
   private config: VertexAIConfig;
   private searchCache: Map<string, CachedDocument>;
+  private conversationManager: ConversationManager;
 
   constructor() {
     // Initialize configuration from environment variables
@@ -81,10 +172,24 @@ class VertexAIMCPServer {
       maxTokens: parseInt(process.env.VERTEX_MAX_TOKENS || "8192", 10),
       topP: parseFloat(process.env.VERTEX_TOP_P || "0.95"),
       topK: parseInt(process.env.VERTEX_TOP_K || "40", 10),
+      enableConversations: process.env.VERTEX_ENABLE_CONVERSATIONS === "true",
+      sessionTimeout: parseInt(process.env.VERTEX_SESSION_TIMEOUT || "3600", 10),
+      maxHistory: parseInt(process.env.VERTEX_MAX_HISTORY || "10", 10),
     };
 
     // Initialize search cache
     this.searchCache = new Map<string, CachedDocument>();
+
+    // Initialize conversation manager
+    this.conversationManager = new ConversationManager(
+      this.config.sessionTimeout,
+      this.config.maxHistory
+    );
+
+    // Cleanup expired sessions every 5 minutes
+    setInterval(() => {
+      this.conversationManager.cleanupExpiredSessions();
+    }, 5 * 60 * 1000);
 
     if (!this.config.projectId) {
       console.error(
@@ -123,13 +228,18 @@ class VertexAIMCPServer {
           description:
             "Query Google Cloud Vertex AI with a prompt. " +
             "This tool allows you to send prompts to Vertex AI models " +
-            "for tasks such as cross-validation, comparison, or getting alternative perspectives.",
+            "for tasks such as cross-validation, comparison, or getting alternative perspectives. " +
+            "Supports multi-turn conversations when sessionId is provided.",
           inputSchema: {
             type: "object",
             properties: {
               prompt: {
                 type: "string",
                 description: "The prompt to send to Vertex AI",
+              },
+              sessionId: {
+                type: "string",
+                description: "Optional conversation session ID for multi-turn conversations",
               },
             },
             required: ["prompt"],
@@ -199,12 +309,47 @@ class VertexAIMCPServer {
       // Validate input
       const input = QuerySchema.parse(args);
 
+      // Handle conversation context
+      let conversationContext = "";
+      let sessionId = input.sessionId;
+
+      if (this.config.enableConversations && sessionId) {
+        // Get conversation history
+        const history = this.conversationManager.getHistory(sessionId);
+        if (history.length > 0) {
+          // Build context from history
+          conversationContext = history
+            .map((msg) => `${msg.role}: ${msg.content}`)
+            .join("\n") + "\n";
+        }
+
+        // Add user message to history
+        this.conversationManager.addMessage(sessionId, {
+          role: 'user',
+          content: input.prompt,
+          timestamp: new Date(),
+        });
+      } else if (this.config.enableConversations && !sessionId) {
+        // Auto-create session if conversations are enabled
+        sessionId = this.conversationManager.createSession();
+        this.conversationManager.addMessage(sessionId, {
+          role: 'user',
+          content: input.prompt,
+          timestamp: new Date(),
+        });
+      }
+
+      // Construct the full prompt with conversation context
+      const fullPrompt = conversationContext 
+        ? `${conversationContext}user: ${input.prompt}\nassistant:`
+        : input.prompt;
+
       // Construct the endpoint using config
       const endpoint = `projects/${this.config.projectId}/locations/${this.config.location}/publishers/google/models/${this.config.model}`;
 
       // Prepare the request - Vertex AI expects a specific format
       const instance = {
-        content: input.prompt,
+        content: fullPrompt,
       };
 
       const parameters = {
@@ -247,11 +392,25 @@ class VertexAIMCPServer {
         }
       }
 
+      // Add assistant response to conversation history
+      if (this.config.enableConversations && sessionId) {
+        this.conversationManager.addMessage(sessionId, {
+          role: 'assistant',
+          content: responseText,
+          timestamp: new Date(),
+        });
+      }
+
+      // Include session ID in response if conversations are enabled
+      const resultText = sessionId 
+        ? `[Session: ${sessionId}]\n\n${responseText}`
+        : responseText;
+
       return {
         content: [
           {
             type: "text",
-            text: responseText,
+            text: resultText,
           },
         ],
       };

@@ -80,7 +80,18 @@ export VERTEX_TOP_K="40"                    # Top-k sampling
 
 These settings apply to all queries made through the MCP server.
 
-### 4. Enable Vertex AI API
+### 4. (Optional) Enable Agent Mode Features
+
+**Multi-turn Conversations:**
+```bash
+export VERTEX_ENABLE_CONVERSATIONS="true"   # Enable conversation tracking
+export VERTEX_SESSION_TIMEOUT="3600"        # Session timeout (seconds)
+export VERTEX_MAX_HISTORY="10"              # Max messages in history
+```
+
+When enabled, the query tool supports session IDs for multi-turn conversations with context preservation.
+
+### 5. Enable Vertex AI API
 
 Ensure the Vertex AI API is enabled in your Google Cloud project:
 
@@ -150,10 +161,11 @@ Or if installed globally:
 
 ### query
 
-Query Google Cloud Vertex AI with a prompt. The model and parameters are configured via environment variables.
+Query Google Cloud Vertex AI with a prompt. The model and parameters are configured via environment variables. Supports multi-turn conversations when Agent Mode is enabled.
 
 **Parameters:**
 - `prompt` (string, required): The prompt to send to Vertex AI
+- `sessionId` (string, optional): Conversation session ID for multi-turn conversations (when `VERTEX_ENABLE_CONVERSATIONS=true`)
 
 **Configuration (via environment variables):**
 - `VERTEX_MODEL`: The model to use (default: `gemini-1.5-flash-002`)
@@ -162,6 +174,11 @@ Query Google Cloud Vertex AI with a prompt. The model and parameters are configu
 - `VERTEX_MAX_TOKENS`: Maximum tokens in response (default: 8192)
 - `VERTEX_TOP_P`: Nucleus sampling parameter (default: 0.95)
 - `VERTEX_TOP_K`: Top-k sampling parameter (default: 40)
+
+**Agent Mode (Conversations):**
+- `VERTEX_ENABLE_CONVERSATIONS`: Enable multi-turn conversations (default: false)
+- `VERTEX_SESSION_TIMEOUT`: Session timeout in seconds (default: 3600)
+- `VERTEX_MAX_HISTORY`: Maximum messages in history (default: 10)
 
 **Example Usage in Claude:**
 
@@ -208,6 +225,39 @@ A JSON object containing:
 ```
 First use search to find documents, then use fetch with the document ID to get full contents
 ```
+
+## Agent Mode
+
+The server supports advanced Agent mode features for enhanced capabilities:
+
+### Multi-turn Conversations
+
+When `VERTEX_ENABLE_CONVERSATIONS=true`, the server maintains conversation context across multiple queries:
+
+**Benefits:**
+- Context preservation across turns
+- Natural multi-turn dialogues
+- Automatic session management
+- Configurable history limits
+
+**Usage Example:**
+```
+1. First query: "What is machine learning?" (auto-creates session)
+2. Follow-up: "Can you explain supervised learning in detail?" (uses same sessionId from response)
+3. Continue: "Give me an example of a supervised learning algorithm" (maintains full context)
+```
+
+The server automatically includes session IDs in responses when conversation mode is enabled. Sessions expire after the configured timeout period (`VERTEX_SESSION_TIMEOUT`).
+
+### Future Agent Mode Features
+
+The following features are planned for implementation:
+
+1. **Chain of Thought Reasoning**: Multi-step internal reasoning before responding
+2. **MCP-to-MCP Connectivity**: Connect to other MCP servers for task delegation
+3. **Agentic Workflows**: Complex multi-step task execution
+
+See `AGENT_MODE_PLAN.md` for detailed implementation plans.
 
 ## Example Use Cases
 
