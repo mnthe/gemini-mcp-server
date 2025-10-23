@@ -7,7 +7,11 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Read(//Users/mnthe/Downloads/**)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(cat:*)",
+      "Bash(npm run clean:*)",
+      "Bash(npm ci)",
+      "Bash(test:*)"
     ],
     "deny": [],
     "ask": []
