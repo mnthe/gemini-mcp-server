@@ -356,15 +356,57 @@ See `AGENT_MODE_PLAN.md` for detailed implementation information.
 ## Development
 
 ### Project Structure
+
+The codebase follows a clean, modular architecture with clear separation of concerns:
+
 ```
 vertex-mcp-server/
 ├── src/
-│   └── index.ts          # Main server implementation
-├── build/                # Compiled JavaScript output
-├── package.json
-├── tsconfig.json
-└── README.md
+│   ├── index.ts                   # Entry point
+│   ├── types/                     # TypeScript type definitions
+│   │   ├── config.ts
+│   │   ├── conversation.ts
+│   │   ├── search.ts
+│   │   └── mcp.ts
+│   ├── config/                    # Configuration loading
+│   │   └── index.ts
+│   ├── managers/                  # Business logic managers
+│   │   ├── ConversationManager.ts
+│   │   └── MCPClientManager.ts
+│   ├── services/                  # External service integrations
+│   │   └── VertexAIService.ts
+│   ├── agents/                    # AI agent logic
+│   │   ├── PromptAnalyzer.ts
+│   │   ├── ReasoningAgent.ts
+│   │   └── DelegationAgent.ts
+│   ├── handlers/                  # Tool request handlers
+│   │   ├── QueryHandler.ts
+│   │   ├── SearchHandler.ts
+│   │   └── FetchHandler.ts
+│   ├── schemas/                   # Zod validation schemas
+│   │   └── index.ts
+│   └── server/                    # MCP server orchestration
+│       └── VertexAIMCPServer.ts
+├── build/                               # Compiled JavaScript output
+├── package.json                         # Dependencies and scripts
+├── tsconfig.json                        # TypeScript configuration
+├── README.md                             # This file
+├── ARCHITECTURE.md                       # Architecture documentation
+├── CONTRIBUTING.md                       # Contribution guidelines
+├── IMPLEMENTATION.md                     # Implementation details
+├── AGENT_MODE_PLAN.md                    # Agent mode roadmap
+├── .env.example                          # Environment template
+└── claude_desktop_config.json.example   # Claude Desktop integration
 ```
+
+**Architecture Highlights:**
+- **Separation of Concerns**: Each module has a single, well-defined responsibility
+- **Dependency Injection**: Components receive dependencies via constructor
+- **Type Safety**: Comprehensive TypeScript types and Zod validation
+- **Testability**: Small, focused units that are easy to test
+- **Extensibility**: Clear extension points for new features
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed architecture documentation.
 
 ### Building
 ```bash
