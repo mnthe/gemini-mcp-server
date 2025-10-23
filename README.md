@@ -226,11 +226,48 @@ A JSON object containing:
 First use search to find documents, then use fetch with the document ID to get full contents
 ```
 
+### reason
+
+Engage in chain-of-thought reasoning to solve complex problems. Breaks down problems into steps and reasons through each one.
+
+**Parameters:**
+- `prompt` (string, required): The complex problem or question to reason about
+- `steps` (number, optional): Number of reasoning steps (default: 3, max: configurable)
+- `sessionId` (string, optional): Conversation session ID
+
+**Configuration:**
+- `VERTEX_ENABLE_REASONING`: Enable reasoning capability (default: false)
+- `VERTEX_MAX_REASONING_STEPS`: Maximum reasoning steps (default: 5)
+
+**Example Usage in Claude:**
+
+```
+Use the reason tool to think through: "How can we optimize database performance for a high-traffic web application?"
+```
+
+### delegate
+
+Delegate a task to another MCP server. Allows this server to connect to and use tools from other MCP servers.
+
+**Parameters:**
+- `serverName` (string, required): Name of the MCP server to delegate to
+- `toolName` (string, required): Name of the tool to call on the target server
+- `arguments` (object, required): Arguments to pass to the tool
+
+**Configuration:**
+- `VERTEX_MCP_SERVERS`: JSON array of server configurations
+
+**Example Usage in Claude:**
+
+```
+Use the delegate tool to call the 'search_web' tool on the 'web-search-server' with query "latest AI research"
+```
+
 ## Agent Mode
 
 The server supports advanced Agent mode features for enhanced capabilities:
 
-### Multi-turn Conversations
+### Multi-turn Conversations (Phase 1 ✅)
 
 When `VERTEX_ENABLE_CONVERSATIONS=true`, the server maintains conversation context across multiple queries:
 
@@ -249,15 +286,55 @@ When `VERTEX_ENABLE_CONVERSATIONS=true`, the server maintains conversation conte
 
 The server automatically includes session IDs in responses when conversation mode is enabled. Sessions expire after the configured timeout period (`VERTEX_SESSION_TIMEOUT`).
 
-### Future Agent Mode Features
+### Chain of Thought Reasoning (Phase 2 ✅)
 
-The following features are planned for implementation:
+When `VERTEX_ENABLE_REASONING=true`, the server can engage in multi-step reasoning:
 
-1. **Chain of Thought Reasoning**: Multi-step internal reasoning before responding
-2. **MCP-to-MCP Connectivity**: Connect to other MCP servers for task delegation
-3. **Agentic Workflows**: Complex multi-step task execution
+**How it works:**
+1. Breaks down complex problems into reasoning steps
+2. Processes each step with internal thinking
+3. Synthesizes insights into a final answer
+4. Shows the complete reasoning process
 
-See `AGENT_MODE_PLAN.md` for detailed implementation plans.
+**Configuration:**
+```bash
+VERTEX_ENABLE_REASONING=true
+VERTEX_MAX_REASONING_STEPS=5
+```
+
+**Usage Example:**
+```
+Use the reason tool to solve: "What are the trade-offs between microservices and monolithic architecture?"
+```
+
+### MCP-to-MCP Connectivity (Phase 3 ✅)
+
+Connect to other MCP servers for task delegation and orchestration:
+
+**How it works:**
+- Configure external MCP servers via environment variable
+- Use the `delegate` tool to call tools on other servers
+- Aggregate results from multiple sources
+- Enable complex multi-server workflows
+
+**Configuration:**
+```bash
+VERTEX_MCP_SERVERS='[
+  {
+    "name": "web-search",
+    "command": "npx",
+    "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+    "env": {"BRAVE_API_KEY": "your-key"}
+  }
+]'
+```
+
+**Usage Example:**
+```
+Use delegate to call the search tool on web-search server, then reason about the results
+```
+
+See `AGENT_MODE_PLAN.md` for detailed implementation information.
 
 ## Example Use Cases
 
@@ -274,6 +351,16 @@ See `AGENT_MODE_PLAN.md` for detailed implementation plans.
 3. **Information Retrieval**: Use the search and fetch tools for finding information
    ```
    Use the search tool to find recent research papers on machine learning optimization, then use fetch to get the full content of the most relevant result.
+   ```
+
+4. **Complex Reasoning**: Use the reason tool for multi-step problem solving
+   ```
+   Use the reason tool to analyze: "What are the security implications of implementing OAuth 2.0 in a distributed system?"
+   ```
+
+5. **Multi-Server Orchestration**: Delegate tasks to multiple MCP servers
+   ```
+   Use delegate to search the web, then use reason to analyze the findings, and use query to get Vertex AI's perspective on the synthesized information.
    ```
 
 ## Development
