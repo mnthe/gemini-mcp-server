@@ -1,89 +1,49 @@
 /**
  * QueryHandler - Handles the query tool
- * Main intelligent agent entrypoint with automatic reasoning and delegation
+ * Uses AgenticLoop for intelligent multi-turn execution with tools
  */
 export class QueryHandler {
-    config;
     conversationManager;
-    vertexAI;
-    promptAnalyzer;
-    reasoningAgent;
-    delegationAgent;
-    constructor(config, conversationManager, vertexAI, promptAnalyzer, reasoningAgent, delegationAgent) {
-        this.config = config;
+    agenticLoop;
+    enableConversations;
+    constructor(conversationManager, agenticLoop, enableConversations = true) {
         this.conversationManager = conversationManager;
-        this.vertexAI = vertexAI;
-        this.promptAnalyzer = promptAnalyzer;
-        this.reasoningAgent = reasoningAgent;
-        this.delegationAgent = delegationAgent;
+        this.agenticLoop = agenticLoop;
+        this.enableConversations = enableConversations;
     }
     /**
-     * Handle a query tool request
+     * Handle a query tool request using AgenticLoop
      */
     async handle(input) {
         try {
-            // Handle conversation context
-            let conversationContext = "";
             let sessionId = input.sessionId;
-            if (this.config.enableConversations && sessionId) {
-                const history = this.conversationManager.getHistory(sessionId);
-                if (history.length > 0) {
-                    conversationContext = history
-                        .map((msg) => `${msg.role}: ${msg.content}`)
-                        .join("\n") + "\n";
+            let conversationHistory = [];
+            // Handle conversation context
+            if (this.enableConversations) {
+                if (!sessionId) {
+                    sessionId = this.conversationManager.createSession();
                 }
-                this.conversationManager.addMessage(sessionId, {
-                    role: 'user',
-                    content: input.prompt,
-                    timestamp: new Date(),
-                });
+                conversationHistory = this.conversationManager.getHistory(sessionId);
             }
-            else if (this.config.enableConversations && !sessionId) {
-                sessionId = this.conversationManager.createSession();
-                this.conversationManager.addMessage(sessionId, {
-                    role: 'user',
-                    content: input.prompt,
-                    timestamp: new Date(),
-                });
+            // Run agentic loop
+            const result = await this.agenticLoop.run(input.prompt, conversationHistory, {
+                sessionId,
+                maxTurns: 10,
+                logDir: './logs',
+            });
+            // Update conversation history with all messages from result
+            if (this.enableConversations && sessionId) {
+                for (const msg of result.messages) {
+                    this.conversationManager.addMessage(sessionId, msg);
+                }
             }
-            // Agent Decision: Determine if prompt needs special handling
-            const promptAnalysis = this.promptAnalyzer.analyze(input.prompt);
-            let responseText;
-            let thinkingProcess = "";
-            // Internal Agent Logic: Apply reasoning if needed
-            if (this.config.enableReasoning && promptAnalysis.needsReasoning) {
-                thinkingProcess += `[Internal: Detected complex problem, applying chain-of-thought reasoning]\n\n`;
-                responseText = await this.reasoningAgent.reason(input.prompt, conversationContext);
-            }
-            // Internal Agent Logic: Check if delegation is needed
-            else if (promptAnalysis.needsDelegation && this.delegationAgent.isDelegationAvailable()) {
-                thinkingProcess += `[Internal: Delegating to ${promptAnalysis.targetServer}]\n\n`;
-                responseText = await this.delegationAgent.delegate(input.prompt, promptAnalysis.targetServer, conversationContext);
-            }
-            // Standard query
-            else {
-                const fullPrompt = conversationContext
-                    ? `${conversationContext}user: ${input.prompt}\nassistant:`
-                    : input.prompt;
-                responseText = await this.vertexAI.query(fullPrompt);
-            }
-            // Add assistant response to conversation history
-            if (this.config.enableConversations && sessionId) {
-                this.conversationManager.addMessage(sessionId, {
-                    role: 'assistant',
-                    content: responseText,
-                    timestamp: new Date(),
-                });
-            }
-            // Include session ID in response if conversations are enabled
-            const resultText = sessionId
-                ? `[Session: ${sessionId}]\n${thinkingProcess}${responseText}`
-                : `${thinkingProcess}${responseText}`;
+            // Format response
+            const responseText = this.formatResponse(result, sessionId);
             return {
                 content: [
                     {
                         type: "text",
-                        text: resultText,
+                        text: responseText,
                     },
                 ],
             };
@@ -94,11 +54,28 @@ export class QueryHandler {
                 content: [
                     {
                         type: "text",
-                        text: `Error querying Vertex AI: ${errorMessage}`,
+                        text: `Error in agentic loop: ${errorMessage}`,
                     },
                 ],
             };
         }
+    }
+    /**
+     * Format agentic loop result for response
+     */
+    formatResponse(result, sessionId) {
+        const parts = [];
+        // Session info
+        if (sessionId) {
+            parts.push(`[Session: ${sessionId}]`);
+        }
+        // Stats
+        if (result.toolCallsCount > 0 || result.reasoningStepsCount > 0) {
+            parts.push(`[Stats: ${result.turnsUsed} turns, ${result.toolCallsCount} tool calls, ${result.reasoningStepsCount} reasoning steps]`);
+        }
+        // Final output
+        parts.push(result.finalOutput);
+        return parts.join('\n\n');
     }
 }
 //# sourceMappingURL=QueryHandler.js.map

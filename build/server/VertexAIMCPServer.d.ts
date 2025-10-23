@@ -7,11 +7,11 @@ export declare class VertexAIMCPServer {
     private server;
     private config;
     private conversationManager;
-    private mcpClientManager;
     private vertexAI;
-    private promptAnalyzer;
-    private reasoningAgent;
-    private delegationAgent;
+    private mcpClient;
+    private toolRegistry;
+    private agenticLoop;
+    private logger;
     private queryHandler;
     private searchHandler;
     private fetchHandler;
@@ -25,5 +25,13 @@ export declare class VertexAIMCPServer {
      * Start the MCP server
      */
     run(): Promise<void>;
+    /**
+     * Initialize external MCP servers
+     */
+    private initializeMCPServers;
+    /**
+     * Register all tools (WebFetch + MCP tools)
+     */
+    private registerTools;
 }
 //# sourceMappingURL=VertexAIMCPServer.d.ts.map

@@ -7,26 +7,24 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { CallToolRequestSchema, ListToolsRequestSchema, } from "@modelcontextprotocol/sdk/types.js";
 import { QuerySchema, SearchSchema, FetchSchema } from '../schemas/index.js';
 import { ConversationManager } from '../managers/ConversationManager.js';
-import { MCPClientManager } from '../managers/MCPClientManager.js';
 import { VertexAIService } from '../services/VertexAIService.js';
-import { PromptAnalyzer } from '../agents/PromptAnalyzer.js';
-import { ReasoningAgent } from '../agents/ReasoningAgent.js';
-import { DelegationAgent } from '../agents/DelegationAgent.js';
+import { EnhancedMCPClient } from '../mcp/EnhancedMCPClient.js';
+import { ToolRegistry } from '../tools/ToolRegistry.js';
+import { AgenticLoop } from '../agentic/AgenticLoop.js';
+import { Logger } from '../utils/Logger.js';
 import { QueryHandler } from '../handlers/QueryHandler.js';
 import { SearchHandler } from '../handlers/SearchHandler.js';
 import { FetchHandler } from '../handlers/FetchHandler.js';
 export class VertexAIMCPServer {
     server;
     config;
-    // Managers
+    // Core components
     conversationManager;
-    mcpClientManager;
-    // Services
     vertexAI;
-    // Agents
-    promptAnalyzer;
-    reasoningAgent;
-    delegationAgent;
+    mcpClient;
+    toolRegistry;
+    agenticLoop;
+    logger;
     // Handlers
     queryHandler;
     searchHandler;
@@ -45,17 +43,18 @@ export class VertexAIMCPServer {
         });
         // Initialize cache
         this.searchCache = new Map();
-        // Initialize managers
+        // Initialize core components
+        this.logger = new Logger('server', './logs');
         this.conversationManager = new ConversationManager(config.sessionTimeout, config.maxHistory);
-        this.mcpClientManager = new MCPClientManager();
-        // Initialize services
         this.vertexAI = new VertexAIService(config);
-        // Initialize agents
-        this.promptAnalyzer = new PromptAnalyzer();
-        this.reasoningAgent = new ReasoningAgent(this.vertexAI, config.maxReasoningSteps);
-        this.delegationAgent = new DelegationAgent(this.mcpClientManager, this.vertexAI);
+        // Initialize MCP client (will be initialized async in start())
+        this.mcpClient = new EnhancedMCPClient('server', './logs');
+        // Initialize tool registry
+        this.toolRegistry = new ToolRegistry(this.logger);
+        // Initialize agentic loop
+        this.agenticLoop = new AgenticLoop(this.vertexAI, this.toolRegistry);
         // Initialize handlers
-        this.queryHandler = new QueryHandler(config, this.conversationManager, this.vertexAI, this.promptAnalyzer, this.reasoningAgent, this.delegationAgent);
+        this.queryHandler = new QueryHandler(this.conversationManager, this.agenticLoop, config.enableConversations);
         this.searchHandler = new SearchHandler(this.vertexAI, this.searchCache);
         this.fetchHandler = new FetchHandler(this.searchCache);
         this.setupHandlers();
@@ -69,13 +68,11 @@ export class VertexAIMCPServer {
             const tools = [
                 {
                     name: "query",
-                    description: "Query Google Cloud Vertex AI with a prompt. " +
-                        "This tool acts as an intelligent agent that can handle complex requests through internal reasoning and delegation. " +
-                        "The agent will automatically: " +
-                        "1) Use chain-of-thought reasoning for complex problems (when VERTEX_ENABLE_REASONING=true), " +
-                        "2) Delegate to other MCP servers when appropriate (configured via VERTEX_MCP_SERVERS), " +
-                        "3) Maintain multi-turn conversations (when VERTEX_ENABLE_CONVERSATIONS=true). " +
-                        "Simply provide your query and the agent handles the rest.",
+                    description: "Query Google Cloud Vertex AI (Gemini models) with a prompt. " +
+                        "This tool operates as an intelligent agent with multi-turn execution capabilities. " +
+                        "The agent can automatically use available tools (web fetching, external MCP servers) " +
+                        "to gather information and provide comprehensive answers. " +
+                        "Supports multi-turn conversations when sessionId is provided.",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -150,9 +147,45 @@ export class VertexAIMCPServer {
      * Start the MCP server
      */
     async run() {
+        this.logger.info('Initializing Vertex AI MCP Server');
+        // Initialize MCP servers from config
+        await this.initializeMCPServers();
+        // Register tools
+        await this.registerTools();
+        // Start server
         const transport = new StdioServerTransport();
         await this.server.connect(transport);
+        this.logger.info("Vertex AI MCP Server running on stdio");
         console.error("Vertex AI MCP Server running on stdio");
+    }
+    /**
+     * Initialize external MCP servers
+     */
+    async initializeMCPServers() {
+        const mcpServersJson = process.env.VERTEX_MCP_SERVERS;
+        if (!mcpServersJson) {
+            this.logger.info('No external MCP servers configured');
+            return;
+        }
+        try {
+            const serverConfigs = JSON.parse(mcpServersJson);
+            await this.mcpClient.initialize(serverConfigs);
+            this.logger.info(`Initialized ${serverConfigs.length} MCP servers`);
+        }
+        catch (error) {
+            this.logger.error('Failed to initialize MCP servers', error);
+        }
+    }
+    /**
+     * Register all tools (WebFetch + MCP tools)
+     */
+    async registerTools() {
+        // Register built-in WebFetch tool
+        this.toolRegistry.registerWebFetch();
+        // Register MCP tools
+        this.toolRegistry.registerMCPTools(this.mcpClient);
+        const toolCount = this.toolRegistry.getAllTools().length;
+        this.logger.info(`Registered ${toolCount} total tools`);
     }
 }
 //# sourceMappingURL=VertexAIMCPServer.js.map

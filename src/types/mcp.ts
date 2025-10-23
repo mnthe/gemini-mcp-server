@@ -4,9 +4,16 @@
 
 export interface MCPServerConfig {
   name: string;
-  command: string;
-  args: string[];
-  env: Record<string, string>;
+  transport: 'stdio' | 'http';
+
+  // Stdio-specific fields
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+
+  // HTTP-specific fields
+  url?: string;
+  headers?: Record<string, string>;
 }
 
 export interface ReasoningStep {
