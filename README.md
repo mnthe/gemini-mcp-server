@@ -171,15 +171,42 @@ Can you use the query tool to ask: "What are the key differences between Python 
 
 ### search
 
-Search for information using Vertex AI. This tool provides search/fetch capabilities similar to ChatGPT's web browsing.
+Search for information using Vertex AI. Returns a list of relevant search results following the OpenAI MCP specification.
 
 **Parameters:**
 - `query` (string, required): The search query
+
+**Returns:**
+A JSON object with a `results` array, where each result contains:
+- `id`: Unique identifier for the document
+- `title`: Human-readable title
+- `url`: Canonical URL for citation
 
 **Example Usage in Claude:**
 
 ```
 Use the search tool to find information about "latest developments in quantum computing"
+```
+
+### fetch
+
+Fetch the full contents of a search result document by its ID. Follows the OpenAI MCP specification for fetch tools.
+
+**Parameters:**
+- `id` (string, required): The unique identifier for the document (from search results)
+
+**Returns:**
+A JSON object containing:
+- `id`: Unique identifier
+- `title`: Document title
+- `text`: Full text content
+- `url`: Document URL
+- `metadata`: Optional metadata about the document
+
+**Example Usage in Claude:**
+
+```
+First use search to find documents, then use fetch with the document ID to get full contents
 ```
 
 ## Example Use Cases
@@ -194,9 +221,9 @@ Use the search tool to find information about "latest developments in quantum co
    Use the query tool to get another AI's opinion on [topic], then provide your own analysis.
    ```
 
-3. **Information Retrieval**: Use the search tool for finding information
+3. **Information Retrieval**: Use the search and fetch tools for finding information
    ```
-   Use the search tool to find recent research papers on machine learning optimization.
+   Use the search tool to find recent research papers on machine learning optimization, then use fetch to get the full content of the most relevant result.
    ```
 
 ## Development

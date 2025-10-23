@@ -15,13 +15,44 @@ const QuerySchema = z.object({
   prompt: z.string().describe("The prompt to send to Vertex AI"),
 });
 
-// Input schema for search/fetch tool
+// Input schema for search tool (OpenAI MCP spec)
 const SearchSchema = z.object({
   query: z.string().describe("The search query"),
 });
 
+// Input schema for fetch tool (OpenAI MCP spec)
+const FetchSchema = z.object({
+  id: z.string().describe("The unique identifier for the document to fetch"),
+});
+
 type QueryInput = z.infer<typeof QuerySchema>;
 type SearchInput = z.infer<typeof SearchSchema>;
+type FetchInput = z.infer<typeof FetchSchema>;
+
+// Interface for search results (OpenAI MCP spec)
+interface SearchResult {
+  id: string;
+  title: string;
+  url: string;
+}
+
+// Interface for fetch result (OpenAI MCP spec)
+interface FetchResult {
+  id: string;
+  title: string;
+  text: string;
+  url: string;
+  metadata?: Record<string, unknown>;
+}
+
+// Simple in-memory cache for search results
+interface CachedDocument {
+  id: string;
+  title: string;
+  text: string;
+  url: string;
+  metadata?: Record<string, unknown>;
+}
 
 interface VertexAIConfig {
   projectId: string;
@@ -37,6 +68,7 @@ class VertexAIMCPServer {
   private server: Server;
   private predictionClient: PredictionServiceClient;
   private config: VertexAIConfig;
+  private searchCache: Map<string, CachedDocument>;
 
   constructor() {
     // Initialize configuration from environment variables
@@ -50,6 +82,9 @@ class VertexAIMCPServer {
       topP: parseFloat(process.env.VERTEX_TOP_P || "0.95"),
       topK: parseInt(process.env.VERTEX_TOP_K || "40", 10),
     };
+
+    // Initialize search cache
+    this.searchCache = new Map<string, CachedDocument>();
 
     if (!this.config.projectId) {
       console.error(
@@ -103,8 +138,8 @@ class VertexAIMCPServer {
         {
           name: "search",
           description:
-            "Search for information using Vertex AI. " +
-            "This tool can be used to fetch and search for information, similar to ChatGPT's web browsing capability.",
+            "Search for information using Vertex AI. Returns a list of relevant search results. " +
+            "Follows OpenAI MCP specification for search tools.",
           inputSchema: {
             type: "object",
             properties: {
@@ -116,20 +151,44 @@ class VertexAIMCPServer {
             required: ["query"],
           },
         },
+        {
+          name: "fetch",
+          description:
+            "Fetch the full contents of a search result document by its ID. " +
+            "Follows OpenAI MCP specification for fetch tools.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              id: {
+                type: "string",
+                description: "The unique identifier for the document to fetch",
+              },
+            },
+            required: ["id"],
+          },
+        },
       ];
 
       return { tools };
     });
 
-    // Handle tool calls
+    // Handle tool calls with switch-case statement
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      if (request.params.name === "query") {
-        return await this.handleQuery(request.params.arguments || {});
-      } else if (request.params.name === "search") {
-        return await this.handleSearch(request.params.arguments || {});
-      }
+      const toolName = request.params.name;
 
-      throw new Error(`Unknown tool: ${request.params.name}`);
+      switch (toolName) {
+        case "query":
+          return await this.handleQuery(request.params.arguments || {});
+        
+        case "search":
+          return await this.handleSearch(request.params.arguments || {});
+        
+        case "fetch":
+          return await this.handleFetch(request.params.arguments || {});
+        
+        default:
+          throw new Error(`Unknown tool: ${toolName}`);
+      }
     });
   }
 
@@ -218,7 +277,8 @@ class VertexAIMCPServer {
       const input = SearchSchema.parse(args);
 
       // Construct a search-oriented prompt
-      const searchPrompt = `Search and provide information about: ${input.query}`;
+      const searchPrompt = `Search and provide information about: ${input.query}. 
+      Return your response as a structured list of relevant topics or documents with brief descriptions.`;
 
       // Use the same prediction client but with a search-oriented approach
       const endpoint = `projects/${this.config.projectId}/locations/${this.config.location}/publishers/google/models/${this.config.model}`;
@@ -244,7 +304,7 @@ class VertexAIMCPServer {
       const [response] = await this.predictionClient.predict(request as any);
 
       // Extract the response text
-      let responseText = "No search results found";
+      let responseText = "";
 
       if (response.predictions && response.predictions.length > 0) {
         const prediction = response.predictions[0];
@@ -265,11 +325,42 @@ class VertexAIMCPServer {
         }
       }
 
+      // Parse response into search results format (OpenAI MCP spec)
+      // Create structured results from the AI response
+      const results: SearchResult[] = [];
+      
+      // Generate search results based on the query
+      // For now, we'll create a single comprehensive result
+      const docId = `doc-${Date.now()}`;
+      const result: SearchResult = {
+        id: docId,
+        title: `Search results for: ${input.query}`,
+        url: `vertex-ai://search/${encodeURIComponent(input.query)}`
+      };
+      results.push(result);
+
+      // Cache the full document for fetch
+      const cachedDoc: CachedDocument = {
+        id: docId,
+        title: result.title,
+        text: responseText,
+        url: result.url,
+        metadata: {
+          query: input.query,
+          timestamp: new Date().toISOString(),
+          model: this.config.model
+        }
+      };
+      this.searchCache.set(docId, cachedDoc);
+
+      // Return results in OpenAI MCP format
+      const resultsJson = JSON.stringify({ results });
+
       return {
         content: [
           {
             type: "text",
-            text: responseText,
+            text: resultsJson,
           },
         ],
       };
@@ -280,7 +371,66 @@ class VertexAIMCPServer {
         content: [
           {
             type: "text",
-            text: `Error searching with Vertex AI: ${errorMessage}`,
+            text: JSON.stringify({ 
+              results: [],
+              error: `Error searching with Vertex AI: ${errorMessage}`
+            }),
+          },
+        ],
+      };
+    }
+  }
+
+  private async handleFetch(
+    args: Record<string, unknown>
+  ): Promise<{ content: Array<{ type: string; text: string }> }> {
+    try {
+      // Validate input
+      const input = FetchSchema.parse(args);
+
+      // Retrieve from cache
+      const cachedDoc = this.searchCache.get(input.id);
+
+      if (!cachedDoc) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                error: `Document with id '${input.id}' not found. Please perform a search first.`
+              }),
+            },
+          ],
+        };
+      }
+
+      // Return document in OpenAI MCP format
+      const fetchResult: FetchResult = {
+        id: cachedDoc.id,
+        title: cachedDoc.title,
+        text: cachedDoc.text,
+        url: cachedDoc.url,
+        metadata: cachedDoc.metadata
+      };
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(fetchResult),
+          },
+        ],
+      };
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              error: `Error fetching document: ${errorMessage}`
+            }),
           },
         ],
       };
