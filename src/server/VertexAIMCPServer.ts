@@ -208,7 +208,6 @@ export class VertexAIMCPServer {
     await this.server.connect(transport);
 
     this.logger.info("Vertex AI MCP Server running on stdio");
-    console.error("Vertex AI MCP Server running on stdio");
   }
 
   /**

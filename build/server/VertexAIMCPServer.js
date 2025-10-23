@@ -159,7 +159,6 @@ export class VertexAIMCPServer {
         const transport = new StdioServerTransport();
         await this.server.connect(transport);
         this.logger.info("Vertex AI MCP Server running on stdio");
-        console.error("Vertex AI MCP Server running on stdio");
     }
     /**
      * Initialize external MCP servers
