@@ -4,7 +4,8 @@
  */
 import { VertexAIConfig } from '../types/index.js';
 export declare class VertexAIService {
-    private client;
+    private vertexAI;
+    private model;
     private config;
     constructor(config: VertexAIConfig);
     /**
