@@ -9,7 +9,7 @@ export declare class EnhancedMCPClient {
     private httpServers;
     private logger;
     private discoveredTools;
-    constructor(sessionId: string, logDir?: string, disableLogging?: boolean);
+    constructor(sessionId: string, logDir?: string, disableLogging?: boolean, logToStderr?: boolean);
     /**
      * Initialize from MCP server configurations
      */

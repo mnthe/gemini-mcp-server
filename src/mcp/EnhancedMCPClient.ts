@@ -36,8 +36,8 @@ export class EnhancedMCPClient {
   private logger: Logger;
   private discoveredTools: Tool[] = [];
 
-  constructor(sessionId: string, logDir?: string, disableLogging: boolean = false) {
-    this.logger = new Logger(sessionId, logDir, disableLogging);
+  constructor(sessionId: string, logDir?: string, disableLogging: boolean = false, logToStderr: boolean = false) {
+    this.logger = new Logger(sessionId, logDir, disableLogging, logToStderr);
   }
 
   /**

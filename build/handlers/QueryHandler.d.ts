@@ -11,7 +11,8 @@ export declare class QueryHandler {
     private enableConversations;
     private logDir;
     private disableLogging;
-    constructor(conversationManager: ConversationManager, agenticLoop: AgenticLoop, enableConversations?: boolean, logDir?: string, disableLogging?: boolean);
+    private logToStderr;
+    constructor(conversationManager: ConversationManager, agenticLoop: AgenticLoop, enableConversations?: boolean, logDir?: string, disableLogging?: boolean, logToStderr?: boolean);
     /**
      * Handle a query tool request using AgenticLoop
      */

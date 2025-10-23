@@ -8,12 +8,14 @@ export class QueryHandler {
     enableConversations;
     logDir;
     disableLogging;
-    constructor(conversationManager, agenticLoop, enableConversations = true, logDir = './logs', disableLogging = false) {
+    logToStderr;
+    constructor(conversationManager, agenticLoop, enableConversations = true, logDir = './logs', disableLogging = false, logToStderr = false) {
         this.conversationManager = conversationManager;
         this.agenticLoop = agenticLoop;
         this.enableConversations = enableConversations;
         this.logDir = logDir;
         this.disableLogging = disableLogging;
+        this.logToStderr = logToStderr;
     }
     /**
      * Handle a query tool request using AgenticLoop
@@ -35,6 +37,7 @@ export class QueryHandler {
                 maxTurns: 10,
                 logDir: this.logDir,
                 disableLogging: this.disableLogging,
+                logToStderr: this.logToStderr,
             });
             // Update conversation history with all messages from result
             if (this.enableConversations && sessionId) {

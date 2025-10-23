@@ -97,6 +97,7 @@ export VERTEX_MAX_HISTORY="10"
 # Logging configuration
 export VERTEX_DISABLE_LOGGING="false"      # Set to 'true' to disable file-based logging
 export VERTEX_LOG_DIR="/path/to/logs"      # Custom log directory (default: ./logs)
+export VERTEX_LOG_TO_STDERR="true"         # Set to 'true' to pipe logs to stderr for debugging
 
 # External MCP servers (for tool delegation)
 export VERTEX_MCP_SERVERS='[
@@ -345,6 +346,13 @@ To use a custom log directory:
 export VERTEX_LOG_DIR="/path/to/custom/logs"
 ```
 
+To pipe logs to stderr for debugging (useful for seeing logs in MCP client output):
+```bash
+export VERTEX_LOG_TO_STDERR="true"
+```
+
+**Note:** When `VERTEX_LOG_TO_STDERR` is enabled, logs are written to stderr instead of files. This is useful for debugging MCP server issues as the logs will appear in the MCP client's log output (e.g., Claude Desktop logs).
+
 ### Custom Tool Development
 
 Tools follow MCP standard:
@@ -391,6 +399,28 @@ npm run dev
 ```
 
 ## Troubleshooting
+
+### MCP Server Connection Issues
+
+If the MCP server appears to be "dead" or disconnects unexpectedly:
+
+**Enable stderr logging to see what's happening:**
+```json
+{
+  "mcpServers": {
+    "vertex-ai": {
+      "command": "npx",
+      "args": ["-y", "github:mnthe/vertex-mcp-server"],
+      "env": {
+        "GOOGLE_CLOUD_PROJECT": "your-project-id",
+        "VERTEX_LOG_TO_STDERR": "true"
+      }
+    }
+  }
+}
+```
+
+This will pipe all server logs to stderr, making them visible in your MCP client's logs (e.g., Claude Desktop logs at `~/Library/Logs/Claude/mcp*.log` on macOS). This helps diagnose startup issues, authentication errors, or crashes.
 
 ### Log Directory Errors
 If you encounter errors like `ENOENT: no such file or directory, mkdir './logs'`:

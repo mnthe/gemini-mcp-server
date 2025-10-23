@@ -45,6 +45,7 @@ export function loadConfig(): VertexAIConfig {
   // Logging configuration
   const logDir = process.env.VERTEX_LOG_DIR;
   const disableLogging = process.env.VERTEX_DISABLE_LOGGING === "true";
+  const logToStderr = process.env.VERTEX_LOG_TO_STDERR === "true";
 
   return {
     projectId,
@@ -61,5 +62,6 @@ export function loadConfig(): VertexAIConfig {
     maxReasoningSteps,
     logDir,
     disableLogging,
+    logToStderr,
   };
 }

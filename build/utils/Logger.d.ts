@@ -20,7 +20,8 @@ export declare class Logger {
     private generalLogPath;
     private reasoningLogPath;
     private disabled;
-    constructor(sessionId: string, logDir?: string, disabled?: boolean);
+    private logToStderr;
+    constructor(sessionId: string, logDir?: string, disabled?: boolean, logToStderr?: boolean);
     /**
      * Log info message
      */

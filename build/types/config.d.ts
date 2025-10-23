@@ -16,5 +16,6 @@ export interface VertexAIConfig {
     maxReasoningSteps: number;
     logDir?: string;
     disableLogging: boolean;
+    logToStderr: boolean;
 }
 //# sourceMappingURL=config.d.ts.map
