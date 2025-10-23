@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "vertex-ai": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "github:mnthe/vertex-mcp-server"
+      ],
+      "env": {
+        "GOOGLE_CLOUD_PROJECT": "your-gcp-project-id",
+        "GOOGLE_CLOUD_LOCATION": "us-central1",
+        "VERTEX_MODEL": "gemini-1.5-flash-002",
+        "VERTEX_TEMPERATURE": "1.0",
+        "VERTEX_MAX_TOKENS": "8192",
+        "VERTEX_TOP_P": "0.95",
+        "VERTEX_TOP_K": "40"
+      }
+    }
+  }
+}
