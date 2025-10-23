@@ -1,0 +1,174 @@
+/**
+ * Logger - File-based logging system with reasoning trace support
+ * Logs to both general log file and separate reasoning log
+ */
+
+import * as fs from 'fs';
+import * as path from 'path';
+
+export interface LogEntry {
+  timestamp: string;
+  level: 'info' | 'error' | 'reasoning' | 'tool';
+  sessionId?: string;
+  message: string;
+  data?: any;
+}
+
+export interface ReasoningItem {
+  step: number;
+  thought: string;
+  result: string;
+}
+
+export class Logger {
+  private logDir: string;
+  private sessionId: string;
+  private generalLogPath: string;
+  private reasoningLogPath: string;
+
+  constructor(sessionId: string, logDir: string = './logs') {
+    this.sessionId = sessionId;
+    this.logDir = logDir;
+    this.generalLogPath = path.join(logDir, 'general.log');
+    this.reasoningLogPath = path.join(logDir, 'reasoning.log');
+
+    // Ensure log directory exists
+    this.ensureLogDirectory();
+  }
+
+  /**
+   * Log info message
+   */
+  info(message: string, data?: any): void {
+    this.writeLog('info', message, data);
+  }
+
+  /**
+   * Log error message
+   */
+  error(message: string, error?: Error): void {
+    const errorData = error ? {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    } : undefined;
+
+    this.writeLog('error', message, errorData);
+  }
+
+  /**
+   * Log reasoning step (separate file)
+   */
+  reasoning(step: ReasoningItem): void {
+    const reasoningText = `
+================================================================================
+[${new Date().toISOString()}] Session: ${this.sessionId}
+Step ${step.step}: ${step.thought}
+--------------------------------------------------------------------------------
+${step.result}
+================================================================================
+`;
+
+    this.writeReasoning(reasoningText);
+    this.writeLog('reasoning', `Step ${step.step}: ${step.thought}`, { result: step.result });
+  }
+
+  /**
+   * Log tool call
+   */
+  toolCall(toolName: string, args: any): void {
+    this.writeLog('tool', `CALL: ${toolName}`, { args });
+  }
+
+  /**
+   * Log tool result
+   */
+  toolResult(toolName: string, result: any): void {
+    this.writeLog('tool', `RESULT: ${toolName}`, { result });
+  }
+
+  /**
+   * Write to general log file
+   */
+  private writeLog(level: string, message: string, data?: any): void {
+    const entry: LogEntry = {
+      timestamp: new Date().toISOString(),
+      level: level as LogEntry['level'],
+      sessionId: this.sessionId,
+      message,
+      data,
+    };
+
+    const logLine = `[${entry.timestamp}] [${entry.level.toUpperCase()}] [${entry.sessionId}] ${entry.message}`;
+    const fullLine = data ? `${logLine} | ${JSON.stringify(data)}\n` : `${logLine}\n`;
+
+    try {
+      fs.appendFileSync(this.generalLogPath, fullLine, 'utf8');
+    } catch (error) {
+      // Fallback to console if file write fails
+      console.error('Failed to write to log file:', error);
+      console.log(fullLine);
+    }
+  }
+
+  /**
+   * Write to reasoning log file (separate for easier analysis)
+   */
+  private writeReasoning(reasoningText: string): void {
+    try {
+      fs.appendFileSync(this.reasoningLogPath, reasoningText, 'utf8');
+    } catch (error) {
+      console.error('Failed to write to reasoning log:', error);
+      console.log(reasoningText);
+    }
+  }
+
+  /**
+   * Ensure log directory exists
+   */
+  private ensureLogDirectory(): void {
+    try {
+      if (!fs.existsSync(this.logDir)) {
+        fs.mkdirSync(this.logDir, { recursive: true });
+      }
+    } catch (error) {
+      console.error('Failed to create log directory:', error);
+    }
+  }
+
+  /**
+   * Get log file path for external access
+   */
+  getLogPath(): string {
+    return this.generalLogPath;
+  }
+
+  /**
+   * Get reasoning log file path for external access
+   */
+  getReasoningLogPath(): string {
+    return this.reasoningLogPath;
+  }
+
+  /**
+   * Static method to clean old logs (optional maintenance)
+   */
+  static cleanOldLogs(logDir: string, daysToKeep: number = 7): void {
+    try {
+      const files = fs.readdirSync(logDir);
+      const now = Date.now();
+      const maxAge = daysToKeep * 24 * 60 * 60 * 1000;
+
+      for (const file of files) {
+        const filePath = path.join(logDir, file);
+        const stats = fs.statSync(filePath);
+
+        if (now - stats.mtimeMs > maxAge) {
+          fs.unlinkSync(filePath);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to clean old logs:', error);
+    }
+  }
+}

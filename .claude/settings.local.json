@@ -5,7 +5,9 @@
       "WebFetch(domain:github.com)",
       "Bash(npm install)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Read(//Users/mnthe/Downloads/**)",
+      "Bash(npm run build:*)"
     ],
     "deny": [],
     "ask": []
