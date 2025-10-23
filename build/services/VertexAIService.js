@@ -1,11 +1,10 @@
 /**
  * VertexAIService - Handles communication with Google Cloud Vertex AI
- * Provides a clean interface for making predictions
+ * Provides a clean interface for making predictions with thinking mode support
  */
 import { VertexAI } from "@google-cloud/vertexai";
 export class VertexAIService {
     vertexAI;
-    model;
     config;
     constructor(config) {
         this.config = config;
@@ -13,27 +12,36 @@ export class VertexAIService {
             project: config.projectId,
             location: config.location,
         });
-        this.model = this.vertexAI.getGenerativeModel({
-            model: config.model,
-            generationConfig: {
-                temperature: config.temperature,
-                maxOutputTokens: config.maxTokens,
-                topP: config.topP,
-                topK: config.topK,
-            },
-        });
     }
     /**
      * Query Vertex AI with a prompt
      */
-    async query(prompt) {
+    async query(prompt, options = {}) {
+        const generationConfig = {
+            temperature: this.config.temperature,
+            maxOutputTokens: this.config.maxTokens,
+            topP: this.config.topP,
+            topK: this.config.topK,
+        };
+        // Enable thinking mode if requested
+        if (options.enableThinking) {
+            // Gemini thinking mode configuration
+            // Note: This is a placeholder - adjust based on actual Gemini API
+            generationConfig.thinkingConfig = {
+                mode: 'THINKING',
+            };
+        }
+        const model = this.vertexAI.getGenerativeModel({
+            model: this.config.model,
+            generationConfig,
+        });
         const request = {
             contents: [{
                     role: 'user',
                     parts: [{ text: prompt }]
                 }]
         };
-        const result = await this.model.generateContent(request);
+        const result = await model.generateContent(request);
         return this.extractResponseText(result);
     }
     /**

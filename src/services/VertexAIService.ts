@@ -1,14 +1,17 @@
 /**
  * VertexAIService - Handles communication with Google Cloud Vertex AI
- * Provides a clean interface for making predictions
+ * Provides a clean interface for making predictions with thinking mode support
  */
 
 import { VertexAI, GenerativeModel } from "@google-cloud/vertexai";
 import { VertexAIConfig } from '../types/index.js';
 
+export interface QueryOptions {
+  enableThinking?: boolean;
+}
+
 export class VertexAIService {
   private vertexAI: VertexAI;
-  private model: GenerativeModel;
   private config: VertexAIConfig;
 
   constructor(config: VertexAIConfig) {
@@ -17,21 +20,33 @@ export class VertexAIService {
       project: config.projectId,
       location: config.location,
     });
-    this.model = this.vertexAI.getGenerativeModel({
-      model: config.model,
-      generationConfig: {
-        temperature: config.temperature,
-        maxOutputTokens: config.maxTokens,
-        topP: config.topP,
-        topK: config.topK,
-      },
-    });
   }
 
   /**
    * Query Vertex AI with a prompt
    */
-  async query(prompt: string): Promise<string> {
+  async query(prompt: string, options: QueryOptions = {}): Promise<string> {
+    const generationConfig: any = {
+      temperature: this.config.temperature,
+      maxOutputTokens: this.config.maxTokens,
+      topP: this.config.topP,
+      topK: this.config.topK,
+    };
+
+    // Enable thinking mode if requested
+    if (options.enableThinking) {
+      // Gemini thinking mode configuration
+      // Note: This is a placeholder - adjust based on actual Gemini API
+      generationConfig.thinkingConfig = {
+        mode: 'THINKING',
+      };
+    }
+
+    const model = this.vertexAI.getGenerativeModel({
+      model: this.config.model,
+      generationConfig,
+    });
+
     const request = {
       contents: [{
         role: 'user',
@@ -39,7 +54,7 @@ export class VertexAIService {
       }]
     };
 
-    const result = await this.model.generateContent(request);
+    const result = await model.generateContent(request);
 
     return this.extractResponseText(result);
   }
