@@ -5,7 +5,7 @@
 
 import { BaseTool, ToolResult, RunContext, JSONSchema } from '../agentic/Tool.js';
 import { SecurityError } from '../errors/index.js';
-import * as dns from 'dns/promises';
+import { validateSecureUrl } from '../utils/urlSecurity.js';
 
 export class WebFetchTool extends BaseTool {
   name = 'web_fetch';
@@ -33,14 +33,8 @@ export class WebFetchTool extends BaseTool {
 
     const { url, extract = true } = args;
 
-    // Security check 1: HTTPS only
-    if (!url.startsWith('https://')) {
-      throw new SecurityError('Only HTTPS URLs are allowed');
-    }
-
-    // Security check 2: Private IP blocking
-    const hostname = new URL(url).hostname;
-    await this.checkPrivateIP(hostname);
+    // Security validation: HTTPS only and private IP blocking
+    await validateSecureUrl(url);
 
     try {
       // Fetch content
@@ -85,79 +79,6 @@ export class WebFetchTool extends BaseTool {
         content: `Failed to fetch URL: ${(error as Error).message}`,
       };
     }
-  }
-
-  /**
-   * Check if hostname resolves to private IP
-   */
-  private async checkPrivateIP(hostname: string): Promise<void> {
-    // Skip check for well-known public domains
-    if (this.isPublicDomain(hostname)) {
-      return;
-    }
-
-    try {
-      const addresses = await dns.resolve4(hostname);
-
-      for (const ip of addresses) {
-        if (this.isPrivateIPAddress(ip)) {
-          throw new SecurityError(
-            `Private IP addresses are not allowed: ${ip}`
-          );
-        }
-      }
-    } catch (error) {
-      if (error instanceof SecurityError) {
-        throw error;
-      }
-      // DNS resolution failed - could be IPv6 only, or invalid domain
-      // Allow the fetch to proceed and let it fail naturally
-    }
-  }
-
-  /**
-   * Check if IP address is in private CIDR ranges
-   */
-  private isPrivateIPAddress(ip: string): boolean {
-    const parts = ip.split('.').map(Number);
-
-    // 10.0.0.0/8
-    if (parts[0] === 10) {
-      return true;
-    }
-
-    // 172.16.0.0/12
-    if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) {
-      return true;
-    }
-
-    // 192.168.0.0/16
-    if (parts[0] === 192 && parts[1] === 168) {
-      return true;
-    }
-
-    // 127.0.0.0/8 (localhost)
-    if (parts[0] === 127) {
-      return true;
-    }
-
-    return false;
-  }
-
-  /**
-   * Check if domain is known public domain (skip IP check)
-   */
-  private isPublicDomain(hostname: string): boolean {
-    const publicDomains = [
-      'google.com',
-      'github.com',
-      'stackoverflow.com',
-      'wikipedia.org',
-      'medium.com',
-      'arxiv.org',
-    ];
-
-    return publicDomains.some((domain) => hostname.endsWith(domain));
   }
 
   /**

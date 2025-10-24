@@ -5,6 +5,8 @@
 
 import { GenerateContentConfig, GoogleGenAI, Part } from "@google/genai";
 import { GeminiAIConfig, MultimodalPart, isSupportedMimeType } from '../types/index.js';
+import { validateSecureUrl } from '../utils/urlSecurity.js';
+import { SecurityError } from '../errors/index.js';
 
 export interface QueryOptions {
   enableThinking?: boolean;
@@ -48,7 +50,7 @@ export class GeminiAIService {
       }
 
       // Build content parts
-      const contents = this.buildContents(prompt, multimodalParts);
+      const contents = await this.buildContents(prompt, multimodalParts);
 
       const response = await this.client.models.generateContent({
         model: this.config.model,
@@ -70,7 +72,7 @@ export class GeminiAIService {
   /**
    * Build contents array from prompt and multimodal parts
    */
-  private buildContents(prompt: string, multimodalParts?: MultimodalPart[]): any {
+  private async buildContents(prompt: string, multimodalParts?: MultimodalPart[]): Promise<any> {
     // If no multimodal parts, use simple string format
     if (!multimodalParts || multimodalParts.length === 0) {
       return prompt;
@@ -84,7 +86,7 @@ export class GeminiAIService {
       parts.push({ text: prompt });
     }
 
-    // Add multimodal parts
+    // Add multimodal parts with security validation
     for (const part of multimodalParts) {
       const contentPart: Part = {};
 
@@ -109,6 +111,20 @@ export class GeminiAIService {
         if (!isSupportedMimeType(part.fileData.mimeType)) {
           console.warn(`Unsupported MIME type: ${part.fileData.mimeType}. Including anyway.`);
         }
+
+        // Security validation for HTTPS URLs
+        const fileUri = part.fileData.fileUri;
+        if (fileUri.startsWith('https://')) {
+          try {
+            await validateSecureUrl(fileUri);
+          } catch (error) {
+            if (error instanceof SecurityError) {
+              throw error;
+            }
+            throw new Error(`Invalid file URI: ${(error as Error).message}`);
+          }
+        }
+        // Allow gs:// URIs without additional validation (Cloud Storage)
 
         contentPart.fileData = {
           mimeType: part.fileData.mimeType,
