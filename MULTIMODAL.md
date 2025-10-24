@@ -102,7 +102,7 @@ Each part object in the `parts` array must have **exactly one** of these fields:
 **Security for HTTPS URLs:**
 When using HTTPS URLs in `fileUri`, the following security checks are applied:
 - Only HTTPS URLs are allowed (HTTP is rejected)
-- Private IP addresses are blocked (10.x, 172.16.x, 192.168.x, 127.x)
+- Private IP addresses are blocked (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8)
 - DNS validation prevents SSRF attacks
 
 #### Complete Request Schema
@@ -200,7 +200,7 @@ For large files, use Cloud Storage URIs:
 When using HTTPS URLs (e.g., `https://example.com/image.jpg`) instead of Cloud Storage URIs (`gs://`), the server applies the same security validation as the WebFetch tool:
 
 - **HTTPS Only**: Only HTTPS URLs are accepted. HTTP URLs are rejected with a SecurityError.
-- **Private IP Blocking**: URLs that resolve to private IP addresses (10.x.x.x, 172.16.x.x, 192.168.x.x, 127.x.x.x) are blocked to prevent SSRF attacks.
+- **Private IP Blocking**: URLs that resolve to private IP addresses (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8) are blocked to prevent SSRF attacks.
 - **DNS Validation**: The server performs DNS resolution to check if the hostname resolves to a private IP address.
 
 Cloud Storage URIs (`gs://`) are not subject to these additional security checks as they are managed by Google Cloud Platform.
