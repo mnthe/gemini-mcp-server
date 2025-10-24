@@ -18,6 +18,7 @@ export interface GeminiAIConfig {
   logDir?: string;
   disableLogging: boolean;
   logToStderr: boolean;
+  allowFileUris: boolean;
 }
 
 // Legacy alias for backward compatibility

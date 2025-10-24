@@ -113,6 +113,9 @@ export GEMINI_DISABLE_LOGGING="false"      # Set to 'true' to disable file-based
 export GEMINI_LOG_DIR="/path/to/logs"      # Custom log directory (default: ./logs)
 export GEMINI_LOG_TO_STDERR="true"         # Set to 'true' to pipe logs to stderr for debugging
 
+# File URI support (for CLI environments only)
+export GEMINI_ALLOW_FILE_URIS="true"       # Set to 'true' to allow file:// URIs (CLI tools only, NOT for desktop apps)
+
 # External MCP servers (for tool delegation)
 export GEMINI_MCP_SERVERS='[
   {

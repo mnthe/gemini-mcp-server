@@ -42,6 +42,10 @@ export function loadConfig(): GeminiAIConfig {
   const disableLogging = process.env.GEMINI_DISABLE_LOGGING === "true";
   const logToStderr = process.env.GEMINI_LOG_TO_STDERR === "true";
 
+  // File URI configuration - allows file:// URLs in CLI environments (Codex, Claude Code, Gemini CLI)
+  // Should NOT be enabled in desktop apps (Claude Desktop, ChatGPT App) for security reasons
+  const allowFileUris = process.env.GEMINI_ALLOW_FILE_URIS === "true";
+
   return {
     projectId,
     location,
@@ -58,5 +62,6 @@ export function loadConfig(): GeminiAIConfig {
     logDir,
     disableLogging,
     logToStderr,
+    allowFileUris,
   };
 }

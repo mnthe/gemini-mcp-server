@@ -17,6 +17,7 @@ export interface GeminiAIConfig {
     logDir?: string;
     disableLogging: boolean;
     logToStderr: boolean;
+    allowFileUris: boolean;
 }
 export type VertexAIConfig = GeminiAIConfig;
 //# sourceMappingURL=config.d.ts.map

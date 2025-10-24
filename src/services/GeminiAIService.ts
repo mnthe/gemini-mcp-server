@@ -112,9 +112,11 @@ export class GeminiAIService {
           console.warn(`Unsupported MIME type: ${part.fileData.mimeType}. Including anyway.`);
         }
 
-        // Security validation for HTTPS URLs
+        // Security validation for URLs
         const fileUri = part.fileData.fileUri;
+        
         if (fileUri.startsWith('https://')) {
+          // HTTPS URLs: validate for security (SSRF protection)
           try {
             await validateSecureUrl(fileUri);
           } catch (error) {
@@ -122,6 +124,13 @@ export class GeminiAIService {
               throw error;
             }
             throw new Error(`Invalid file URI: ${(error as Error).message}`);
+          }
+        } else if (fileUri.startsWith('file://')) {
+          // file:// URLs: only allowed if explicitly enabled (CLI environments)
+          if (!this.config.allowFileUris) {
+            throw new SecurityError(
+              'file:// URIs are not allowed. Set GEMINI_ALLOW_FILE_URIS=true to enable (only for CLI environments, not desktop apps)'
+            );
           }
         }
         // Allow gs:// URIs without additional validation (Cloud Storage)
