@@ -1,12 +1,12 @@
 /**
  * AgenticLoop - Main orchestrator for turn-based agentic execution
- * Integrates all components: RunState, Tools, ResponseProcessor, VertexAI
+ * Integrates all components: RunState, Tools, ResponseProcessor, GeminiAI
  */
 
 import { RunState, RunOptions } from './RunState.js';
 import { ResponseProcessor } from './ResponseProcessor.js';
 import { ToolRegistry } from '../tools/ToolRegistry.js';
-import { VertexAIService } from '../services/VertexAIService.js';
+import { GeminiAIService } from '../services/GeminiAIService.js';
 import { Message } from '../types/index.js';
 
 export interface RunResult {
@@ -19,15 +19,15 @@ export interface RunResult {
 }
 
 export class AgenticLoop {
-  private vertexAI: VertexAIService;
+  private geminiAI: GeminiAIService;
   private toolRegistry: ToolRegistry;
   private responseProcessor: ResponseProcessor;
 
   constructor(
-    vertexAI: VertexAIService,
+    geminiAI: GeminiAIService,
     toolRegistry: ToolRegistry
   ) {
-    this.vertexAI = vertexAI;
+    this.geminiAI = geminiAI;
     this.toolRegistry = toolRegistry;
     this.responseProcessor = new ResponseProcessor();
   }
@@ -67,12 +67,12 @@ export class AgenticLoop {
       // 2. Detect if we should use thinking mode
       const useThinking = this.shouldUseThinking(state);
 
-      // 3. Call Vertex AI
-      const response = await this.vertexAI.query(fullPrompt, {
+      // 3. Call Gemini AI
+      const response = await this.geminiAI.query(fullPrompt, {
         enableThinking: useThinking,
       });
 
-      state.logger.info('Received response from Vertex AI');
+      state.logger.info('Received response from Gemini AI');
 
       // 4. Validate and process response
       try {
@@ -114,7 +114,7 @@ export class AgenticLoop {
 
           // Build fallback prompt
           const fallbackPrompt = this.buildFallbackPrompt(state, processed.toolCalls, results);
-          const fallbackResponse = await this.vertexAI.query(fallbackPrompt);
+          const fallbackResponse = await this.geminiAI.query(fallbackPrompt);
 
           // Add fallback response as final output
           state.addMessage({

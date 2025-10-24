@@ -1,16 +1,17 @@
 #!/usr/bin/env node
 /**
- * Vertex AI MCP Server - Entry Point
+ * Gemini AI MCP Server - Entry Point
  *
  * A Model Context Protocol (MCP) server that provides intelligent agent capabilities
- * for Google Cloud Vertex AI, including automatic reasoning and delegation.
+ * for Google AI (Gemini models) via Vertex AI or Google AI Studio, including 
+ * automatic reasoning and delegation.
  *
  * Architecture:
  * - config/: Configuration loading and validation
  * - types/: TypeScript type definitions
  * - schemas/: Zod validation schemas
  * - managers/: Business logic managers (conversations, MCP clients)
- * - services/: External service integrations (Vertex AI)
+ * - services/: External service integrations (Gemini AI)
  * - agentic/: Agentic loop components (AgenticLoop, RunState, ResponseProcessor)
  * - mcp/: MCP client implementation
  * - tools/: Tool implementations (WebFetch, ToolRegistry)
@@ -22,13 +23,13 @@
 import 'dotenv/config';
 
 import { loadConfig } from './config/index.js';
-import { VertexAIMCPServer } from './server/VertexAIMCPServer.js';
+import { GeminiAIMCPServer } from './server/GeminiAIMCPServer.js';
 
 // Load configuration
 const config = loadConfig();
 
 // Create and start server
-const server = new VertexAIMCPServer(config);
+const server = new GeminiAIMCPServer(config);
 server.run().catch((error) => {
   console.error("Fatal error:", error);
   process.exit(1);

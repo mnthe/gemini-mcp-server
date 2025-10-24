@@ -1,13 +1,13 @@
 /**
- * VertexAIMCPServer - Main MCP server implementation
+ * GeminiAIMCPServer - Main MCP server implementation
  * Orchestrates all components and handles MCP protocol
  */
-import { VertexAIConfig } from '../types/index.js';
-export declare class VertexAIMCPServer {
+import { GeminiAIConfig } from '../types/index.js';
+export declare class GeminiAIMCPServer {
     private server;
     private config;
     private conversationManager;
-    private vertexAI;
+    private geminiAI;
     private mcpClient;
     private toolRegistry;
     private agenticLoop;
@@ -16,7 +16,7 @@ export declare class VertexAIMCPServer {
     private searchHandler;
     private fetchHandler;
     private searchCache;
-    constructor(config: VertexAIConfig);
+    constructor(config: GeminiAIConfig);
     /**
      * Setup MCP protocol handlers
      */
@@ -34,4 +34,4 @@ export declare class VertexAIMCPServer {
      */
     private registerTools;
 }
-//# sourceMappingURL=VertexAIMCPServer.d.ts.map
+//# sourceMappingURL=GeminiAIMCPServer.d.ts.map

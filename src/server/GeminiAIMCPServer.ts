@@ -1,5 +1,5 @@
 /**
- * VertexAIMCPServer - Main MCP server implementation
+ * GeminiAIMCPServer - Main MCP server implementation
  * Orchestrates all components and handles MCP protocol
  */
 
@@ -10,10 +10,10 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
-import { VertexAIConfig, CachedDocument, MCPServerConfig } from '../types/index.js';
+import { GeminiAIConfig, CachedDocument, MCPServerConfig } from '../types/index.js';
 import { QuerySchema, SearchSchema, FetchSchema } from '../schemas/index.js';
 import { ConversationManager } from '../managers/ConversationManager.js';
-import { VertexAIService } from '../services/VertexAIService.js';
+import { GeminiAIService } from '../services/GeminiAIService.js';
 import { EnhancedMCPClient } from '../mcp/EnhancedMCPClient.js';
 import { ToolRegistry } from '../tools/ToolRegistry.js';
 import { AgenticLoop } from '../agentic/AgenticLoop.js';
@@ -22,13 +22,13 @@ import { QueryHandler } from '../handlers/QueryHandler.js';
 import { SearchHandler } from '../handlers/SearchHandler.js';
 import { FetchHandler } from '../handlers/FetchHandler.js';
 
-export class VertexAIMCPServer {
+export class GeminiAIMCPServer {
   private server: Server;
-  private config: VertexAIConfig;
+  private config: GeminiAIConfig;
 
   // Core components
   private conversationManager: ConversationManager;
-  private vertexAI: VertexAIService;
+  private geminiAI: GeminiAIService;
   private mcpClient: EnhancedMCPClient;
   private toolRegistry: ToolRegistry;
   private agenticLoop: AgenticLoop;
@@ -42,11 +42,11 @@ export class VertexAIMCPServer {
   // Cache
   private searchCache: Map<string, CachedDocument>;
 
-  constructor(config: VertexAIConfig) {
+  constructor(config: GeminiAIConfig) {
     this.config = config;
     this.server = new Server(
       {
-        name: "vertex-mcp-server",
+        name: "gemini-mcp-server",
         version: "1.0.0",
       },
       {
@@ -70,7 +70,7 @@ export class VertexAIMCPServer {
       config.sessionTimeout,
       config.maxHistory
     );
-    this.vertexAI = new VertexAIService(config);
+    this.geminiAI = new GeminiAIService(config);
 
     // Initialize MCP client (will be initialized async in start())
     this.mcpClient = new EnhancedMCPClient('server', logDir, disableLogging, logToStderr);
@@ -80,7 +80,7 @@ export class VertexAIMCPServer {
 
     // Initialize agentic loop
     this.agenticLoop = new AgenticLoop(
-      this.vertexAI,
+      this.geminiAI,
       this.toolRegistry
     );
 
@@ -93,7 +93,7 @@ export class VertexAIMCPServer {
       disableLogging,
       logToStderr
     );
-    this.searchHandler = new SearchHandler(this.vertexAI, this.searchCache);
+    this.searchHandler = new SearchHandler(this.geminiAI, this.searchCache);
     this.fetchHandler = new FetchHandler(this.searchCache);
 
     this.setupHandlers();
@@ -109,7 +109,7 @@ export class VertexAIMCPServer {
         {
           name: "query",
           description:
-            "Query Google Cloud Vertex AI (Gemini models) with a prompt. " +
+            "Query Google AI (Gemini models) with a prompt. " +
             "This tool operates as an intelligent agent with multi-turn execution capabilities. " +
             "The agent can automatically use available tools (web fetching, external MCP servers) " +
             "to gather information and provide comprehensive answers. " +
@@ -119,7 +119,7 @@ export class VertexAIMCPServer {
             properties: {
               prompt: {
                 type: "string",
-                description: "The prompt to send to Vertex AI",
+                description: "The prompt to send to Gemini",
               },
               sessionId: {
                 type: "string",
@@ -132,7 +132,7 @@ export class VertexAIMCPServer {
         {
           name: "search",
           description:
-            "Search for information using Vertex AI. Returns a list of relevant search results. " +
+            "Search for information using Gemini. Returns a list of relevant search results. " +
             "Follows OpenAI MCP specification for search tools.",
           inputSchema: {
             type: "object",
@@ -197,7 +197,7 @@ export class VertexAIMCPServer {
    * Start the MCP server
    */
   async run(): Promise<void> {
-    this.logger.info('Initializing Vertex AI MCP Server');
+    this.logger.info('Initializing Gemini AI MCP Server');
 
     // Initialize MCP servers from config
     await this.initializeMCPServers();
@@ -209,14 +209,14 @@ export class VertexAIMCPServer {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
 
-    this.logger.info("Vertex AI MCP Server running on stdio");
+    this.logger.info("Gemini AI MCP Server running on stdio");
   }
 
   /**
    * Initialize external MCP servers
    */
   private async initializeMCPServers(): Promise<void> {
-    const mcpServersJson = process.env.VERTEX_MCP_SERVERS;
+    const mcpServersJson = process.env.GEMINI_MCP_SERVERS;
     if (!mcpServersJson) {
       this.logger.info('No external MCP servers configured');
       return;

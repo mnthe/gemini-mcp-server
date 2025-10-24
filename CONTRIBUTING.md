@@ -1,11 +1,11 @@
-# Contributing to vertex-mcp-server
+# Contributing to gemini-mcp-server
 
-Thank you for your interest in contributing to vertex-mcp-server! This document provides guidelines for contributing to the project.
+Thank you for your interest in contributing to gemini-mcp-server! This document provides guidelines for contributing to the project.
 
 ## Getting Started
 
 1. Fork the repository
-2. Clone your fork: `git clone https://github.com/YOUR_USERNAME/vertex-mcp-server.git`
+2. Clone your fork: `git clone https://github.com/YOUR_USERNAME/gemini-mcp-server.git`
 3. Install dependencies: `npm install`
 4. Build the project: `npm run build`
 
@@ -30,7 +30,7 @@ Thank you for your interest in contributing to vertex-mcp-server! This document 
 Before submitting a PR:
 
 1. Build the project: `npm run build`
-2. Test the server starts: `VERTEX_PROJECT_ID=test node build/index.js`
+2. Test the server starts: `GEMINI_PROJECT_ID=test node build/index.js`
 3. Verify the tool list works as expected
 
 ### Submitting a Pull Request

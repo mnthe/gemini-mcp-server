@@ -1,12 +1,12 @@
-# vertex-mcp-server
+# gemini-mcp-server
 
-An intelligent MCP (Model Context Protocol) server that enables AI assistants to query Google Cloud Vertex AI with **agentic capabilities** - automatic tool selection, multi-turn reasoning, and MCP-to-MCP delegation.
+An intelligent MCP (Model Context Protocol) server that enables AI assistants to query Google AI (Gemini models) via **Vertex AI or Google AI Studio** with **agentic capabilities** - automatic tool selection, multi-turn reasoning, and MCP-to-MCP delegation.
 
 ## Purpose
 
 This server provides:
 - **Agentic Loop**: Turn-based execution with automatic tool selection and reasoning
-- **Query Vertex AI**: Access Gemini and other Vertex AI models for cross-validation
+- **Query Gemini**: Access Gemini models via Vertex AI or Google AI Studio for cross-validation
 - **Tool Execution**: Built-in WebFetch + integration with external MCP servers
 - **Multi-turn Conversations**: Maintain context across queries with session management
 - **Reasoning Traces**: File-based logging of AI thinking processes
@@ -38,8 +38,8 @@ Inspired by OpenAI Agents SDK, the server operates as an autonomous agent:
 ## Prerequisites
 
 - Node.js 18 or higher
-- Google Cloud Platform account with Vertex AI API enabled
-- Google Cloud credentials configured
+- Google Cloud Platform account (for Vertex AI) OR Google AI Studio account
+- Google Cloud credentials configured (for Vertex AI mode)
 
 ## Quick Start
 
@@ -47,18 +47,20 @@ Inspired by OpenAI Agents SDK, the server operates as an autonomous agent:
 
 #### Option 1: npx (Recommended)
 ```bash
-npx -y github:mnthe/vertex-mcp-server
+npx -y github:mnthe/gemini-mcp-server
 ```
 
 #### Option 2: From Source
 ```bash
-git clone https://github.com/mnthe/vertex-mcp-server.git
-cd vertex-mcp-server
+git clone https://github.com/mnthe/gemini-mcp-server.git
+cd gemini-mcp-server
 npm install
 npm run build
 ```
 
 ### Authentication
+
+The gen-ai SDK supports multiple authentication methods. For Vertex AI mode:
 
 **Application Default Credentials (Recommended):**
 ```bash
@@ -70,6 +72,8 @@ gcloud auth application-default login
 export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account-key.json"
 ```
 
+For Google AI Studio mode, see the [gen-ai SDK documentation](https://googleapis.github.io/js-genai/release_docs/index.html).
+
 ### Configuration
 
 **Required Environment Variables:**
@@ -80,27 +84,27 @@ export GOOGLE_CLOUD_LOCATION="us-central1"
 
 **Optional Model Settings:**
 ```bash
-export VERTEX_MODEL="gemini-1.5-flash-002"
-export VERTEX_TEMPERATURE="1.0"
-export VERTEX_MAX_TOKENS="8192"
-export VERTEX_TOP_P="0.95"
-export VERTEX_TOP_K="40"
+export GEMINI_MODEL="gemini-2.5-pro"
+export GEMINI_TEMPERATURE="1.0"
+export GEMINI_MAX_TOKENS="8192"
+export GEMINI_TOP_P="0.95"
+export GEMINI_TOP_K="40"
 ```
 
 **Optional Agentic Features:**
 ```bash
 # Multi-turn conversations
-export VERTEX_ENABLE_CONVERSATIONS="true"
-export VERTEX_SESSION_TIMEOUT="3600"
-export VERTEX_MAX_HISTORY="10"
+export GEMINI_ENABLE_CONVERSATIONS="true"
+export GEMINI_SESSION_TIMEOUT="3600"
+export GEMINI_MAX_HISTORY="10"
 
 # Logging configuration
-export VERTEX_DISABLE_LOGGING="false"      # Set to 'true' to disable file-based logging
-export VERTEX_LOG_DIR="/path/to/logs"      # Custom log directory (default: ./logs)
-export VERTEX_LOG_TO_STDERR="true"         # Set to 'true' to pipe logs to stderr for debugging
+export GEMINI_DISABLE_LOGGING="false"      # Set to 'true' to disable file-based logging
+export GEMINI_LOG_DIR="/path/to/logs"      # Custom log directory (default: ./logs)
+export GEMINI_LOG_TO_STDERR="true"         # Set to 'true' to pipe logs to stderr for debugging
 
 # External MCP servers (for tool delegation)
-export VERTEX_MCP_SERVERS='[
+export GEMINI_MCP_SERVERS='[
   {
     "name": "filesystem",
     "transport": "stdio",
@@ -123,14 +127,14 @@ Add to your MCP client configuration:
 ```json
 {
   "mcpServers": {
-    "vertex-ai": {
+    "gemini": {
       "command": "npx",
-      "args": ["-y", "github:mnthe/vertex-mcp-server"],
+      "args": ["-y", "github:mnthe/gemini-mcp-server"],
       "env": {
         "GOOGLE_CLOUD_PROJECT": "your-gcp-project-id",
         "GOOGLE_CLOUD_LOCATION": "us-central1",
-        "VERTEX_MODEL": "gemini-1.5-flash-002",
-        "VERTEX_ENABLE_CONVERSATIONS": "true"
+        "GEMINI_MODEL": "gemini-2.5-pro",
+        "GEMINI_ENABLE_CONVERSATIONS": "true"
       }
     }
   }
@@ -143,11 +147,11 @@ Add to your MCP client configuration:
   "mcpServers": {
     "gemini": {
       "command": "npx",
-      "args": ["-y", "github:mnthe/vertex-mcp-server"],
+      "args": ["-y", "github:mnthe/gemini-mcp-server"],
       "env": {
         "GOOGLE_CLOUD_PROJECT": "your-gcp-project-id",
         "GOOGLE_CLOUD_LOCATION": "us-central1",
-        "VERTEX_MODEL": "gemini-1.5-flash-002"
+        "GEMINI_MODEL": "gemini-2.5-pro"
       }
     }
   }
@@ -157,10 +161,10 @@ Add to your MCP client configuration:
 **Other MCP Clients** (Generic stdio):
 ```bash
 # Command to run
-npx -y github:mnthe/vertex-mcp-server
+npx -y github:mnthe/gemini-mcp-server
 
 # Or direct execution
-node /path/to/vertex-mcp-server/build/index.js
+node /path/to/gemini-mcp-server/build/index.js
 ```
 
 ## Available Tools
@@ -203,7 +207,7 @@ query: "Give me an example" (uses sessionId from previous response)
 
 ### search
 
-Search for information using Vertex AI (OpenAI MCP spec).
+Search for information using Gemini (OpenAI MCP spec).
 
 **Parameters:**
 - `query` (string, required): Search query
@@ -273,7 +277,7 @@ src/
 │   └── ToolRegistry.ts      # Tool management + parallel execution
 │
 ├── services/          # External services
-│   └── VertexAIService.ts   # Gemini API (with thinkingConfig)
+│   └── GeminiAIService.ts   # Gemini API (with thinkingConfig)
 │
 ├── handlers/          # MCP tool handlers
 │   ├── QueryHandler.ts
@@ -291,7 +295,7 @@ src/
 │   └── utils/         # Logger
 │
 └── server/            # MCP server bootstrap
-    └── VertexAIMCPServer.ts
+    └── GeminiAIMCPServer.ts
 ```
 
 See [DIRECTORY_STRUCTURE.md](DIRECTORY_STRUCTURE.md) and [ARCHITECTURE.md](ARCHITECTURE.md) for details.
@@ -304,7 +308,7 @@ Connect to external MCP servers for extended capabilities:
 
 **Stdio (subprocess):**
 ```bash
-export VERTEX_MCP_SERVERS='[
+export GEMINI_MCP_SERVERS='[
   {
     "name": "filesystem",
     "transport": "stdio",
@@ -316,7 +320,7 @@ export VERTEX_MCP_SERVERS='[
 
 **HTTP:**
 ```bash
-export VERTEX_MCP_SERVERS='[
+export GEMINI_MCP_SERVERS='[
   {
     "name": "api-server",
     "transport": "http",
@@ -338,20 +342,20 @@ tail -f logs/reasoning.log   # Gemini thinking process only
 
 To disable logging when running via npx or in containerized environments:
 ```bash
-export VERTEX_DISABLE_LOGGING="true"
+export GEMINI_DISABLE_LOGGING="true"
 ```
 
 To use a custom log directory:
 ```bash
-export VERTEX_LOG_DIR="/path/to/custom/logs"
+export GEMINI_LOG_DIR="/path/to/custom/logs"
 ```
 
 To pipe logs to stderr for debugging (useful for seeing logs in MCP client output):
 ```bash
-export VERTEX_LOG_TO_STDERR="true"
+export GEMINI_LOG_TO_STDERR="true"
 ```
 
-**Note:** When `VERTEX_LOG_TO_STDERR` is enabled, logs are written to stderr instead of files. This is useful for debugging MCP server issues as the logs will appear in the MCP client's log output (e.g., Claude Desktop logs).
+**Note:** When `GEMINI_LOG_TO_STDERR` is enabled, logs are written to stderr instead of files. This is useful for debugging MCP server issues as the logs will appear in the MCP client's log output (e.g., Claude Desktop logs).
 
 ### Custom Tool Development
 
@@ -408,12 +412,12 @@ If the MCP server appears to be "dead" or disconnects unexpectedly:
 ```json
 {
   "mcpServers": {
-    "vertex-ai": {
+    "gemini": {
       "command": "npx",
-      "args": ["-y", "github:mnthe/vertex-mcp-server"],
+      "args": ["-y", "github:mnthe/gemini-mcp-server"],
       "env": {
         "GOOGLE_CLOUD_PROJECT": "your-project-id",
-        "VERTEX_LOG_TO_STDERR": "true"
+        "GEMINI_LOG_TO_STDERR": "true"
       }
     }
   }
@@ -427,24 +431,24 @@ If you encounter errors like `ENOENT: no such file or directory, mkdir './logs'`
 
 **Quick Fix:** Disable logging when running via npx:
 ```bash
-export VERTEX_DISABLE_LOGGING="true"
+export GEMINI_DISABLE_LOGGING="true"
 ```
 
 **Alternative:** Set a custom log directory with write permissions:
 ```bash
-export VERTEX_LOG_DIR="/tmp/vertex-logs"
+export GEMINI_LOG_DIR="/tmp/gemini-logs"
 ```
 
 When using Claude Desktop or other MCP clients, add the environment variable:
 ```json
 {
   "mcpServers": {
-    "vertex-ai": {
+    "gemini": {
       "command": "npx",
-      "args": ["-y", "github:mnthe/vertex-mcp-server"],
+      "args": ["-y", "github:mnthe/gemini-mcp-server"],
       "env": {
         "GOOGLE_CLOUD_PROJECT": "your-project-id",
-        "VERTEX_DISABLE_LOGGING": "true"
+        "GEMINI_DISABLE_LOGGING": "true"
       }
     }
   }
@@ -458,7 +462,7 @@ When using Claude Desktop or other MCP clients, add the environment variable:
 
 ### Tool Execution Failures
 - Check logs in `logs/general.log` (if logging is enabled)
-- Verify MCP server configurations in `VERTEX_MCP_SERVERS`
+- Verify MCP server configurations in `GEMINI_MCP_SERVERS`
 - Ensure external servers are running (for HTTP transport)
 
 ### MaxTurns Exceeded

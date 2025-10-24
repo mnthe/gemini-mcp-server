@@ -9,9 +9,9 @@ src/
 │   └── tool/          # Tool interface and base classes
 │
 ├── infrastructure/    # External services and clients
-│   ├── vertexai/      # VertexAI service
-│   ├── mcp/           # MCP client connections (stdio, HTTP)
-│   └── tools/         # Tool implementations (WebFetch, Registry)
+│   ├── gemini/         # GeminiAI service
+│   ├── mcp/            # MCP client connections (stdio, HTTP)
+│   └── tools/          # Tool implementations (WebFetch, Registry)
 │
 ├── domain/            # Business logic
 │   ├── handlers/      # MCP tool handlers (query, search, fetch)
@@ -25,7 +25,7 @@ src/
 │   └── utils/         # Logger and utilities
 │
 ├── server/            # MCP server entry point
-│   └── VertexAIMCPServer.ts
+│   └── GeminiAIMCPServer.ts
 │
 └── index.ts           # Application entry point
 ```
@@ -36,7 +36,7 @@ src/
 Contains the **heart of the agentic system** - the loop, state management, and tool interface. These are the most critical components that define how the agent operates.
 
 ### infrastructure/
-**External dependencies and implementations** - services that interact with external systems (Vertex AI, MCP servers) and tool implementations. Changes here are usually about integration rather than business logic.
+**External dependencies and implementations** - services that interact with external systems (Gemini AI, MCP servers) and tool implementations. Changes here are usually about integration rather than business logic.
 
 ### domain/
 **Business logic layer** - handlers process user requests, managers maintain application state. This is where business rules live.

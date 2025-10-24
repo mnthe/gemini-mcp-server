@@ -1,10 +1,10 @@
 /**
  * AgenticLoop - Main orchestrator for turn-based agentic execution
- * Integrates all components: RunState, Tools, ResponseProcessor, VertexAI
+ * Integrates all components: RunState, Tools, ResponseProcessor, GeminiAI
  */
 import { RunOptions } from './RunState.js';
 import { ToolRegistry } from '../tools/ToolRegistry.js';
-import { VertexAIService } from '../services/VertexAIService.js';
+import { GeminiAIService } from '../services/GeminiAIService.js';
 import { Message } from '../types/index.js';
 export interface RunResult {
     sessionId: string;
@@ -15,10 +15,10 @@ export interface RunResult {
     turnsUsed: number;
 }
 export declare class AgenticLoop {
-    private vertexAI;
+    private geminiAI;
     private toolRegistry;
     private responseProcessor;
-    constructor(vertexAI: VertexAIService, toolRegistry: ToolRegistry);
+    constructor(geminiAI: GeminiAIService, toolRegistry: ToolRegistry);
     /**
      * Run the agentic loop
      */

@@ -1,5 +1,5 @@
 /**
- * Configuration types for Vertex AI MCP Server
+ * Configuration types for Gemini AI MCP Server
  */
 export {};
 //# sourceMappingURL=config.js.map

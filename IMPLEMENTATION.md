@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Vertex AI MCP Server is a production-grade intelligent agent that enables AI assistants to query Google Cloud Vertex AI with full agentic capabilities - turn-based execution, automatic tool orchestration, and MCP-to-MCP integration.
+The Gemini AI MCP Server is a production-grade intelligent agent that enables AI assistants to query Google AI (Gemini models) via Vertex AI or Google AI Studio with full agentic capabilities - turn-based execution, automatic tool orchestration, and MCP-to-MCP integration.
 
 **Implementation Date**: January 2025
 **Architecture**: OpenAI Agents SDK-inspired agentic loop
@@ -77,11 +77,12 @@ The Vertex AI MCP Server is a production-grade intelligent agent that enables AI
 
 #### 4. Infrastructure
 
-**VertexAIService.ts** (`src/services/`)
-- Gemini API integration
+**GeminiAIService.ts** (`src/services/`)
+- Gemini API integration via gen-ai SDK
 - ThinkingConfig support for reasoning mode
 - Dynamic generation config per query
 - Response text extraction
+- Supports both Vertex AI and Google AI Studio modes
 
 **Logger.ts** (`src/utils/`)
 - File-based logging (`logs/general.log`, `logs/reasoning.log`)
@@ -211,7 +212,7 @@ npm audit
 ### Design Patterns Used
 - **Strategy Pattern**: Different tool execution strategies
 - **Template Method**: BaseTool abstract class
-- **Facade Pattern**: VertexAIMCPServer hides complexity
+- **Facade Pattern**: GeminiAIMCPServer hides complexity
 - **Observer Pattern**: Logger for execution tracing
 - **Dependency Injection**: Constructor-based dependencies
 
@@ -282,7 +283,7 @@ query: "Give me an example" (with sessionId)
 
 ### 1. Installation
 ```bash
-npx -y github:mnthe/vertex-mcp-server
+npx -y github:mnthe/gemini-mcp-server
 ```
 
 ### 2. Authentication
@@ -301,13 +302,13 @@ Add to `claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
-    "vertex-ai": {
+    "gemini": {
       "command": "npx",
-      "args": ["-y", "github:mnthe/vertex-mcp-server"],
+      "args": ["-y", "github:mnthe/gemini-mcp-server"],
       "env": {
         "GOOGLE_CLOUD_PROJECT": "your-project-id",
         "GOOGLE_CLOUD_LOCATION": "us-central1",
-        "VERTEX_ENABLE_CONVERSATIONS": "true"
+        "GEMINI_ENABLE_CONVERSATIONS": "true"
       }
     }
   }
@@ -316,7 +317,7 @@ Add to `claude_desktop_config.json`:
 
 ### 5. Optional: External MCP Servers
 ```bash
-export VERTEX_MCP_SERVERS='[
+export GEMINI_MCP_SERVERS='[
   {
     "name": "filesystem",
     "transport": "stdio",
@@ -328,7 +329,7 @@ export VERTEX_MCP_SERVERS='[
 
 ## Conclusion
 
-The Vertex AI MCP Server successfully implements a production-grade agentic system with:
+The Gemini AI MCP Server successfully implements a production-grade agentic system with:
 - Turn-based autonomous execution
 - Automatic tool orchestration
 - Robust error handling and security

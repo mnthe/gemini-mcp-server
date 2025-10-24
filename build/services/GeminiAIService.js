@@ -1,9 +1,9 @@
 /**
- * VertexAIService - Handles communication with Google Cloud Vertex AI
- * Uses @google/genai unified SDK with Vertex AI mode
+ * GeminiAIService - Handles communication with Google AI (Gemini models)
+ * Uses @google/genai unified SDK supporting both Vertex AI and Google AI Studio
  */
 import { GoogleGenAI } from "@google/genai";
-export class VertexAIService {
+export class GeminiAIService {
     client;
     config;
     constructor(config) {
@@ -41,14 +41,14 @@ export class VertexAIService {
         }
         catch (error) {
             // Log error details for debugging
-            console.error('Vertex AI query error:', error);
+            console.error('Gemini API query error:', error);
             // Return error message instead of throwing
             const errorMsg = error instanceof Error ? error.message : String(error);
-            throw new Error(`Vertex AI API error: ${errorMsg}`);
+            throw new Error(`Gemini API error: ${errorMsg}`);
         }
     }
     /**
-     * Extract text from Vertex AI response
+     * Extract text from Gemini API response
      */
     extractResponseText(response) {
         try {
@@ -84,4 +84,4 @@ export class VertexAIService {
         return { ...this.config };
     }
 }
-//# sourceMappingURL=VertexAIService.js.map
+//# sourceMappingURL=GeminiAIService.js.map
