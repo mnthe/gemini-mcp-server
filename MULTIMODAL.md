@@ -97,7 +97,21 @@ Each part object in the `parts` array must have **exactly one** of these fields:
 - `mimeType` (string, required): Must be a valid MIME type from the supported list
 - `fileUri` (string, required): 
   - Cloud Storage: `gs://bucket-name/path/to/file`
-  - Public HTTPS: `https://example.com/path/to/file`
+  - Public HTTPS: `https://example.com/path/to/file` (subject to security validation)
+  - Local Files: `file:///path/to/file` (only if `GEMINI_ALLOW_FILE_URIS=true` is set)
+  
+**Security for HTTPS URLs:**
+When using HTTPS URLs in `fileUri`, the following security checks are applied:
+- Only HTTPS URLs are allowed (HTTP is rejected)
+- Private IP addresses are blocked (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8)
+- DNS validation prevents SSRF attacks
+
+**Local File URIs (file://):**
+Local file URIs are disabled by default for security. To enable:
+- Set `GEMINI_ALLOW_FILE_URIS=true` environment variable
+- **Only use in CLI environments** (Codex, Claude Code, Gemini CLI) where the MCP server and agent share the same sandbox
+- **Do NOT enable in desktop apps** (Claude Desktop, ChatGPT App) for security reasons
+
 
 #### Complete Request Schema
 
@@ -188,6 +202,16 @@ For large files, use Cloud Storage URIs:
   }
 }
 ```
+
+**Security for HTTPS URLs:**
+
+When using HTTPS URLs (e.g., `https://example.com/image.jpg`) instead of Cloud Storage URIs (`gs://`), the server applies the same security validation as the WebFetch tool:
+
+- **HTTPS Only**: Only HTTPS URLs are accepted. HTTP URLs are rejected with a SecurityError.
+- **Private IP Blocking**: URLs that resolve to private IP addresses (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8) are blocked to prevent SSRF attacks.
+- **DNS Validation**: The server performs DNS resolution to check if the hostname resolves to a private IP address.
+
+Cloud Storage URIs (`gs://`) are not subject to these additional security checks as they are managed by Google Cloud Platform.
 
 ### Multiple Files
 
@@ -313,7 +337,28 @@ const response = await client.callTool({
 });
 ```
 
-### Example 4: Audio Transcription
+### Example 4: Local File URI (CLI environments only)
+
+```javascript
+// Only works if GEMINI_ALLOW_FILE_URIS=true is set
+// Use in CLI tools (Codex, Claude Code, Gemini CLI) where server and agent share sandbox
+const response = await client.callTool({
+  name: "query",
+  arguments: {
+    prompt: "Analyze this local image",
+    parts: [
+      {
+        fileData: {
+          mimeType: "image/jpeg",
+          fileUri: "file:///workspace/image.jpg"
+        }
+      }
+    ]
+  }
+});
+```
+
+### Example 5: Audio Transcription
 
 ```javascript
 const audioBuffer = fs.readFileSync('audio.mp3');
@@ -377,6 +422,8 @@ export GEMINI_MODEL="gemini-2.0-flash-exp"
 5. **Validate MIME Types**: Ensure you're using supported MIME types from the list above
 
 6. **Consider Context Length**: Large multimodal inputs consume more of the model's context window
+
+7. **Use HTTPS for Web Resources**: When using HTTPS URLs for `fileUri`, ensure they are publicly accessible and not behind authentication. The server enforces HTTPS-only and blocks private IP addresses for security.
 
 ## For Agent/Client Developers
 
@@ -605,6 +652,7 @@ Errors will be returned in the standard error format. Common multimodal-related 
 - Inaccessible file URI
 - File too large
 - Model doesn't support multimodal
+- `file://` URIs not allowed (when `GEMINI_ALLOW_FILE_URIS` is not enabled)
 
 ## Limitations
 
@@ -627,6 +675,17 @@ For API errors related to multimodal content, check:
 - File size is within limits
 - Model supports multimodal inputs
 - Cloud Storage URIs are accessible
+
+**Security Errors:**
+
+If using HTTPS URLs in `fileData.fileUri`, you may encounter security errors:
+- `SecurityError: Only HTTPS URLs are allowed` - The URL must use HTTPS, not HTTP
+- `SecurityError: Private IP addresses are not allowed` - The URL resolves to a private IP address and is blocked for security reasons
+
+If using `file://` URLs:
+- `SecurityError: file:// URIs are not allowed` - Local file URIs are disabled by default. Set `GEMINI_ALLOW_FILE_URIS=true` to enable (only for CLI environments)
+
+These security measures protect against Server-Side Request Forgery (SSRF) attacks and follow the same security policy as the WebFetch tool.
 
 ## Migration from Text-Only
 

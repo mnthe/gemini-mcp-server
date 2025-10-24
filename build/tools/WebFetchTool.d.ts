@@ -12,18 +12,6 @@ export declare class WebFetchTool extends BaseTool {
         extract?: boolean;
     }, context: RunContext): Promise<ToolResult>;
     /**
-     * Check if hostname resolves to private IP
-     */
-    private checkPrivateIP;
-    /**
-     * Check if IP address is in private CIDR ranges
-     */
-    private isPrivateIPAddress;
-    /**
-     * Check if domain is known public domain (skip IP check)
-     */
-    private isPublicDomain;
-    /**
      * Check if content is HTML
      */
     private isHTML;
