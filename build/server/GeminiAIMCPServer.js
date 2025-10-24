@@ -76,7 +76,8 @@ export class GeminiAIMCPServer {
                         "This tool operates as an intelligent agent with multi-turn execution capabilities. " +
                         "The agent can automatically use available tools (web fetching, external MCP servers) " +
                         "to gather information and provide comprehensive answers. " +
-                        "Supports multi-turn conversations when sessionId is provided.",
+                        "Supports multi-turn conversations when sessionId is provided. " +
+                        "Supports multimodal inputs (images, audio, video, documents) via the optional 'parts' parameter.",
                     inputSchema: {
                         type: "object",
                         properties: {
@@ -88,6 +89,49 @@ export class GeminiAIMCPServer {
                                 type: "string",
                                 description: "Optional conversation session ID for multi-turn conversations",
                             },
+                            parts: {
+                                type: "array",
+                                description: "Optional multimodal content parts (images, audio, video, documents)",
+                                items: {
+                                    type: "object",
+                                    properties: {
+                                        text: {
+                                            type: "string",
+                                            description: "Text content"
+                                        },
+                                        inlineData: {
+                                            type: "object",
+                                            description: "Inline base64 encoded file data",
+                                            properties: {
+                                                mimeType: {
+                                                    type: "string",
+                                                    description: "MIME type of the file (e.g., 'image/jpeg', 'audio/mp3', 'video/mp4')"
+                                                },
+                                                data: {
+                                                    type: "string",
+                                                    description: "Base64 encoded file data"
+                                                }
+                                            },
+                                            required: ["mimeType", "data"]
+                                        },
+                                        fileData: {
+                                            type: "object",
+                                            description: "File URI for Cloud Storage or public URLs",
+                                            properties: {
+                                                mimeType: {
+                                                    type: "string",
+                                                    description: "MIME type of the file"
+                                                },
+                                                fileUri: {
+                                                    type: "string",
+                                                    description: "URI of the file (gs:// for Cloud Storage or https:// for public URLs)"
+                                                }
+                                            },
+                                            required: ["mimeType", "fileUri"]
+                                        }
+                                    }
+                                }
+                            }
                         },
                         required: ["prompt"],
                     },

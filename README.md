@@ -1,17 +1,27 @@
 # gemini-mcp-server
 
-An intelligent MCP (Model Context Protocol) server that enables AI assistants to query Google AI (Gemini models) via **Vertex AI or Google AI Studio** with **agentic capabilities** - automatic tool selection, multi-turn reasoning, and MCP-to-MCP delegation.
+An intelligent MCP (Model Context Protocol) server that enables AI assistants to query Google AI (Gemini models) via **Vertex AI or Google AI Studio** with **agentic capabilities** - automatic tool selection, multi-turn reasoning, MCP-to-MCP delegation, and **multimodal input support**.
 
 ## Purpose
 
 This server provides:
 - **Agentic Loop**: Turn-based execution with automatic tool selection and reasoning
 - **Query Gemini**: Access Gemini models via Vertex AI or Google AI Studio for cross-validation
+- **Multimodal Support**: Send images, audio, video, and code files alongside text prompts
 - **Tool Execution**: Built-in WebFetch + integration with external MCP servers
 - **Multi-turn Conversations**: Maintain context across queries with session management
 - **Reasoning Traces**: File-based logging of AI thinking processes
 
 ## Key Features
+
+### 🎨 Multimodal Input Support
+Send images, audio, video, and code files to Gemini:
+- **Images**: JPEG, PNG, WebP, HEIC
+- **Videos**: MP4, MOV, AVI, WebM, and more
+- **Audio**: MP3, WAV, AAC, FLAC, and more
+- **Documents/Code**: PDF, text files, code files (Python, JavaScript, etc.)
+- Support for both base64-encoded inline data and Cloud Storage URIs
+- See [MULTIMODAL.md](MULTIMODAL.md) for detailed documentation
 
 ### 🤖 Intelligent Agentic Loop
 Inspired by OpenAI Agents SDK, the server operates as an autonomous agent:
@@ -171,23 +181,24 @@ node /path/to/gemini-mcp-server/build/index.js
 
 ### query
 
-Main agentic entrypoint that handles multi-turn execution with automatic tool selection.
+Main agentic entrypoint that handles multi-turn execution with automatic tool selection and **multimodal input support**.
 
 **Parameters:**
-- `prompt` (string, required): The prompt to send
+- `prompt` (string, required): The text prompt to send
 - `sessionId` (string, optional): Conversation session ID
+- `parts` (array, optional): Multimodal content parts (images, audio, video, documents)
 
 **How It Works:**
-1. Analyzes the prompt and conversation history
+1. Analyzes the prompt and conversation history (including multimodal content)
 2. Decides whether to use tools or respond directly
 3. Executes tools in parallel if needed (WebFetch, MCP tools)
 4. Retries failed tools with exponential backoff
 5. Falls back to Gemini knowledge if tools fail
 6. Continues for up to 10 turns until final answer
 
-**Example:**
+**Examples:**
 ```
-# Simple query
+# Simple text query
 query: "What is the capital of France?"
 
 # Complex query with tool usage
@@ -195,10 +206,24 @@ query: "Fetch the latest news from https://example.com/news and summarize"
 → Automatically uses WebFetch tool
 → Synthesizes content into answer
 
+# Image analysis (multimodal)
+query: "What's in this image?"
+parts: [{ inlineData: { mimeType: "image/jpeg", data: "<base64>" } }]
+
 # Multi-turn conversation
 query: "What is machine learning?" (sessionId auto-created)
 query: "Give me an example" (uses sessionId from previous response)
 ```
+
+**Multimodal Support:**
+See [MULTIMODAL.md](MULTIMODAL.md) for detailed documentation on:
+- **Parts array structure and field requirements** (for agent developers)
+- Supported file types (images, audio, video, documents)
+- Base64 inline data vs Cloud Storage URIs
+- Complete schema and validation rules
+- Usage examples and code samples
+- Best practices and limitations
+- Common mistakes to avoid
 
 **Response Includes:**
 - Final answer

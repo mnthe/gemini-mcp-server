@@ -14,9 +14,9 @@ export class AgenticLoop {
         this.responseProcessor = new ResponseProcessor();
     }
     /**
-     * Run the agentic loop
+     * Run the agentic loop with optional multimodal support
      */
-    async run(prompt, conversationHistory, options = {}) {
+    async run(prompt, conversationHistory, options = {}, multimodalParts) {
         const state = new RunState(options);
         // Add conversation history
         for (const msg of conversationHistory) {
@@ -37,10 +37,11 @@ export class AgenticLoop {
             const fullPrompt = this.buildPromptWithTools(state);
             // 2. Detect if we should use thinking mode
             const useThinking = this.shouldUseThinking(state);
-            // 3. Call Gemini AI
+            // 3. Call Gemini AI (with multimodal parts on first turn only)
+            const isFirstTurn = state.currentTurn === 1;
             const response = await this.geminiAI.query(fullPrompt, {
                 enableThinking: useThinking,
-            });
+            }, isFirstTurn ? multimodalParts : undefined);
             state.logger.info('Received response from Gemini AI');
             // 4. Validate and process response
             try {
