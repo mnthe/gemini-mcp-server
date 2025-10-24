@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Vertex AI MCP Server implements an **intelligent agentic loop** inspired by the OpenAI Agents SDK. The architecture supports turn-based execution, automatic tool selection, parallel tool execution, and robust error handling.
+The Gemini AI MCP Server implements an **intelligent agentic loop** inspired by the OpenAI Agents SDK. The architecture supports turn-based execution, automatic tool selection, parallel tool execution, and robust error handling.
 
 **Last Updated**: 2025-01-23 (Post-Agentic Loop Implementation)
 
@@ -77,7 +77,7 @@ src/
 │   └── ToolRegistry.ts     # Tool management + parallel execution
 │
 ├── services/          # External service integrations
-│   └── VertexAIService.ts  # Gemini API (thinkingConfig support)
+│   └── GeminiAIService.ts  # Gemini API (thinkingConfig support)
 │
 ├── handlers/          # MCP tool handlers
 │   ├── QueryHandler.ts     # Main query handler (uses AgenticLoop)
@@ -108,7 +108,7 @@ src/
 │   └── Logger.ts           # File-based logging system
 │
 ├── server/            # MCP server bootstrap
-│   └── VertexAIMCPServer.ts
+│   └── GeminiAIMCPServer.ts
 │
 └── index.ts           # Application entry point
 ```
@@ -216,12 +216,12 @@ ARGUMENTS: {"url": "https://example.com", "extract": true}
 - **Stdio**: Subprocess communication (stdin/stdout JSON-RPC)
 - **HTTP**: RESTful API (`POST /tools/list`, `POST /tools/call`)
 
-### 7. VertexAIService (Gemini API)
+### 7. GeminiAIService (Gemini API)
 
-**Location**: `src/services/VertexAIService.ts`
+**Location**: `src/services/GeminiAIService.ts`
 
 **Responsibilities**:
-- Gemini API communication
+- Gemini API communication via gen-ai SDK
 - ThinkingConfig support for reasoning mode
 - Response text extraction
 
@@ -229,6 +229,7 @@ ARGUMENTS: {"url": "https://example.com", "extract": true}
 - Dynamic generation config per query
 - Thinking mode activation
 - Response parsing with error handling
+- Supports both Vertex AI and Google AI Studio modes
 
 ### 8. Logger (File-based Logging)
 
@@ -249,7 +250,7 @@ ARGUMENTS: {"url": "https://example.com", "extract": true}
 ### Query Execution Flow
 
 ```
-1. MCP Client → VertexAIMCPServer
+1. MCP Client → GeminiAIMCPServer
    ↓
 2. QueryHandler.handle()
    ↓
@@ -418,7 +419,7 @@ toolRegistry.tools.set(myTool.name, myTool);
 
 ### Adding External MCP Server
 
-Update `VERTEX_MCP_SERVERS` environment variable:
+Update `GEMINI_MCP_SERVERS` environment variable:
 ```json
 [
   {
@@ -463,14 +464,14 @@ expect(parsed.toolCalls.length).toBe(1);
 Test agentic loop end-to-end:
 
 ```typescript
-const loop = new AgenticLoop(vertexAI, toolRegistry);
+const loop = new AgenticLoop(geminiAI, toolRegistry);
 const result = await loop.run("Fetch https://example.com", [], {});
 expect(result.finalOutput).toContain("content");
 ```
 
 ### Mock Strategy
 
-- Mock `VertexAIService` for predictable responses
+- Mock `GeminiAIService` for predictable responses
 - Mock `EnhancedMCPClient` for tool testing
 - Use in-memory `Logger` for test isolation
 

@@ -1,6 +1,6 @@
 # Build Pipeline Documentation
 
-This document describes the build pipeline and distribution setup for the Vertex AI MCP Server.
+This document describes the build pipeline and distribution setup for the Gemini AI MCP Server.
 
 ## Overview
 
@@ -13,7 +13,7 @@ The project is configured to support multiple installation methods, with a focus
 Users can run the server directly from GitHub without cloning or installing:
 
 ```bash
-npx -y github:mnthe/vertex-mcp-server
+npx -y github:mnthe/gemini-mcp-server
 ```
 
 This method:
@@ -25,15 +25,15 @@ This method:
 ### 2. Global Installation (Future - when published to npm)
 
 ```bash
-npm install -g vertex-mcp-server
-vertex-mcp-server
+npm install -g gemini-mcp-server
+gemini-mcp-server
 ```
 
 ### 3. Local Development
 
 ```bash
-git clone https://github.com/mnthe/vertex-mcp-server.git
-cd vertex-mcp-server
+git clone https://github.com/mnthe/gemini-mcp-server.git
+cd gemini-mcp-server
 npm install
 npm run build
 node build/index.js
@@ -46,7 +46,7 @@ node build/index.js
 **Key Fields:**
 - `"type": "module"` - Uses ES modules
 - `"main": "./build/index.js"` - Entry point
-- `"bin": { "vertex-mcp-server": "./build/index.js" }` - CLI executable
+- `"bin": { "gemini-mcp-server": "./build/index.js" }` - CLI executable
 - `"files": ["build", "README.md", "LICENSE", ".env.example"]` - Included in package
 
 **Scripts:**
@@ -81,7 +81,7 @@ build/
 ├── managers/ (compiled state managers)
 ├── schemas/ (compiled validation)
 ├── server/ (compiled MCP server)
-├── services/ (compiled Vertex AI service)
+├── services/ (compiled Gemini AI service)
 └── types/ (compiled type definitions)
 ```
 
@@ -163,7 +163,7 @@ The build directory is **committed to the repository** to support `npx` usage di
 ```
 
 This is intentionally different from typical Node.js projects where build output is gitignored. Committing the build output allows:
-- Direct execution via `npx github:mnthe/vertex-mcp-server`
+- Direct execution via `npx github:mnthe/gemini-mcp-server`
 - No build step required for users
 - Faster installation time
 
@@ -227,7 +227,7 @@ npm run build
 
 ### npx Fails to Run
 
-**Issue:** `npx github:mnthe/vertex-mcp-server` doesn't work
+**Issue:** `npx github:mnthe/gemini-mcp-server` doesn't work
 
 **Possible causes:**
 1. Build directory not committed to repository
@@ -291,7 +291,7 @@ ls -la build/
 1. **Automated Testing**
    - Unit tests for all modules
    - Integration tests for MCP protocol
-   - End-to-end tests with Vertex AI
+   - End-to-end tests with Gemini AI
 
 2. **Code Quality**
    - ESLint configuration
