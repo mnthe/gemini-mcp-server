@@ -42,9 +42,93 @@ The Gemini MCP Server now supports multimodal inputs, allowing you to send image
 
 ## Usage
 
+### Parts Array Structure for Agents
+
+The `query` tool accepts an optional `parts` array parameter that enables multimodal content. This section provides detailed information for MCP clients and agents on how to properly construct multimodal requests.
+
+#### Parts Array Overview
+
+The `parts` parameter is an **optional array** of multimodal content parts. Each part in the array represents one piece of content (text, image, audio, video, or document).
+
+**Key Points:**
+- The `parts` array is **optional** - text-only queries don't need it
+- Each part is an **object** with one of three possible structures: `text`, `inlineData`, or `fileData`
+- You can mix multiple types of content in a single query
+- Parts are processed in order and combined with the main `prompt`
+
+#### Part Object Structure
+
+Each part object in the `parts` array must have **exactly one** of these fields:
+
+1. **`text`** (string, optional): Additional text content
+   ```json
+   {
+     "text": "Additional context or instructions"
+   }
+   ```
+
+2. **`inlineData`** (object, optional): Base64-encoded file content
+   ```json
+   {
+     "inlineData": {
+       "mimeType": "image/jpeg",  // Required: MIME type string
+       "data": "base64string..."   // Required: Base64-encoded file data
+     }
+   }
+   ```
+
+3. **`fileData`** (object, optional): Cloud Storage or public URL reference
+   ```json
+   {
+     "fileData": {
+       "mimeType": "video/mp4",              // Required: MIME type string
+       "fileUri": "gs://bucket/file.mp4"     // Required: URI string (gs:// or https://)
+     }
+   }
+   ```
+
+#### Field Requirements
+
+**For `inlineData`:**
+- `mimeType` (string, required): Must be a valid MIME type from the supported list
+- `data` (string, required): Base64-encoded binary data of the file
+
+**For `fileData`:**
+- `mimeType` (string, required): Must be a valid MIME type from the supported list
+- `fileUri` (string, required): 
+  - Cloud Storage: `gs://bucket-name/path/to/file`
+  - Public HTTPS: `https://example.com/path/to/file`
+
+#### Complete Request Schema
+
+```json
+{
+  "name": "query",
+  "arguments": {
+    "prompt": "string (required): The main text prompt",
+    "sessionId": "string (optional): Session ID for conversation continuity",
+    "parts": [
+      // Optional array of part objects
+      {
+        // Include ONE of: text, inlineData, or fileData
+        "text": "string (optional)",
+        "inlineData": {
+          "mimeType": "string (required)",
+          "data": "string (required, base64)"
+        },
+        "fileData": {
+          "mimeType": "string (required)",
+          "fileUri": "string (required, gs:// or https://)"
+        }
+      }
+    ]
+  }
+}
+```
+
 ### Basic Structure
 
-The `query` tool now accepts an optional `parts` array that can contain multimodal content:
+Example of a simple multimodal query with an image:
 
 ```json
 {
@@ -293,6 +377,234 @@ export GEMINI_MODEL="gemini-2.0-flash-exp"
 5. **Validate MIME Types**: Ensure you're using supported MIME types from the list above
 
 6. **Consider Context Length**: Large multimodal inputs consume more of the model's context window
+
+## For Agent/Client Developers
+
+This section provides implementation guidance for developers building MCP clients or agents that need to use multimodal functionality.
+
+### Constructing Parts Arrays
+
+When building a multimodal request, construct the `parts` array as follows:
+
+```typescript
+// Example: TypeScript/JavaScript client
+interface MultimodalPart {
+  text?: string;
+  inlineData?: {
+    mimeType: string;
+    data: string;  // base64
+  };
+  fileData?: {
+    mimeType: string;
+    fileUri: string;  // gs:// or https://
+  };
+}
+
+// Build parts array
+const parts: MultimodalPart[] = [];
+
+// Add image
+parts.push({
+  inlineData: {
+    mimeType: "image/jpeg",
+    data: base64ImageString
+  }
+});
+
+// Add text context
+parts.push({
+  text: "This is additional context"
+});
+
+// Add video from Cloud Storage
+parts.push({
+  fileData: {
+    mimeType: "video/mp4",
+    fileUri: "gs://my-bucket/video.mp4"
+  }
+});
+
+// Make the request
+const request = {
+  name: "query",
+  arguments: {
+    prompt: "Analyze these materials",
+    parts: parts
+  }
+};
+```
+
+### Python Client Example
+
+```python
+import base64
+import json
+
+# Read and encode file
+with open("image.jpg", "rb") as f:
+    image_data = base64.b64encode(f.read()).decode('utf-8')
+
+# Construct request
+request = {
+    "name": "query",
+    "arguments": {
+        "prompt": "What's in this image?",
+        "parts": [
+            {
+                "inlineData": {
+                    "mimeType": "image/jpeg",
+                    "data": image_data
+                }
+            }
+        ]
+    }
+}
+
+# Send via MCP client
+response = mcp_client.call_tool(request)
+```
+
+### Validation Checklist for Agents
+
+Before sending a multimodal request, validate:
+
+1. **Parts Array Structure**
+   - ✓ `parts` is an array (or omitted entirely)
+   - ✓ Each part is an object
+   - ✓ Each part has exactly ONE of: `text`, `inlineData`, or `fileData`
+
+2. **InlineData Validation**
+   - ✓ `mimeType` is a non-empty string
+   - ✓ `data` is a valid base64-encoded string
+   - ✓ `mimeType` matches the actual file type
+
+3. **FileData Validation**
+   - ✓ `mimeType` is a non-empty string
+   - ✓ `fileUri` starts with `gs://` or `https://`
+   - ✓ URI is accessible from the Vertex AI project
+
+4. **General Validation**
+   - ✓ `prompt` is always provided (required field)
+   - ✓ MIME types are from the supported list
+   - ✓ Total request size is reasonable (consider base64 overhead)
+
+### Common Mistakes to Avoid
+
+1. **Missing Required Fields**
+   ```json
+   // ❌ WRONG: Missing 'data' field
+   {
+     "inlineData": {
+       "mimeType": "image/jpeg"
+     }
+   }
+   
+   // ✅ CORRECT
+   {
+     "inlineData": {
+       "mimeType": "image/jpeg",
+       "data": "base64string..."
+     }
+   }
+   ```
+
+2. **Multiple Content Types in One Part**
+   ```json
+   // ❌ WRONG: Can't have both inlineData and fileData
+   {
+     "inlineData": {...},
+     "fileData": {...}
+   }
+   
+   // ✅ CORRECT: Use separate parts
+   [
+     { "inlineData": {...} },
+     { "fileData": {...} }
+   ]
+   ```
+
+3. **Incorrect Base64 Encoding**
+   ```python
+   # ❌ WRONG: Not base64 encoded
+   data = file.read()
+   
+   # ✅ CORRECT: Properly base64 encoded
+   data = base64.b64encode(file.read()).decode('utf-8')
+   ```
+
+4. **Wrong MIME Type**
+   ```json
+   // ❌ WRONG: Generic or incorrect MIME type
+   {
+     "inlineData": {
+       "mimeType": "application/octet-stream",
+       "data": "..."
+     }
+   }
+   
+   // ✅ CORRECT: Specific, supported MIME type
+   {
+     "inlineData": {
+       "mimeType": "image/jpeg",
+       "data": "..."
+     }
+   }
+   ```
+
+### Testing Multimodal Requests
+
+Use the MCP Inspector to test multimodal functionality:
+
+```bash
+# Start MCP Inspector
+npx @modelcontextprotocol/inspector node build/index.js
+```
+
+Then send a test request:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "query",
+    "arguments": {
+      "prompt": "Test multimodal",
+      "parts": [
+        {
+          "inlineData": {
+            "mimeType": "image/jpeg",
+            "data": "/9j/4AAQSkZJRg..."
+          }
+        }
+      ]
+    }
+  }
+}
+```
+
+### Response Handling
+
+The server will return responses in the standard MCP format:
+
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Response from Gemini about the multimodal content..."
+    }
+  ]
+}
+```
+
+Errors will be returned in the standard error format. Common multimodal-related errors:
+- Invalid MIME type
+- Malformed base64 data
+- Inaccessible file URI
+- File too large
+- Model doesn't support multimodal
 
 ## Limitations
 

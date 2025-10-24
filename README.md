@@ -217,10 +217,13 @@ query: "Give me an example" (uses sessionId from previous response)
 
 **Multimodal Support:**
 See [MULTIMODAL.md](MULTIMODAL.md) for detailed documentation on:
+- **Parts array structure and field requirements** (for agent developers)
 - Supported file types (images, audio, video, documents)
 - Base64 inline data vs Cloud Storage URIs
-- Usage examples
+- Complete schema and validation rules
+- Usage examples and code samples
 - Best practices and limitations
+- Common mistakes to avoid
 
 **Response Includes:**
 - Final answer
