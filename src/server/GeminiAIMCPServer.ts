@@ -161,7 +161,9 @@ export class GeminiAIMCPServer {
                         },
                         fileUri: {
                           type: "string",
-                          description: "URI of the file (gs:// for Cloud Storage, https:// for public URLs, or file:// for local files if GEMINI_ALLOW_FILE_URIS is enabled)"
+                          description: this.config.allowFileUris
+                            ? "URI of the file (gs:// for Cloud Storage, https:// for public URLs, or file:// for local files)"
+                            : "URI of the file (gs:// for Cloud Storage or https:// for public URLs)"
                         }
                       },
                       required: ["mimeType", "fileUri"]
