@@ -116,7 +116,7 @@ export class GeminiAIMCPServer {
                                         },
                                         fileData: {
                                             type: "object",
-                                            description: "File URI for Cloud Storage or public URLs",
+                                            description: "File URI for Cloud Storage (gs://) or public URLs (https://)",
                                             properties: {
                                                 mimeType: {
                                                     type: "string",
