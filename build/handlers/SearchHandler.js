@@ -3,10 +3,10 @@
  * Returns structured search results following OpenAI MCP spec
  */
 export class SearchHandler {
-    vertexAI;
+    geminiAI;
     searchCache;
-    constructor(vertexAI, searchCache) {
-        this.vertexAI = vertexAI;
+    constructor(geminiAI, searchCache) {
+        this.geminiAI = geminiAI;
         this.searchCache = searchCache;
     }
     /**
@@ -16,7 +16,7 @@ export class SearchHandler {
         try {
             const searchPrompt = `Search and provide information about: ${input.query}. 
 Return your response as a structured list of relevant topics or documents with brief descriptions.`;
-            const responseText = await this.vertexAI.query(searchPrompt);
+            const responseText = await this.geminiAI.query(searchPrompt);
             // Parse response and create structured results
             const results = this.parseSearchResults(responseText, input.query);
             // Cache documents for fetch
@@ -29,7 +29,7 @@ Return your response as a structured list of relevant topics or documents with b
                     metadata: {
                         query: input.query,
                         timestamp: new Date().toISOString(),
-                        model: this.vertexAI.getConfig().model,
+                        model: this.geminiAI.getConfig().model,
                     }
                 };
                 this.searchCache.set(result.id, cachedDoc);
@@ -51,7 +51,7 @@ Return your response as a structured list of relevant topics or documents with b
                         type: "text",
                         text: JSON.stringify({
                             results: [],
-                            error: `Error searching with Vertex AI: ${errorMessage}`
+                            error: `Error searching with Gemini: ${errorMessage}`
                         }),
                     },
                 ],
@@ -59,7 +59,7 @@ Return your response as a structured list of relevant topics or documents with b
         }
     }
     /**
-     * Parse Vertex AI response into structured search results
+     * Parse Gemini API response into structured search results
      */
     parseSearchResults(responseText, query) {
         // Generate synthetic search results from the response
@@ -72,7 +72,7 @@ Return your response as a structured list of relevant topics or documents with b
                 results.push({
                     id: `doc-${Date.now()}-${i}`,
                     title: line.substring(0, 100).trim(),
-                    url: `https://vertex-ai-search/${query.replace(/\s+/g, '-')}/${i}`,
+                    url: `https://gemini-search/${query.replace(/\s+/g, '-')}/${i}`,
                 });
             }
         }
@@ -81,7 +81,7 @@ Return your response as a structured list of relevant topics or documents with b
             results.push({
                 id: `doc-${Date.now()}-0`,
                 title: query,
-                url: `https://vertex-ai-search/${query.replace(/\s+/g, '-')}`,
+                url: `https://gemini-search/${query.replace(/\s+/g, '-')}`,
             });
         }
         return results;

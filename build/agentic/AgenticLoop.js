@@ -1,15 +1,15 @@
 /**
  * AgenticLoop - Main orchestrator for turn-based agentic execution
- * Integrates all components: RunState, Tools, ResponseProcessor, VertexAI
+ * Integrates all components: RunState, Tools, ResponseProcessor, GeminiAI
  */
 import { RunState } from './RunState.js';
 import { ResponseProcessor } from './ResponseProcessor.js';
 export class AgenticLoop {
-    vertexAI;
+    geminiAI;
     toolRegistry;
     responseProcessor;
-    constructor(vertexAI, toolRegistry) {
-        this.vertexAI = vertexAI;
+    constructor(geminiAI, toolRegistry) {
+        this.geminiAI = geminiAI;
         this.toolRegistry = toolRegistry;
         this.responseProcessor = new ResponseProcessor();
     }
@@ -37,11 +37,11 @@ export class AgenticLoop {
             const fullPrompt = this.buildPromptWithTools(state);
             // 2. Detect if we should use thinking mode
             const useThinking = this.shouldUseThinking(state);
-            // 3. Call Vertex AI
-            const response = await this.vertexAI.query(fullPrompt, {
+            // 3. Call Gemini AI
+            const response = await this.geminiAI.query(fullPrompt, {
                 enableThinking: useThinking,
             });
-            state.logger.info('Received response from Vertex AI');
+            state.logger.info('Received response from Gemini AI');
             // 4. Validate and process response
             try {
                 this.responseProcessor.validate(response);
@@ -73,7 +73,7 @@ export class AgenticLoop {
                     state.logger.error('All tools failed, falling back to Gemini knowledge');
                     // Build fallback prompt
                     const fallbackPrompt = this.buildFallbackPrompt(state, processed.toolCalls, results);
-                    const fallbackResponse = await this.vertexAI.query(fallbackPrompt);
+                    const fallbackResponse = await this.geminiAI.query(fallbackPrompt);
                     // Add fallback response as final output
                     state.addMessage({
                         role: 'assistant',

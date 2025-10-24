@@ -1,7 +1,7 @@
 /**
- * Configuration types for Vertex AI MCP Server
+ * Configuration types for Gemini AI MCP Server
  */
-export interface VertexAIConfig {
+export interface GeminiAIConfig {
     projectId: string;
     location: string;
     model: string;
@@ -18,4 +18,5 @@ export interface VertexAIConfig {
     disableLogging: boolean;
     logToStderr: boolean;
 }
+export type VertexAIConfig = GeminiAIConfig;
 //# sourceMappingURL=config.d.ts.map

@@ -4,7 +4,7 @@
  */
 
 import { QueryInput } from '../schemas/index.js';
-import { VertexAIConfig, Message } from '../types/index.js';
+import { GeminiAIConfig, Message } from '../types/index.js';
 import { ConversationManager } from '../managers/ConversationManager.js';
 import { AgenticLoop } from '../agentic/AgenticLoop.js';
 

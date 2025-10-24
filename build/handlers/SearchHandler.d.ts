@@ -4,11 +4,11 @@
  */
 import { SearchInput } from '../schemas/index.js';
 import { CachedDocument } from '../types/index.js';
-import { VertexAIService } from '../services/VertexAIService.js';
+import { GeminiAIService } from '../services/GeminiAIService.js';
 export declare class SearchHandler {
-    private vertexAI;
+    private geminiAI;
     private searchCache;
-    constructor(vertexAI: VertexAIService, searchCache: Map<string, CachedDocument>);
+    constructor(geminiAI: GeminiAIService, searchCache: Map<string, CachedDocument>);
     /**
      * Handle a search tool request
      */
@@ -19,7 +19,7 @@ export declare class SearchHandler {
         }>;
     }>;
     /**
-     * Parse Vertex AI response into structured search results
+     * Parse Gemini API response into structured search results
      */
     private parseSearchResults;
 }
