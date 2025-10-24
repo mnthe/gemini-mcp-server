@@ -3,6 +3,7 @@
  * Uses @google/genai unified SDK supporting both Vertex AI and Google AI Studio
  */
 import { GoogleGenAI } from "@google/genai";
+import { isSupportedMimeType } from '../types/index.js';
 export class GeminiAIService {
     client;
     config;
@@ -15,9 +16,9 @@ export class GeminiAIService {
         });
     }
     /**
-     * Query Vertex AI with a prompt
+     * Query Vertex AI with a prompt and optional multimodal content
      */
-    async query(prompt, options = {}) {
+    async query(prompt, options = {}, multimodalParts) {
         try {
             const config = {
                 temperature: this.config.temperature,
@@ -32,9 +33,11 @@ export class GeminiAIService {
                     includeThoughts: true, // Include thought summaries in response
                 };
             }
+            // Build content parts
+            const contents = this.buildContents(prompt, multimodalParts);
             const response = await this.client.models.generateContent({
                 model: this.config.model,
-                contents: prompt,
+                contents,
                 config,
             });
             return this.extractResponseText(response);
@@ -46,6 +49,59 @@ export class GeminiAIService {
             const errorMsg = error instanceof Error ? error.message : String(error);
             throw new Error(`Gemini API error: ${errorMsg}`);
         }
+    }
+    /**
+     * Build contents array from prompt and multimodal parts
+     */
+    buildContents(prompt, multimodalParts) {
+        // If no multimodal parts, use simple string format
+        if (!multimodalParts || multimodalParts.length === 0) {
+            return prompt;
+        }
+        // Build structured content with parts
+        const parts = [];
+        // Add text prompt as first part
+        if (prompt) {
+            parts.push({ text: prompt });
+        }
+        // Add multimodal parts
+        for (const part of multimodalParts) {
+            const contentPart = {};
+            if (part.text) {
+                contentPart.text = part.text;
+            }
+            if (part.inlineData) {
+                // Validate MIME type
+                if (!isSupportedMimeType(part.inlineData.mimeType)) {
+                    console.warn(`Unsupported MIME type: ${part.inlineData.mimeType}. Including anyway.`);
+                }
+                contentPart.inlineData = {
+                    mimeType: part.inlineData.mimeType,
+                    data: part.inlineData.data,
+                };
+            }
+            if (part.fileData) {
+                // Validate MIME type
+                if (!isSupportedMimeType(part.fileData.mimeType)) {
+                    console.warn(`Unsupported MIME type: ${part.fileData.mimeType}. Including anyway.`);
+                }
+                contentPart.fileData = {
+                    mimeType: part.fileData.mimeType,
+                    fileUri: part.fileData.fileUri,
+                };
+            }
+            // Only add part if it has content
+            if (Object.keys(contentPart).length > 0) {
+                parts.push(contentPart);
+            }
+        }
+        // Return structured content
+        return [
+            {
+                role: "user",
+                parts,
+            },
+        ];
     }
     /**
      * Extract text from Gemini API response

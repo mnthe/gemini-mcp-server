@@ -7,7 +7,7 @@ import { RunState, RunOptions } from './RunState.js';
 import { ResponseProcessor } from './ResponseProcessor.js';
 import { ToolRegistry } from '../tools/ToolRegistry.js';
 import { GeminiAIService } from '../services/GeminiAIService.js';
-import { Message } from '../types/index.js';
+import { Message, MultimodalPart } from '../types/index.js';
 
 export interface RunResult {
   sessionId: string;
@@ -33,12 +33,13 @@ export class AgenticLoop {
   }
 
   /**
-   * Run the agentic loop
+   * Run the agentic loop with optional multimodal support
    */
   async run(
     prompt: string,
     conversationHistory: Message[],
-    options: RunOptions = {}
+    options: RunOptions = {},
+    multimodalParts?: MultimodalPart[]
   ): Promise<RunResult> {
     const state = new RunState(options);
 
@@ -67,10 +68,15 @@ export class AgenticLoop {
       // 2. Detect if we should use thinking mode
       const useThinking = this.shouldUseThinking(state);
 
-      // 3. Call Gemini AI
-      const response = await this.geminiAI.query(fullPrompt, {
-        enableThinking: useThinking,
-      });
+      // 3. Call Gemini AI (with multimodal parts on first turn only)
+      const isFirstTurn = state.currentTurn === 1;
+      const response = await this.geminiAI.query(
+        fullPrompt, 
+        {
+          enableThinking: useThinking,
+        },
+        isFirstTurn ? multimodalParts : undefined
+      );
 
       state.logger.info('Received response from Gemini AI');
 

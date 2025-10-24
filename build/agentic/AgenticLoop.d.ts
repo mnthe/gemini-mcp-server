@@ -5,7 +5,7 @@
 import { RunOptions } from './RunState.js';
 import { ToolRegistry } from '../tools/ToolRegistry.js';
 import { GeminiAIService } from '../services/GeminiAIService.js';
-import { Message } from '../types/index.js';
+import { Message, MultimodalPart } from '../types/index.js';
 export interface RunResult {
     sessionId: string;
     finalOutput: string;
@@ -20,9 +20,9 @@ export declare class AgenticLoop {
     private responseProcessor;
     constructor(geminiAI: GeminiAIService, toolRegistry: ToolRegistry);
     /**
-     * Run the agentic loop
+     * Run the agentic loop with optional multimodal support
      */
-    run(prompt: string, conversationHistory: Message[], options?: RunOptions): Promise<RunResult>;
+    run(prompt: string, conversationHistory: Message[], options?: RunOptions, multimodalParts?: MultimodalPart[]): Promise<RunResult>;
     /**
      * Build prompt with tool definitions and conversation history
      */

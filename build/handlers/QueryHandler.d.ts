@@ -14,7 +14,7 @@ export declare class QueryHandler {
     private logToStderr;
     constructor(conversationManager: ConversationManager, agenticLoop: AgenticLoop, enableConversations?: boolean, logDir?: string, disableLogging?: boolean, logToStderr?: boolean);
     /**
-     * Handle a query tool request using AgenticLoop
+     * Handle a query tool request using AgenticLoop with multimodal support
      */
     handle(input: QueryInput): Promise<{
         content: Array<{

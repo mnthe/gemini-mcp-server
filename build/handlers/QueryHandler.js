@@ -18,7 +18,7 @@ export class QueryHandler {
         this.logToStderr = logToStderr;
     }
     /**
-     * Handle a query tool request using AgenticLoop
+     * Handle a query tool request using AgenticLoop with multimodal support
      */
     async handle(input) {
         try {
@@ -31,14 +31,15 @@ export class QueryHandler {
                 }
                 conversationHistory = this.conversationManager.getHistory(sessionId);
             }
-            // Run agentic loop
+            // Run agentic loop with multimodal parts if provided
             const result = await this.agenticLoop.run(input.prompt, conversationHistory, {
                 sessionId,
                 maxTurns: 10,
                 logDir: this.logDir,
                 disableLogging: this.disableLogging,
                 logToStderr: this.logToStderr,
-            });
+            }, input.parts // Pass multimodal parts
+            );
             // Update conversation history with all messages from result
             if (this.enableConversations && sessionId) {
                 for (const msg of result.messages) {
