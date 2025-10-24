@@ -116,7 +116,7 @@ export class GeminiAIMCPServer {
                                         },
                                         fileData: {
                                             type: "object",
-                                            description: "File URI for Cloud Storage or public URLs. HTTPS URLs are validated for security (HTTPS-only, private IP blocking).",
+                                            description: "File URI for Cloud Storage or public URLs",
                                             properties: {
                                                 mimeType: {
                                                     type: "string",
@@ -124,7 +124,7 @@ export class GeminiAIMCPServer {
                                                 },
                                                 fileUri: {
                                                     type: "string",
-                                                    description: "URI of the file (gs:// for Cloud Storage or https:// for public URLs). HTTPS URLs are validated: only HTTPS allowed, private IPs blocked (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8)."
+                                                    description: "URI of the file (gs:// for Cloud Storage or https:// for public URLs)"
                                                 }
                                             },
                                             required: ["mimeType", "fileUri"]
