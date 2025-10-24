@@ -97,7 +97,13 @@ Each part object in the `parts` array must have **exactly one** of these fields:
 - `mimeType` (string, required): Must be a valid MIME type from the supported list
 - `fileUri` (string, required): 
   - Cloud Storage: `gs://bucket-name/path/to/file`
-  - Public HTTPS: `https://example.com/path/to/file`
+  - Public HTTPS: `https://example.com/path/to/file` (subject to security validation)
+  
+**Security for HTTPS URLs:**
+When using HTTPS URLs in `fileUri`, the following security checks are applied:
+- Only HTTPS URLs are allowed (HTTP is rejected)
+- Private IP addresses are blocked (10.x, 172.16.x, 192.168.x, 127.x)
+- DNS validation prevents SSRF attacks
 
 #### Complete Request Schema
 
@@ -188,6 +194,16 @@ For large files, use Cloud Storage URIs:
   }
 }
 ```
+
+**Security for HTTPS URLs:**
+
+When using HTTPS URLs (e.g., `https://example.com/image.jpg`) instead of Cloud Storage URIs (`gs://`), the server applies the same security validation as the WebFetch tool:
+
+- **HTTPS Only**: Only HTTPS URLs are accepted. HTTP URLs are rejected with a SecurityError.
+- **Private IP Blocking**: URLs that resolve to private IP addresses (10.x.x.x, 172.16.x.x, 192.168.x.x, 127.x.x.x) are blocked to prevent SSRF attacks.
+- **DNS Validation**: The server performs DNS resolution to check if the hostname resolves to a private IP address.
+
+Cloud Storage URIs (`gs://`) are not subject to these additional security checks as they are managed by Google Cloud Platform.
 
 ### Multiple Files
 
@@ -377,6 +393,8 @@ export GEMINI_MODEL="gemini-2.0-flash-exp"
 5. **Validate MIME Types**: Ensure you're using supported MIME types from the list above
 
 6. **Consider Context Length**: Large multimodal inputs consume more of the model's context window
+
+7. **Use HTTPS for Web Resources**: When using HTTPS URLs for `fileUri`, ensure they are publicly accessible and not behind authentication. The server enforces HTTPS-only and blocks private IP addresses for security.
 
 ## For Agent/Client Developers
 
@@ -627,6 +645,14 @@ For API errors related to multimodal content, check:
 - File size is within limits
 - Model supports multimodal inputs
 - Cloud Storage URIs are accessible
+
+**Security Errors:**
+
+If using HTTPS URLs in `fileData.fileUri`, you may encounter security errors:
+- `SecurityError: Only HTTPS URLs are allowed` - The URL must use HTTPS, not HTTP
+- `SecurityError: Private IP addresses are not allowed` - The URL resolves to a private IP address and is blocked for security reasons
+
+These security measures protect against Server-Side Request Forgery (SSRF) attacks and follow the same security policy as the WebFetch tool.
 
 ## Migration from Text-Only
 
