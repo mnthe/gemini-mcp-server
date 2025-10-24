@@ -84,14 +84,11 @@ export GOOGLE_CLOUD_LOCATION="us-central1"
 
 **Optional Model Settings:**
 ```bash
-export GEMINI_MODEL="gemini-1.5-flash-002"
+export GEMINI_MODEL="gemini-2.5-pro"
 export GEMINI_TEMPERATURE="1.0"
 export GEMINI_MAX_TOKENS="8192"
 export GEMINI_TOP_P="0.95"
 export GEMINI_TOP_K="40"
-
-# Backward compatibility with VERTEX_* variables is also supported
-# export VERTEX_MODEL="gemini-1.5-flash-002"
 ```
 
 **Optional Agentic Features:**
@@ -136,7 +133,7 @@ Add to your MCP client configuration:
       "env": {
         "GOOGLE_CLOUD_PROJECT": "your-gcp-project-id",
         "GOOGLE_CLOUD_LOCATION": "us-central1",
-        "GEMINI_MODEL": "gemini-1.5-flash-002",
+        "GEMINI_MODEL": "gemini-2.5-pro",
         "GEMINI_ENABLE_CONVERSATIONS": "true"
       }
     }
@@ -154,7 +151,7 @@ Add to your MCP client configuration:
       "env": {
         "GOOGLE_CLOUD_PROJECT": "your-gcp-project-id",
         "GOOGLE_CLOUD_LOCATION": "us-central1",
-        "GEMINI_MODEL": "gemini-1.5-flash-002"
+        "GEMINI_MODEL": "gemini-2.5-pro"
       }
     }
   }

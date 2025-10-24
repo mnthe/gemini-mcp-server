@@ -24,7 +24,7 @@
     "test:mcp": "npx @modelcontextprotocol/inspector node build/index.js",
     "test:list": "echo '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\",\"params\":{}}' | node build/index.js",
     "test:query": "echo '{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"query\",\"arguments\":{\"prompt\":\"Hello\"}}}' | node build/index.js 2>&1",
-    "test:env": "node -e 'console.log(\"Project:\", process.env.GOOGLE_CLOUD_PROJECT); console.log(\"Location:\", process.env.GOOGLE_CLOUD_LOCATION); console.log(\"Model:\", process.env.VERTEX_MODEL || \"gemini-1.5-flash-002\")'"
+    "test:env": "node -e 'console.log(\"Project:\", process.env.GOOGLE_CLOUD_PROJECT); console.log(\"Location:\", process.env.GOOGLE_CLOUD_LOCATION); console.log(\"Model:\", process.env.GEMINI_MODEL || \"gemini-2.5-pro\")'"
   },
   "keywords": [
     "mcp",

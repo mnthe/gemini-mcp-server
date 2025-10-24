@@ -216,7 +216,7 @@ export class GeminiAIMCPServer {
    * Initialize external MCP servers
    */
   private async initializeMCPServers(): Promise<void> {
-    const mcpServersJson = process.env.GEMINI_MCP_SERVERS || process.env.VERTEX_MCP_SERVERS;
+    const mcpServersJson = process.env.GEMINI_MCP_SERVERS;
     if (!mcpServersJson) {
       this.logger.info('No external MCP servers configured');
       return;
