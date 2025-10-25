@@ -176,8 +176,146 @@ All changes are backward compatible:
 
 ---
 
+## Issue #16: File Security Validator ✅
+
+### Changes to `src/utils/fileSecurity.ts`
+
+**New File Created**: Comprehensive file security validator for multimodal content
+
+**Implemented Features:**
+1. **MIME Type Validation**: Whitelist of known safe MIME types
+   - Images: `image/jpeg`, `image/png`, `image/webp`, `image/heic`, `image/heif`
+   - Videos: `video/mp4`, `video/mpeg`, `video/mov`, `video/avi`, `video/webm`, etc.
+   - Audio: `audio/wav`, `audio/mp3`, `audio/aiff`, `audio/aac`, `audio/ogg`, `audio/flac`
+   - Documents: `application/pdf`, `text/plain`, `text/html`, code files
+   - Rejects unknown or unsafe MIME types (executables, octet-stream, etc.)
+
+2. **Executable File Rejection**: Blocks dangerous file extensions
+   - Blocked: `.exe`, `.bat`, `.cmd`, `.com`, `.msi`, `.app`, `.dmg`, `.pkg`, `.deb`, `.rpm`, `.sh`, `.bash`, `.zsh`, `.ps1`, `.dll`, `.so`, `.dylib`, `.jar`, `.apk`, `.ipa`, `.vbs`, `.wsf`, `.scr`, etc.
+
+3. **Path Traversal Prevention**: 
+   - Converts all paths to absolute paths using `path.resolve()`
+   - Resolves `..`, `.`, and other path traversal patterns
+   - Validates normalized paths against whitelist
+
+4. **Directory Whitelist**: Only allows file access in safe directories
+   - Current working directory (`process.cwd()`)
+   - User's Documents folder
+   - User's Downloads folder
+   - User's Desktop folder
+   - Additional directories can be specified via configuration
+   - Paths outside whitelist are rejected
+
+5. **URI Scheme Validation**:
+   - `gs://` URIs: Allowed (Cloud Storage, no additional validation)
+   - `https://` URIs: Allowed with SSRF validation (via urlSecurity.ts)
+   - `http://` URIs: Rejected (insecure)
+   - `file://` URIs: Converted to local paths and validated against whitelist
+   - Other schemes: Rejected (`ftp://`, `data://`, etc.)
+
+6. **File Existence Check**: Optional validation function to check if file exists and is readable
+
+### Integration with `src/services/GeminiAIService.ts`
+
+**Modified**: File data validation in `buildContents()` method
+- Uses `validateMultimodalFile()` for comprehensive validation
+- Validates MIME type and URI together
+- Additional HTTPS URL validation for SSRF protection
+- Enforces `GEMINI_ALLOW_FILE_URIS` setting for file:// URIs
+
+### Test Coverage
+- 34 comprehensive tests in `test/file-security-test.ts`
+- MIME type validation (7 tests)
+- File extension validation (6 tests)
+- Path traversal prevention (3 tests)
+- Directory whitelist (5 tests)
+- URI validation (7 tests)
+- Multimodal file validation (4 tests)
+- File existence check (2 tests)
+
+---
+
+## Issue #17: Security Documentation ✅
+
+### New File: `SECURITY.md`
+
+**Created**: Comprehensive user-facing security documentation
+
+**Sections Included:**
+1. **Overview**: Security architecture and defense-in-depth approach
+2. **SSRF Protection**: URL schemes, private IPs, metadata endpoints, redirects
+3. **Prompt Injection Guardrails**: Trust boundaries, content tagging, system prompt hardening
+4. **External Content Boundaries**: Size limits, content type validation
+5. **File and URL Validation**: MIME types, executables, path traversal, directory whitelist
+6. **Path Traversal Prevention**: Local file access, best practices
+7. **Configuration**: Environment variables, security settings
+8. **Usage Recommendations**: Desktop apps, CLI tools, production services
+9. **Security Testing**: Test commands and coverage summary
+10. **Reporting Vulnerabilities**: Responsible disclosure process
+11. **Security Limitations**: Known limitations, out of scope items
+12. **References**: Related docs, issues, security standards
+13. **Changelog**: Version history
+
+### Changes to `README.md`
+
+**Modified**: Expanded security documentation in README
+
+**Updates Made:**
+1. **Key Features Section**: Enhanced "Security First" bullet
+   - Multi-layer defense description
+   - Comprehensive testing mention
+   - Link to SECURITY.md
+
+2. **New Security Section**: Added detailed security section after "Available Tools"
+   - Defense layers overview (SSRF, prompt injection, file security, content boundaries)
+   - Configuration examples
+   - Best practices for different environments
+   - Security testing commands
+   - Link to SECURITY.md for complete documentation
+
+3. **Documentation Section**: Added SECURITY.md to documentation list
+   - Highlighted as primary security reference
+   - Added MULTIMODAL.md and PROMPT_CUSTOMIZATION.md
+
+---
+
+## Security Impact Summary
+
+### Enhanced Protection
+- ✅ File security validator protects against malicious file uploads
+- ✅ MIME type validation prevents executable file processing
+- ✅ Path traversal prevention protects sensitive system files
+- ✅ Directory whitelist limits file access scope
+- ✅ URI scheme validation enforces secure protocols
+
+### Comprehensive Documentation
+- ✅ SECURITY.md provides complete security reference
+- ✅ README.md includes security best practices
+- ✅ Configuration examples for different environments
+- ✅ Clear guidance on GEMINI_ALLOW_FILE_URIS usage
+- ✅ Security testing instructions
+
+### Test Coverage
+- ✅ 34 new file security tests
+- ✅ 65+ total security tests across all issues
+- ✅ Comprehensive validation of all security features
+
+---
+
+## Future Considerations
+
+1. **Enhanced File Type Detection**: Consider using magic number detection instead of relying solely on extensions
+2. **Content Scanning**: Integration with antivirus/malware scanning for uploaded files
+3. **Rate Limiting**: Add rate limiting for file operations and web fetches
+4. **Audit Logging**: Enhanced security event logging for compliance
+5. **Configurable MIME Types**: Allow users to configure additional safe MIME types
+
+---
+
 ## References
 
-- Issue #15: https://github.com/mnthe/gemini-mcp-server/issues/15
-- Issue #14: https://github.com/mnthe/gemini-mcp-server/issues/14
 - Issue #13: https://github.com/mnthe/gemini-mcp-server/issues/13
+- Issue #14: https://github.com/mnthe/gemini-mcp-server/issues/14
+- Issue #15: https://github.com/mnthe/gemini-mcp-server/issues/15
+- Issue #16: https://github.com/mnthe/gemini-mcp-server/issues/16
+- Issue #17: https://github.com/mnthe/gemini-mcp-server/issues/17
