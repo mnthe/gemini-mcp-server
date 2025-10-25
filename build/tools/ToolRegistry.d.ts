@@ -44,6 +44,10 @@ export declare class ToolRegistry {
      */
     private getSystemPromptSection;
     /**
+     * Get security guidelines section
+     */
+    private getSecurityGuidelinesSection;
+    /**
      * Get tool definitions section
      */
     private getToolDefinitionsSection;
