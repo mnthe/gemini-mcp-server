@@ -74,6 +74,7 @@ The Gemini AI MCP Server is a production-grade intelligent agent that enables AI
 - Parallel execution (`Promise.all`)
 - Per-tool retry logic (exponential backoff)
 - Tool definition formatting for LLM prompts
+- System prompt override support (customizable AI persona)
 
 #### 4. Infrastructure
 
@@ -149,6 +150,13 @@ User Input → Turn 1..10 Loop:
 - JSON-RPC protocol for stdio transport
 - RESTful API for HTTP transport
 - Compatible with MCP ecosystem
+
+### 7. System Prompt Override
+- Customizable AI assistant persona via `GEMINI_SYSTEM_PROMPT` environment variable
+- Domain-specific configurations (financial analyst, code reviewer, research assistant)
+- Safe design: Only system prompt is overridable; tool instructions remain protected
+- 100% backward compatible (optional feature)
+- Supports multi-persona setups (multiple servers with different roles)
 
 ## Technical Achievements
 

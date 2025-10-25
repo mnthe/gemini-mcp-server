@@ -332,6 +332,68 @@ Any succeeded? → Continue loop with results
 - **Protocol**: JSON-RPC for stdio, REST for HTTP
 - **Benefit**: Interoperability with MCP ecosystem
 
+### 7. System Prompt Override
+- **Customizable Personas**: Configure AI assistant behavior via environment variable
+- **Safe Design**: Only system prompt is overridable; tool instructions remain protected
+- **Backward Compatible**: Optional feature - defaults to standard prompt
+- **Benefit**: Domain-specific configurations (financial analyst, code reviewer, etc.)
+
+## System Prompt Override Architecture
+
+### Prompt Assembly Flow
+
+```
+Configuration (GEMINI_SYSTEM_PROMPT env var)
+  ↓
+GeminiAIMCPServer constructor
+  ↓ (passes config.systemPrompt)
+ToolRegistry constructor
+  ↓
+getToolDefinitionsText() - Assembles complete prompt:
+  ├─ getSystemPromptSection()
+  │  ├─ Custom: Uses GEMINI_SYSTEM_PROMPT value
+  │  └─ Default: "You are a helpful AI assistant..."
+  │
+  ├─ getToolDefinitionsSection()
+  │  └─ Auto-generated list of available tools
+  │     (WebFetch + MCP tools)
+  │
+  └─ getToolInstructionsSection()
+     └─ Standard tool call format (protected)
+        TOOL_CALL: <name>
+        ARGUMENTS: <json>
+  ↓
+Complete prompt used in AgenticLoop
+```
+
+### Design Boundaries
+
+**Overridable**:
+- System prompt (persona, role, behavior guidelines)
+
+**Protected (Not Overridable)**:
+- Tool definitions (auto-generated from registered tools)
+- Tool call format (`TOOL_CALL: / ARGUMENTS:`)
+- Tool execution logic
+- Security validations (HTTPS-only, IP blocking)
+
+### Multi-Persona Setup
+
+Different MCP client instances can configure different personas:
+
+```
+Claude Desktop Config
+├─ gemini-code: SYSTEM_PROMPT="Code reviewer..."
+├─ gemini-finance: SYSTEM_PROMPT="Financial analyst..."
+└─ gemini-research: SYSTEM_PROMPT="Research assistant..."
+
+Each runs as separate process with independent:
+- System prompt
+- Tool registry
+- Conversation state
+- Log files
+```
+
 ## Security
 
 ### WebFetch Security Layers
