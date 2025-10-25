@@ -240,4 +240,46 @@ try {
   console.log('✗ FAIL:', error);
 }
 
+// Test 19: gopher:// scheme (should be rejected)
+console.log('\nTest 19: gopher:// scheme (should be rejected)');
+try {
+  await validateSecureUrl('gopher://example.com/file');
+  console.log('✗ FAIL: gopher:// scheme should have been rejected');
+} catch (error) {
+  if (error instanceof SecurityError) {
+    console.log('✓ PASS: gopher:// scheme properly rejected');
+    console.log('  Error:', error.message);
+  } else {
+    console.log('✗ FAIL: Wrong error type:', error);
+  }
+}
+
+// Test 20: dict:// scheme (should be rejected)
+console.log('\nTest 20: dict:// scheme (should be rejected)');
+try {
+  await validateSecureUrl('dict://example.com:2628/d:word');
+  console.log('✗ FAIL: dict:// scheme should have been rejected');
+} catch (error) {
+  if (error instanceof SecurityError) {
+    console.log('✓ PASS: dict:// scheme properly rejected');
+    console.log('  Error:', error.message);
+  } else {
+    console.log('✗ FAIL: Wrong error type:', error);
+  }
+}
+
+// Test 21: tftp:// scheme (should be rejected)
+console.log('\nTest 21: tftp:// scheme (should be rejected)');
+try {
+  await validateSecureUrl('tftp://example.com/file.bin');
+  console.log('✗ FAIL: tftp:// scheme should have been rejected');
+} catch (error) {
+  if (error instanceof SecurityError) {
+    console.log('✓ PASS: tftp:// scheme properly rejected');
+    console.log('  Error:', error.message);
+  } else {
+    console.log('✗ FAIL: Wrong error type:', error);
+  }
+}
+
 console.log('\n=== All Security Tests Complete ===\n');
