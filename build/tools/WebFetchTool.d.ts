@@ -27,5 +27,9 @@ export declare class WebFetchTool extends BaseTool {
      * Decode common HTML entities
      */
     private decodeHTMLEntities;
+    /**
+     * Escape XML special characters to prevent injection
+     */
+    private escapeXml;
 }
 //# sourceMappingURL=WebFetchTool.d.ts.map

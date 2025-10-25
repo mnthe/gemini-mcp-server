@@ -231,4 +231,13 @@ try {
   }
 }
 
+// Test 18: Case-insensitive HTTPS check (should pass)
+console.log('\nTest 18: Case-insensitive HTTPS URL (should be accepted)');
+try {
+  await validateSecureUrl('HTTPS://example.com/image.jpg');
+  console.log('✓ PASS: Case-insensitive HTTPS URL accepted');
+} catch (error) {
+  console.log('✗ FAIL:', error);
+}
+
 console.log('\n=== All Security Tests Complete ===\n');

@@ -30,8 +30,8 @@ export async function validateSecureUrl(url) {
             throw new SecurityError(`Blocked URL scheme: ${scheme}`);
         }
     }
-    // Security check 2: HTTPS only
-    if (!url.startsWith('https://')) {
+    // Security check 2: HTTPS only (case-insensitive)
+    if (!lowerUrl.startsWith('https://')) {
         throw new SecurityError('Only HTTPS URLs are allowed');
     }
     // Security check 3: Block cloud metadata endpoints and private IPs
