@@ -4,19 +4,60 @@
  */
 import * as dns from 'dns/promises';
 import { SecurityError } from '../errors/index.js';
+// Dangerous URL schemes that should be blocked
+const BLOCKED_SCHEMES = ['file:', 'ftp:', 'ftps:', 'data:', 'javascript:', 'vbscript:', 'about:', 'blob:'];
+// Cloud metadata endpoints that must be blocked to prevent SSRF
+const BLOCKED_METADATA_HOSTS = [
+    '169.254.169.254', // AWS, Azure, GCP metadata
+    'metadata.google.internal', // GCP metadata
+    '100.100.100.200', // Alibaba Cloud metadata
+    'fd00:ec2::254', // AWS IPv6 metadata
+    'metadata', // Generic metadata hostname
+    'metadata.azure.com', // Azure metadata
+];
 /**
  * Validate URL for security concerns
  * - Must be HTTPS only
- * - Must not resolve to private IP addresses
+ * - Must not use dangerous schemes
+ * - Must not resolve to private IP addresses or cloud metadata endpoints
+ * - Must not be in link-local range
  */
 export async function validateSecureUrl(url) {
-    // Security check 1: HTTPS only
-    if (!url.startsWith('https://')) {
+    // Security check 1: Block dangerous URL schemes
+    const lowerUrl = url.toLowerCase();
+    for (const scheme of BLOCKED_SCHEMES) {
+        if (lowerUrl.startsWith(scheme)) {
+            throw new SecurityError(`Blocked URL scheme: ${scheme}`);
+        }
+    }
+    // Security check 2: HTTPS only (case-insensitive)
+    if (!lowerUrl.startsWith('https://')) {
         throw new SecurityError('Only HTTPS URLs are allowed');
     }
-    // Security check 2: Private IP blocking
-    const hostname = new URL(url).hostname;
+    // Security check 3: Block cloud metadata endpoints and private IPs
+    const hostname = new URL(url).hostname.toLowerCase();
+    // Check against blocked metadata hosts
+    for (const blockedHost of BLOCKED_METADATA_HOSTS) {
+        if (hostname === blockedHost || hostname.endsWith('.' + blockedHost)) {
+            throw new SecurityError(`Blocked cloud metadata endpoint: ${hostname}`);
+        }
+    }
     await checkPrivateIP(hostname);
+}
+/**
+ * Validate redirect URL to prevent SSRF via redirects
+ * - Must pass all security checks
+ * - Must not change domain from original URL
+ */
+export async function validateRedirectUrl(originalUrl, redirectUrl) {
+    // First validate the redirect URL itself
+    await validateSecureUrl(redirectUrl);
+    // Check that domain hasn't changed
+    const originalHostname = new URL(originalUrl).hostname.toLowerCase();
+    const redirectHostname = new URL(redirectUrl).hostname.toLowerCase();
+    if (originalHostname !== redirectHostname) {
+        throw new SecurityError(`Cross-domain redirect blocked: ${originalHostname} -> ${redirectHostname}`);
+    }
 }
 /**
  * Check if hostname resolves to private IP
@@ -76,6 +117,10 @@ function isPrivateIPAddress(ip) {
     }
     // 127.0.0.0/8 (localhost)
     if (parts[0] === 127) {
+        return true;
+    }
+    // 169.254.0.0/16 (link-local/APIPA)
+    if (parts[0] === 169 && parts[1] === 254) {
         return true;
     }
     return false;

@@ -1,6 +1,6 @@
 /**
  * WebFetchTool - Fetch content from URLs with security guards
- * HTTPS only, private IP blocking, smart content extraction
+ * HTTPS only, private IP blocking, smart content extraction, manual redirect validation
  */
 import { BaseTool, ToolResult, RunContext, JSONSchema } from '../agentic/Tool.js';
 export declare class WebFetchTool extends BaseTool {
@@ -11,6 +11,10 @@ export declare class WebFetchTool extends BaseTool {
         url: string;
         extract?: boolean;
     }, context: RunContext): Promise<ToolResult>;
+    /**
+     * Fetch with manual redirect validation to prevent SSRF via redirects
+     */
+    private fetchWithRedirectValidation;
     /**
      * Check if content is HTML
      */
@@ -23,5 +27,9 @@ export declare class WebFetchTool extends BaseTool {
      * Decode common HTML entities
      */
     private decodeHTMLEntities;
+    /**
+     * Escape XML special characters to prevent injection
+     */
+    private escapeXml;
 }
 //# sourceMappingURL=WebFetchTool.d.ts.map
