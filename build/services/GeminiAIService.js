@@ -5,6 +5,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { isSupportedMimeType } from '../types/index.js';
 import { validateSecureUrl } from '../utils/urlSecurity.js';
+import { validateMultimodalFile } from '../utils/fileSecurity.js';
 import { SecurityError } from '../errors/index.js';
 export class GeminiAIService {
     client;
@@ -83,35 +84,32 @@ export class GeminiAIService {
                 };
             }
             if (part.fileData) {
-                // Validate MIME type
-                if (!isSupportedMimeType(part.fileData.mimeType)) {
-                    console.warn(`Unsupported MIME type: ${part.fileData.mimeType}. Including anyway.`);
-                }
-                // Security validation for URLs
-                const fileUri = part.fileData.fileUri;
-                if (fileUri.startsWith('https://')) {
-                    // HTTPS URLs: validate for security (SSRF protection)
-                    try {
-                        await validateSecureUrl(fileUri);
+                // Security validation for file data using comprehensive file security validator
+                try {
+                    // Validate MIME type and URI together
+                    const validated = validateMultimodalFile(part.fileData.mimeType, part.fileData.fileUri, {
+                        allowAllDirectories: this.config.allowFileUris // Allow file:// only if explicitly enabled
+                    });
+                    // Additional HTTPS URL validation for SSRF protection
+                    if (validated.fileUri.startsWith('https://')) {
+                        await validateSecureUrl(validated.fileUri);
                     }
-                    catch (error) {
-                        if (error instanceof SecurityError) {
-                            throw error;
-                        }
-                        throw new Error(`Invalid file URI: ${error.message}`);
-                    }
-                }
-                else if (fileUri.startsWith('file://')) {
-                    // file:// URLs: only allowed if explicitly enabled (CLI environments)
-                    if (!this.config.allowFileUris) {
+                    // file:// URIs are converted to absolute paths by validateMultimodalFile
+                    // Only allowed if allowFileUris is true (CLI environments)
+                    if (part.fileData.fileUri.startsWith('file://') && !this.config.allowFileUris) {
                         throw new SecurityError('file:// URIs are not allowed. Set GEMINI_ALLOW_FILE_URIS=true to enable (only for CLI environments, not desktop apps)');
                     }
+                    contentPart.fileData = {
+                        mimeType: validated.mimeType,
+                        fileUri: validated.fileUri,
+                    };
                 }
-                // Allow gs:// URIs without additional validation (Cloud Storage)
-                contentPart.fileData = {
-                    mimeType: part.fileData.mimeType,
-                    fileUri: part.fileData.fileUri,
-                };
+                catch (error) {
+                    if (error instanceof SecurityError) {
+                        throw error;
+                    }
+                    throw new Error(`Invalid file data: ${error.message}`);
+                }
             }
             // Only add part if it has content
             if (Object.keys(contentPart).length > 0) {

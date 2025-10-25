@@ -43,9 +43,17 @@ Inspired by OpenAI Agents SDK, the server operates as an autonomous agent:
 - **MCP Integration**: Dynamic discovery and execution of external MCP server tools
 
 ### 🔐 Security First
-- HTTPS-only URL fetching
-- Private IP address blocking (10.x, 172.16.x, 192.168.x, 127.x)
-- DNS validation to prevent SSRF attacks
+
+**Multi-Layer Defense**:
+- **SSRF Protection**: HTTPS-only URL fetching, private IP blocking (10.x, 172.16.x, 192.168.x, 127.x, 169.254.x), cloud metadata endpoint blocking (AWS, GCP, Azure)
+- **Prompt Injection Guardrails**: External content tagging, trust boundaries, system prompt hardening
+- **File Security**: MIME type validation, executable file rejection, path traversal prevention, directory whitelist
+- **Redirect Validation**: Manual redirect handling with security checks, maximum 5 redirects, cross-domain blocking
+- **Content Boundaries**: 50KB size limits, external content wrapping with security tags
+
+**Comprehensive Testing**: 65+ security-focused tests covering SSRF, path traversal, MIME validation, and prompt injection.
+
+See [SECURITY.md](SECURITY.md) for detailed security documentation and best practices.
 
 ### 📝 Observability
 - File-based logging (`logs/general.log`, `logs/reasoning.log`)
@@ -295,6 +303,96 @@ Fetch full content of a search result (OpenAI MCP spec).
 **Returns:**
 - `id`, `title`, `text`, `url`, `metadata`
 
+## Security
+
+The gemini-mcp-server implements comprehensive security measures to protect against common vulnerabilities. See [SECURITY.md](SECURITY.md) for complete documentation.
+
+### Defense Layers
+
+#### 1. SSRF (Server-Side Request Forgery) Protection
+- **HTTPS-only**: HTTP requests are blocked; only HTTPS is allowed for web resources
+- **Private IP blocking**: Blocks access to internal networks (10.x, 172.16.x, 192.168.x, 127.x, 169.254.x)
+- **Cloud metadata blocking**: Prevents access to AWS, GCP, Azure, and Alibaba Cloud metadata endpoints
+- **Redirect validation**: All redirects are manually validated; cross-domain redirects are blocked
+
+#### 2. Prompt Injection Guardrails
+- **Trust boundaries**: Clear separation between user input (trusted) and external content (untrusted)
+- **Content tagging**: All fetched web content is wrapped in `<external_content>` tags with security warnings
+- **System prompt hardening**: Built-in instructions to ignore malicious commands in external content
+- **Information disclosure protection**: Guidelines prevent revealing system prompts or internal details
+
+#### 3. File Security (Multimodal Content)
+- **MIME type validation**: Only known safe types (images, video, audio, PDF, code) are allowed
+- **Executable rejection**: Blocks `.exe`, `.sh`, `.dll`, and other executable file types
+- **Path traversal prevention**: All paths are normalized and validated against a whitelist
+- **Directory whitelist**: Local files only allowed in safe directories (cwd, Documents, Downloads, Desktop)
+- **URI scheme validation**: Only `gs://`, `https://`, and conditionally `file://` URIs are allowed
+
+#### 4. Content Boundaries
+- **Size limits**: Web content limited to 50KB to prevent resource exhaustion
+- **Content type validation**: Basic validation of response content types
+- **Encoding validation**: Proper handling of character encodings
+
+### Configuration
+
+#### File Security (Multimodal)
+```bash
+# Default: false (secure) - file:// URIs are disabled
+export GEMINI_ALLOW_FILE_URIS="false"
+
+# For CLI environments only - enables local file:// URIs with whitelist validation
+export GEMINI_ALLOW_FILE_URIS="true"
+```
+
+**Security Note**: Never enable `GEMINI_ALLOW_FILE_URIS` in production or web-facing applications. It's designed for trusted CLI environments only.
+
+#### Security Monitoring
+```bash
+# Enable logging to monitor security events
+export GEMINI_DISABLE_LOGGING="false"
+export GEMINI_LOG_DIR="/var/log/gemini-mcp"
+
+# Log to stderr for real-time monitoring
+export GEMINI_LOG_TO_STDERR="true"
+```
+
+### Best Practices
+
+#### For Desktop Applications (Recommended)
+```json
+{
+  "mcpServers": {
+    "gemini": {
+      "env": {
+        "GEMINI_ALLOW_FILE_URIS": "false"
+      }
+    }
+  }
+}
+```
+
+#### For CLI Tools (Use with Caution)
+```bash
+export GEMINI_ALLOW_FILE_URIS="true"
+export GEMINI_LOG_TO_STDERR="true"
+```
+
+### Security Testing
+
+Run comprehensive security test suite:
+```bash
+# All security tests
+npx tsx test/url-security-test.ts        # 17 tests - SSRF protection
+npx tsx test/file-security-test.ts       # 34 tests - File validation
+npx tsx test/webfetch-security-test.ts   # 5 tests - Content tagging
+npx tsx test/security-guidelines-test.ts # 3 tests - Prompt injection
+npx tsx test/multimodal-security-test.ts # 6 tests - Multimodal files
+```
+
+**Total**: 65+ security-focused tests covering SSRF, path traversal, MIME validation, and prompt injection.
+
+For detailed security information, threat models, and vulnerability reporting, see [SECURITY.md](SECURITY.md).
+
 ## Architecture
 
 ### Agentic Loop
@@ -542,11 +640,14 @@ When using Claude Desktop or other MCP clients, add the environment variable:
 
 ## Documentation
 
+- [SECURITY.md](SECURITY.md) - **Security documentation and best practices**
 - [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture
 - [AGENTIC_LOOP_DESIGN.md](AGENTIC_LOOP_DESIGN.md) - Agentic loop design
 - [DIRECTORY_STRUCTURE.md](DIRECTORY_STRUCTURE.md) - Code organization
 - [IMPLEMENTATION.md](IMPLEMENTATION.md) - Implementation details
 - [BUILD.md](BUILD.md) - Build and release process
+- [MULTIMODAL.md](MULTIMODAL.md) - Multimodal content guide
+- [PROMPT_CUSTOMIZATION.md](PROMPT_CUSTOMIZATION.md) - System prompt customization
 
 ## License
 
