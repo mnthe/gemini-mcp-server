@@ -13,9 +13,11 @@ import { EnhancedMCPClient } from '../mcp/EnhancedMCPClient.js';
 export class ToolRegistry {
   private tools: Map<string, Tool> = new Map();
   private logger: Logger;
+  private systemPrompt?: string;
 
-  constructor(logger: Logger) {
+  constructor(logger: Logger, systemPrompt?: string) {
     this.logger = logger;
+    this.systemPrompt = systemPrompt;
   }
 
   /**
@@ -138,36 +140,63 @@ export class ToolRegistry {
    * Get tool definitions formatted for LLM prompt
    */
   getToolDefinitionsText(): string {
+    const systemSection = this.getSystemPromptSection();
+    const toolsSection = this.getToolDefinitionsSection();
+    const instructionsSection = this.getToolInstructionsSection();
+
+    return `${systemSection}${toolsSection}${instructionsSection}`;
+  }
+
+  /**
+   * Get system prompt section
+   */
+  private getSystemPromptSection(): string {
+    if (this.systemPrompt) {
+      // Use custom system prompt if provided
+      return `${this.systemPrompt}\n\n`;
+    } else {
+      // Use default system prompt
+      return 'You are a helpful AI assistant with access to the following tools:\n\n';
+    }
+  }
+
+  /**
+   * Get tool definitions section
+   */
+  private getToolDefinitionsSection(): string {
     const tools = this.getAllTools();
 
     if (tools.length === 0) {
-      return 'No tools available.';
+      return 'No tools available.\n\n';
     }
 
-    const lines: string[] = ['You are a helpful AI assistant with access to the following tools:', ''];
-
-    for (const tool of tools) {
+    const toolDefinitions = tools.map(tool => {
       const definition = tool instanceof WebFetchTool || 'getDefinition' in tool
         ? (tool as any).getDefinition()
         : this.createDefinition(tool);
 
-      lines.push(`- ${definition.name}: ${definition.description}`);
-      lines.push(`  Parameters: ${definition.parameters}`);
-      lines.push('');
-    }
+      return `- ${definition.name}: ${definition.description}
+  Parameters: ${definition.parameters}
+`;
+    });
 
-    lines.push('When you need to use a tool, respond with:');
-    lines.push('TOOL_CALL: <tool_name>');
-    lines.push('ARGUMENTS: <json_arguments>');
-    lines.push('');
-    lines.push('Example:');
-    lines.push('TOOL_CALL: web_fetch');
-    lines.push('ARGUMENTS: {"url": "https://example.com", "extract": true}');
-    lines.push('');
-    lines.push('When you have all information needed, provide your final answer without tool calls.');
-    lines.push('');
+    return toolDefinitions.join('\n');
+  }
 
-    return lines.join('\n');
+  /**
+   * Get tool usage instructions section
+   */
+  private getToolInstructionsSection(): string {
+    return `When you need to use a tool, respond with:
+TOOL_CALL: <tool_name>
+ARGUMENTS: <json_arguments>
+
+Example:
+TOOL_CALL: web_fetch
+ARGUMENTS: {"url": "https://example.com", "extract": true}
+
+When you have all information needed, provide your final answer without tool calls.
+`;
   }
 
   /**

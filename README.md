@@ -14,6 +14,14 @@ This server provides:
 
 ## Key Features
 
+### 🎭 System Prompt Customization
+Customize the AI assistant's behavior and persona:
+- **Domain-Specific Roles**: Configure as financial analyst, code reviewer, research assistant, etc.
+- **Environment-Based**: Set via `GEMINI_SYSTEM_PROMPT` environment variable
+- **Multi-Persona Support**: Run multiple servers with different personas
+- **100% Backward Compatible**: Optional feature - works normally without customization
+- See [PROMPT_CUSTOMIZATION.md](PROMPT_CUSTOMIZATION.md) for detailed guide and [examples/custom-prompts.md](examples/custom-prompts.md) for templates
+
 ### 🎨 Multimodal Input Support
 Send images, audio, video, and code files to Gemini:
 - **Images**: JPEG, PNG, WebP, HEIC
@@ -103,6 +111,9 @@ export GEMINI_TOP_K="40"
 
 **Optional Agentic Features:**
 ```bash
+# System prompt customization
+export GEMINI_SYSTEM_PROMPT="You are a specialized financial analyst AI assistant. You have access to the following tools:"
+
 # Multi-turn conversations
 export GEMINI_ENABLE_CONVERSATIONS="true"
 export GEMINI_SESSION_TIMEOUT="3600"
@@ -179,6 +190,37 @@ npx -y github:mnthe/gemini-mcp-server
 # Or direct execution
 node /path/to/gemini-mcp-server/build/index.js
 ```
+
+#### Multi-Persona Setup
+
+You can run multiple Gemini servers with different personas for specialized tasks:
+
+```json
+{
+  "mcpServers": {
+    "gemini-code": {
+      "command": "npx",
+      "args": ["-y", "github:mnthe/gemini-mcp-server"],
+      "env": {
+        "GOOGLE_CLOUD_PROJECT": "your-project-id",
+        "GOOGLE_CLOUD_LOCATION": "us-central1",
+        "GEMINI_SYSTEM_PROMPT": "You are a code review specialist. Focus on code quality, security, and best practices. You have access to the following tools:"
+      }
+    },
+    "gemini-research": {
+      "command": "npx",
+      "args": ["-y", "github:mnthe/gemini-mcp-server"],
+      "env": {
+        "GOOGLE_CLOUD_PROJECT": "your-project-id",
+        "GOOGLE_CLOUD_LOCATION": "us-central1",
+        "GEMINI_SYSTEM_PROMPT": "You are an academic research assistant. Cite sources and provide comprehensive analysis. You have access to the following tools:"
+      }
+    }
+  }
+}
+```
+
+See [PROMPT_CUSTOMIZATION.md](PROMPT_CUSTOMIZATION.md) for comprehensive guide and [examples/custom-prompts.md](examples/custom-prompts.md) for ready-to-use templates.
 
 ## Available Tools
 

@@ -9,7 +9,8 @@ import { EnhancedMCPClient } from '../mcp/EnhancedMCPClient.js';
 export declare class ToolRegistry {
     private tools;
     private logger;
-    constructor(logger: Logger);
+    private systemPrompt?;
+    constructor(logger: Logger, systemPrompt?: string);
     /**
      * Register built-in WebFetch tool
      */
@@ -38,6 +39,18 @@ export declare class ToolRegistry {
      * Get tool definitions formatted for LLM prompt
      */
     getToolDefinitionsText(): string;
+    /**
+     * Get system prompt section
+     */
+    private getSystemPromptSection;
+    /**
+     * Get tool definitions section
+     */
+    private getToolDefinitionsSection;
+    /**
+     * Get tool usage instructions section
+     */
+    private getToolInstructionsSection;
     /**
      * Create tool definition from Tool interface
      */

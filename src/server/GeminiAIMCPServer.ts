@@ -76,7 +76,7 @@ export class GeminiAIMCPServer {
     this.mcpClient = new EnhancedMCPClient('server', logDir, disableLogging, logToStderr);
 
     // Initialize tool registry
-    this.toolRegistry = new ToolRegistry(this.logger);
+    this.toolRegistry = new ToolRegistry(this.logger, config.systemPrompt);
 
     // Initialize agentic loop
     this.agenticLoop = new AgenticLoop(

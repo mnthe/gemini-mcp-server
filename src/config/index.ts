@@ -46,6 +46,9 @@ export function loadConfig(): GeminiAIConfig {
   // Should NOT be enabled in desktop apps (Claude Desktop, ChatGPT App) for security reasons
   const allowFileUris = process.env.GEMINI_ALLOW_FILE_URIS === "true";
 
+  // System prompt override - allows customization of AI assistant behavior
+  const systemPrompt = process.env.GEMINI_SYSTEM_PROMPT;
+
   return {
     projectId,
     location,
@@ -63,5 +66,6 @@ export function loadConfig(): GeminiAIConfig {
     disableLogging,
     logToStderr,
     allowFileUris,
+    systemPrompt,
   };
 }
