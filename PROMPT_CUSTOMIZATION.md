@@ -18,12 +18,12 @@ The Gemini AI MCP Server supports system prompt override, allowing you to custom
 Set the `GEMINI_SYSTEM_PROMPT` environment variable:
 
 ```bash
-export GEMINI_SYSTEM_PROMPT="You are a specialized financial analyst AI assistant. When analyzing data:
+export GEMINI_SYSTEM_PROMPT='You are a specialized financial analyst AI assistant. When analyzing data:
 - Always verify information using available tools
 - Cite sources for all numerical data
 - Consider market context and risk factors
 
-You have access to the following tools:"
+You have access to the following tools:'
 ```
 
 **Important**: End your custom prompt with "You have access to the following tools:" to ensure proper tool integration.
