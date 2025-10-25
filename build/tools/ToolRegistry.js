@@ -125,16 +125,15 @@ export class ToolRegistry {
         if (tools.length === 0) {
             return 'No tools available.\n\n';
         }
-        const lines = [];
-        for (const tool of tools) {
+        const toolDefinitions = tools.map(tool => {
             const definition = tool instanceof WebFetchTool || 'getDefinition' in tool
                 ? tool.getDefinition()
                 : this.createDefinition(tool);
-            lines.push(`- ${definition.name}: ${definition.description}`);
-            lines.push(`  Parameters: ${definition.parameters}`);
-            lines.push('');
-        }
-        return lines.join('\n');
+            return `- ${definition.name}: ${definition.description}
+  Parameters: ${definition.parameters}
+`;
+        });
+        return toolDefinitions.join('\n');
     }
     /**
      * Get tool usage instructions section
