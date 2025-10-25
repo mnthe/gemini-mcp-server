@@ -19,6 +19,7 @@ export interface GeminiAIConfig {
   disableLogging: boolean;
   logToStderr: boolean;
   allowFileUris: boolean;
+  systemPrompt?: string;
 }
 
 // Legacy alias for backward compatibility

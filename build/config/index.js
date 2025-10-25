@@ -33,6 +33,8 @@ export function loadConfig() {
     // File URI configuration - allows file:// URLs in CLI environments (Codex, Claude Code, Gemini CLI)
     // Should NOT be enabled in desktop apps (Claude Desktop, ChatGPT App) for security reasons
     const allowFileUris = process.env.GEMINI_ALLOW_FILE_URIS === "true";
+    // System prompt override - allows customization of AI assistant behavior
+    const systemPrompt = process.env.GEMINI_SYSTEM_PROMPT;
     return {
         projectId,
         location,
@@ -50,6 +52,7 @@ export function loadConfig() {
         disableLogging,
         logToStderr,
         allowFileUris,
+        systemPrompt,
     };
 }
 //# sourceMappingURL=index.js.map
