@@ -23,7 +23,7 @@ SSRF attacks occur when an attacker can trick the server into making requests to
 
 #### URL Scheme Validation
 - **Allowed schemes**: `https://`, `gs://` (Cloud Storage)
-- **Blocked schemes**: `http://`, `file://` (unless explicitly enabled), `ftp://`, `ftps://`, `data://`, `javascript://`, `vbscript://`, `about://`, `blob://`
+- **Blocked schemes**: `http://`, `file://` (unless explicitly enabled), `ftp://`, `ftps://`, `data://`, `javascript://`, `vbscript://`, `about://`, `blob://`, `gopher://`, `dict://`, `tftp://`
 
 **Why HTTP is blocked**: HTTP lacks encryption and is more vulnerable to man-in-the-middle attacks. HTTPS-only ensures secure communication.
 
@@ -290,13 +290,13 @@ npx tsx test/multimodal-security-test.ts
 ```
 
 ### Test Coverage Summary
-- **URL Security**: 17 tests (metadata endpoints, schemes, redirects, private IPs)
+- **URL Security**: 21 tests (metadata endpoints, schemes, redirects, private IPs)
 - **File Security**: 34 tests (MIME types, path traversal, whitelist, executables, URIs)
 - **WebFetch Security**: 5 tests (SSRF protection integration)
 - **System Prompt**: 3 tests (security guidelines presence)
 - **Multimodal**: 6 tests (schema and runtime validation)
 
-**Total**: 65+ security-focused tests
+**Total**: 69 security-focused tests
 
 ## Reporting Security Vulnerabilities
 

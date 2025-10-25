@@ -16,7 +16,7 @@ This document summarizes the security enhancements implemented to address issues
    - Generic: `metadata`
 
 2. **Dangerous URL Scheme Blocking**: Prevents use of dangerous protocols
-   - Blocked schemes: `file:`, `ftp:`, `ftps:`, `data:`, `javascript:`, `vbscript:`, `about:`, `blob:`
+   - Blocked schemes: `file:`, `ftp:`, `ftps:`, `data:`, `javascript:`, `vbscript:`, `about:`, `blob:`, `gopher:`, `dict:`, `tftp:`
 
 3. **Link-Local IP Range Blocking**: Added `169.254.0.0/16` to blocked IP ranges
    - This range is used for APIPA and link-local addressing
@@ -27,8 +27,8 @@ This document summarizes the security enhancements implemented to address issues
    - Prevents redirects to metadata endpoints or private IPs
 
 ### Test Coverage
-- 17 comprehensive tests in `test/url-security-test.ts`
-- All edge cases covered (metadata endpoints, schemes, redirects, private IPs, link-local)
+- 21 comprehensive tests in `test/url-security-test.ts`
+- All edge cases covered (metadata endpoints, schemes including gopher/dict/tftp, redirects, private IPs, link-local)
 
 ---
 
@@ -149,10 +149,14 @@ This document summarizes the security enhancements implemented to address issues
 
 ### All Tests Passing ✅
 ```
-URL Security Tests: 17/17 PASS
+URL Security Tests: 21/21 PASS
 Security Guidelines Tests: 3/3 PASS  
 WebFetch Security Tests: 5/5 PASS
+File Security Tests: 34/34 PASS
+Multimodal Security Tests: 6/6 PASS
 ```
+
+**Total: 69 security tests**
 
 ---
 

@@ -51,7 +51,7 @@ Inspired by OpenAI Agents SDK, the server operates as an autonomous agent:
 - **Redirect Validation**: Manual redirect handling with security checks, maximum 5 redirects, cross-domain blocking
 - **Content Boundaries**: 50KB size limits, external content wrapping with security tags
 
-**Comprehensive Testing**: 65+ security-focused tests covering SSRF, path traversal, MIME validation, and prompt injection.
+**Comprehensive Testing**: 69 security-focused tests covering SSRF, path traversal, MIME validation, and prompt injection.
 
 See [SECURITY.md](SECURITY.md) for detailed security documentation and best practices.
 
@@ -382,14 +382,14 @@ export GEMINI_LOG_TO_STDERR="true"
 Run comprehensive security test suite:
 ```bash
 # All security tests
-npx tsx test/url-security-test.ts        # 17 tests - SSRF protection
+npx tsx test/url-security-test.ts        # 21 tests - SSRF protection
 npx tsx test/file-security-test.ts       # 34 tests - File validation
 npx tsx test/webfetch-security-test.ts   # 5 tests - Content tagging
 npx tsx test/security-guidelines-test.ts # 3 tests - Prompt injection
 npx tsx test/multimodal-security-test.ts # 6 tests - Multimodal files
 ```
 
-**Total**: 65+ security-focused tests covering SSRF, path traversal, MIME validation, and prompt injection.
+**Total**: 69 security-focused tests covering SSRF, path traversal, MIME validation, and prompt injection.
 
 For detailed security information, threat models, and vulnerability reporting, see [SECURITY.md](SECURITY.md).
 

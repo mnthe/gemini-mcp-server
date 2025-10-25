@@ -7,7 +7,7 @@ import * as dns from 'dns/promises';
 import { SecurityError } from '../errors/index.js';
 
 // Dangerous URL schemes that should be blocked
-const BLOCKED_SCHEMES = ['file:', 'ftp:', 'ftps:', 'data:', 'javascript:', 'vbscript:', 'about:', 'blob:'];
+const BLOCKED_SCHEMES = ['file:', 'ftp:', 'ftps:', 'data:', 'javascript:', 'vbscript:', 'about:', 'blob:', 'gopher:', 'dict:', 'tftp:'];
 
 // Cloud metadata endpoints that must be blocked to prevent SSRF
 const BLOCKED_METADATA_HOSTS = [
