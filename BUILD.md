@@ -21,7 +21,7 @@ This method:
 - ✅ No installation required
 - ✅ No local storage needed
 - ✅ Automatic dependency resolution
-- ✅ Automatic build via postinstall hook
+- ✅ Automatic build via prepare hook
 
 ### 2. Global Installation (Future - when published to npm)
 
@@ -52,7 +52,7 @@ node build/index.js
 
 **Scripts:**
 - `build` - Compiles TypeScript to JavaScript
-- `postinstall` - Runs automatically on `npm install` (builds the project for npx usage)
+- `prepare` - Runs automatically on `npm install` (builds the project for npx usage)
 - `prepublishOnly` - Runs before publishing to npm (ensures fresh build)
 - `watch` - Development mode with auto-rebuild
 - `dev` - Run TypeScript directly with tsx
@@ -142,10 +142,10 @@ Follow [Semantic Versioning](https://semver.org/):
 
 ### .gitignore
 
-The build directory is **not committed to the repository**. Instead, it is built automatically via a `postinstall` hook when installed.
+The build directory is **not committed to the repository**. Instead, it is built automatically via a `prepare` hook when installed.
 
 ```gitignore
-# Build output (built via postinstall hook)
+# Build output (built via prepare hook)
 build/
 ```
 
@@ -158,8 +158,8 @@ This approach provides several benefits:
 
 When users run `npx github:mnthe/gemini-mcp-server`, npm automatically:
 1. Downloads the repository from GitHub
-2. Runs `npm install` which triggers the `postinstall` script
-3. The `postinstall` script runs `npm run build` to compile TypeScript
+2. Runs `npm install` which triggers the `prepare` script
+3. The `prepare` script runs `npm run build` to compile TypeScript
 4. The compiled `build/index.js` is then executed
 
 ### Files Included in Package
@@ -225,7 +225,7 @@ npm run build
 **Issue:** `npx github:mnthe/gemini-mcp-server` doesn't work
 
 **Possible causes:**
-1. Build fails during postinstall
+1. Build fails during prepare hook
    - Solution: Check for TypeScript compilation errors
    - Solution: Ensure all dependencies are correctly specified in package.json
 2. Node.js version too old

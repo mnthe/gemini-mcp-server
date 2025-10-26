@@ -138,7 +138,7 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
-# Build output (built via postinstall hook)
+# Build output (built via prepare hook)
 build/
 
 .claude/settings.local.json
