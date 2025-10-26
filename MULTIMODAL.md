@@ -427,91 +427,9 @@ export GEMINI_MODEL="gemini-2.0-flash-exp"
 
 ## For Agent/Client Developers
 
-This section provides implementation guidance for developers building MCP clients or agents that need to use multimodal functionality.
+This section provides additional implementation guidance for developers building MCP clients or agents. For the complete parts array specification, see the "Parts Array Structure for Agents" section above.
 
-### Constructing Parts Arrays
-
-When building a multimodal request, construct the `parts` array as follows:
-
-```typescript
-// Example: TypeScript/JavaScript client
-interface MultimodalPart {
-  text?: string;
-  inlineData?: {
-    mimeType: string;
-    data: string;  // base64
-  };
-  fileData?: {
-    mimeType: string;
-    fileUri: string;  // gs:// or https://
-  };
-}
-
-// Build parts array
-const parts: MultimodalPart[] = [];
-
-// Add image
-parts.push({
-  inlineData: {
-    mimeType: "image/jpeg",
-    data: base64ImageString
-  }
-});
-
-// Add text context
-parts.push({
-  text: "This is additional context"
-});
-
-// Add video from Cloud Storage
-parts.push({
-  fileData: {
-    mimeType: "video/mp4",
-    fileUri: "gs://my-bucket/video.mp4"
-  }
-});
-
-// Make the request
-const request = {
-  name: "query",
-  arguments: {
-    prompt: "Analyze these materials",
-    parts: parts
-  }
-};
-```
-
-### Python Client Example
-
-```python
-import base64
-import json
-
-# Read and encode file
-with open("image.jpg", "rb") as f:
-    image_data = base64.b64encode(f.read()).decode('utf-8')
-
-# Construct request
-request = {
-    "name": "query",
-    "arguments": {
-        "prompt": "What's in this image?",
-        "parts": [
-            {
-                "inlineData": {
-                    "mimeType": "image/jpeg",
-                    "data": image_data
-                }
-            }
-        ]
-    }
-}
-
-# Send via MCP client
-response = mcp_client.call_tool(request)
-```
-
-### Validation Checklist for Agents
+### Validation Checklist
 
 Before sending a multimodal request, validate:
 
