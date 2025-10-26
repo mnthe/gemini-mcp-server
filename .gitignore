@@ -138,7 +138,7 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
-# Build output (committed for npx support)
-# build/
+# Build output (built via prepare hook)
+build/
 
 .claude/settings.local.json
