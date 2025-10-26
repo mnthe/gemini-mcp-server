@@ -344,7 +344,7 @@ The following are outside the scope of this security model:
 - [README.md](README.md) - General usage and configuration
 - [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture
 - [MULTIMODAL.md](MULTIMODAL.md) - Multimodal content documentation
-- [SECURITY_IMPLEMENTATION.md](SECURITY_IMPLEMENTATION.md) - Implementation details
+- See "Appendix: Implementation Details" section above for implementation details
 
 ### Related Issues
 - Issue #13: System Prompt Security Guidelines
@@ -359,6 +359,52 @@ The following are outside the scope of this security model:
 - [CWE-918: SSRF](https://cwe.mitre.org/data/definitions/918.html)
 - [CWE-22: Path Traversal](https://cwe.mitre.org/data/definitions/22.html)
 
+## Appendix: Implementation Details
+
+This appendix provides detailed implementation information about the security features. For complete implementation history, see the git commit history.
+
+### Issue #15: URL Security Enhancement
+
+**Changes to `src/utils/urlSecurity.ts`**:
+1. **Cloud Metadata Endpoint Blocking**: Blocks AWS, GCP, Azure, and Alibaba Cloud metadata endpoints
+2. **Dangerous URL Scheme Blocking**: Prevents file:, ftp:, data:, javascript:, and other dangerous protocols
+3. **Link-Local IP Range Blocking**: Added 169.254.0.0/16 (APIPA) to blocked ranges
+4. **Redirect Validation**: New `validateRedirectUrl()` prevents SSRF via redirects
+
+### Issue #14: WebFetch Content Tagging & Redirect Validation
+
+**Changes to `src/tools/WebFetchTool.ts`**:
+1. **External Content Tagging**: All fetched content wrapped in `<external_content>` security boundary tags
+2. **Manual Redirect Handling**: `fetchWithRedirectValidation()` method validates each redirect
+3. **Content Length Enforcement**: 50KB maximum with truncation metadata
+4. **Enhanced Metadata**: Returns original URL, final URL, truncation status, content type
+
+### Issue #13: System Prompt Security Guidelines
+
+**Changes to `src/tools/ToolRegistry.ts`**:
+- New `getSecurityGuidelinesSection()` method adds comprehensive security guidelines to system prompt
+- Guidelines cover trust boundaries, external content handling, prompt injection patterns to ignore
+- Information disclosure protection and role clarification
+
+### Issue #16: File Security Validator
+
+**New file `src/utils/fileSecurity.ts`**:
+1. **MIME Type Validation**: Whitelist of known safe types for images, videos, audio, documents
+2. **Executable File Rejection**: Blocks dangerous extensions (.exe, .sh, .dll, etc.)
+3. **Path Traversal Prevention**: Normalizes paths and validates against whitelist
+4. **Directory Whitelist**: Only allows access to safe directories (cwd, Documents, Downloads, Desktop)
+5. **URI Scheme Validation**: Validates gs://, https://, and conditionally file:// URIs
+
+### Test Coverage Summary
+
+- **URL Security**: 21 tests (metadata endpoints, schemes, redirects, private IPs)
+- **File Security**: 34 tests (MIME types, path traversal, whitelist, executables, URIs)
+- **WebFetch Security**: 5 tests (SSRF protection integration)
+- **System Prompt**: 3 tests (security guidelines presence)
+- **Multimodal**: 6 tests (schema and runtime validation)
+
+**Total**: 69 security-focused tests
+
 ## Changelog
 
 ### Version 1.0.0 (2025-10-25)
@@ -368,4 +414,4 @@ The following are outside the scope of this security model:
 - External content tagging
 - File security validator
 - Path traversal prevention
-- Comprehensive test coverage (65+ tests)
+- Comprehensive test coverage (69 tests)

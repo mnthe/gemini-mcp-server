@@ -69,23 +69,9 @@ node build/index.js
 
 ### Build Output
 
-The build process creates:
-```
-build/
-├── index.js (entry point with shebang)
-├── index.d.ts (TypeScript definitions)
-├── *.js.map (source maps)
-├── agents/ (compiled agent logic)
-├── config/ (compiled configuration)
-├── handlers/ (compiled tool handlers)
-├── managers/ (compiled state managers)
-├── schemas/ (compiled validation)
-├── server/ (compiled MCP server)
-├── services/ (compiled Gemini AI service)
-└── types/ (compiled type definitions)
-```
+The build process compiles TypeScript source files from `src/` to JavaScript in the `build/` directory. See [DIRECTORY_STRUCTURE.md](DIRECTORY_STRUCTURE.md) for the source code organization.
 
-**Total size:** ~104 KB unpacked, ~28 KB packaged
+**Total size:** ~632 KB unpacked (includes type definitions and source maps)
 
 ## Continuous Integration
 
@@ -279,8 +265,7 @@ ls -la build/
 
 ### Package Size
 
-- Unpacked: 104 KB
-- Tarball: 28 KB
+- Unpacked: ~632 KB (with TypeScript definitions and source maps)
 - Dependencies: ~50 MB (not included in package)
 - Total install: ~50 MB
 

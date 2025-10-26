@@ -4,8 +4,7 @@
 
 The Gemini AI MCP Server is a production-grade intelligent agent that enables AI assistants to query Google AI (Gemini models) via Vertex AI or Google AI Studio with full agentic capabilities - turn-based execution, automatic tool orchestration, and MCP-to-MCP integration.
 
-**Implementation Date**: January 2025
-**Architecture**: OpenAI Agents SDK-inspired agentic loop
+**Last Updated**: 2025-10-26  
 **Status**: Production-ready
 
 ## What Was Built
@@ -163,9 +162,9 @@ User Input → Turn 1..10 Loop:
 ### Dependencies
 ```json
 {
-  "@google-cloud/vertexai": "^1.10.0",      // Gemini API (migrated from aiplatform)
-  "@modelcontextprotocol/sdk": "^1.20.1",   // MCP protocol
-  "zod": "^3.25.76"                          // Schema validation
+  "@google/genai": "^1.27.0",                 // Google Gen AI SDK (Vertex AI & Google AI Studio)
+  "@modelcontextprotocol/sdk": "^1.20.1",     // MCP protocol
+  "zod": "^3.25.76"                            // Schema validation
 }
 ```
 

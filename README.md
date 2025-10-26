@@ -455,12 +455,11 @@ src/
 ├── managers/          # Business logic
 │   └── ConversationManager.ts
 │
-├── common/            # Shared utilities
-│   ├── errors/        # Custom errors
-│   ├── types/         # TypeScript types
-│   ├── schemas/       # Zod validation
-│   ├── config/        # Configuration
-│   └── utils/         # Logger
+├── errors/            # Custom error types
+├── types/             # TypeScript type definitions
+├── schemas/           # Zod validation schemas
+├── config/            # Configuration loading
+├── utils/             # Shared utilities (Logger, security)
 │
 └── server/            # MCP server bootstrap
     └── GeminiAIMCPServer.ts
@@ -641,18 +640,10 @@ When using Claude Desktop or other MCP clients, add the environment variable:
 ## Documentation
 
 - [SECURITY.md](SECURITY.md) - **Security documentation and best practices**
-- [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture
-- [AGENTIC_LOOP_DESIGN.md](AGENTIC_LOOP_DESIGN.md) - Agentic loop design
+- [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture and agentic loop design
 - [DIRECTORY_STRUCTURE.md](DIRECTORY_STRUCTURE.md) - Code organization
 - [IMPLEMENTATION.md](IMPLEMENTATION.md) - Implementation details
 - [BUILD.md](BUILD.md) - Build and release process
 - [MULTIMODAL.md](MULTIMODAL.md) - Multimodal content guide
 - [PROMPT_CUSTOMIZATION.md](PROMPT_CUSTOMIZATION.md) - System prompt customization
-
-## License
-
-MIT
-
-## Contributing
-
-Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+- [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines

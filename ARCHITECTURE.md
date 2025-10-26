@@ -4,7 +4,7 @@
 
 The Gemini AI MCP Server implements an **intelligent agentic loop** inspired by the OpenAI Agents SDK. The architecture supports turn-based execution, automatic tool selection, parallel tool execution, and robust error handling.
 
-**Last Updated**: 2025-01-23 (Post-Agentic Loop Implementation)
+**Last Updated**: 2025-10-26
 
 ## Core Architecture
 
@@ -59,59 +59,7 @@ Structured Result
 
 ## Directory Structure
 
-```
-src/
-├── agentic/           # Core agentic loop components
-│   ├── AgenticLoop.ts       # Main turn-based orchestrator
-│   ├── RunState.ts          # Execution state management
-│   ├── ResponseProcessor.ts # Parse Gemini responses (MCP format)
-│   └── Tool.ts              # Tool interface (MCP standard)
-│
-├── mcp/               # MCP client implementation
-│   ├── EnhancedMCPClient.ts   # Unified stdio + HTTP client
-│   ├── StdioMCPConnection.ts  # Subprocess-based MCP
-│   └── HttpMCPConnection.ts   # HTTP-based MCP
-│
-├── tools/             # Tool implementations
-│   ├── WebFetchTool.ts     # Secure HTTPS web fetching
-│   └── ToolRegistry.ts     # Tool management + parallel execution
-│
-├── services/          # External service integrations
-│   └── GeminiAIService.ts  # Gemini API (thinkingConfig support)
-│
-├── handlers/          # MCP tool handlers
-│   ├── QueryHandler.ts     # Main query handler (uses AgenticLoop)
-│   ├── SearchHandler.ts    # Search tool (OpenAI spec)
-│   └── FetchHandler.ts     # Fetch tool (OpenAI spec)
-│
-├── managers/          # Business logic managers
-│   └── ConversationManager.ts  # Multi-turn session management
-│
-├── errors/            # Custom error types
-│   ├── SecurityError.ts         # Security violations
-│   ├── ToolExecutionError.ts    # Tool failures
-│   └── ModelBehaviorError.ts    # Invalid model responses
-│
-├── types/             # TypeScript type definitions
-│   ├── config.ts           # Configuration types
-│   ├── conversation.ts     # Conversation types
-│   ├── search.ts           # Search/fetch types
-│   └── mcp.ts              # MCP server types
-│
-├── schemas/           # Input validation (Zod)
-│   └── index.ts
-│
-├── config/            # Configuration loading
-│   └── index.ts
-│
-├── utils/             # Shared utilities
-│   └── Logger.ts           # File-based logging system
-│
-├── server/            # MCP server bootstrap
-│   └── GeminiAIMCPServer.ts
-│
-└── index.ts           # Application entry point
-```
+The codebase is organized by architectural layers for better maintainability. See [DIRECTORY_STRUCTURE.md](DIRECTORY_STRUCTURE.md) for the complete directory structure and detailed organization rationale.
 
 ## Component Details
 
