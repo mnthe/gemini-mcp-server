@@ -30,7 +30,7 @@ Thank you for your interest in contributing to gemini-mcp-server! This document 
 Before submitting a PR:
 
 1. Build the project: `npm run build`
-2. Test the server starts: `GEMINI_PROJECT_ID=test node build/index.js`
+2. Test the server starts: `GOOGLE_CLOUD_PROJECT=<your-test-project> GOOGLE_CLOUD_LOCATION=global node build/index.js`
 3. Verify the tool list works as expected
 
 ### Submitting a Pull Request
