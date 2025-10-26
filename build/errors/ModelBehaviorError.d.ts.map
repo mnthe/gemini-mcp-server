@@ -1,1 +1,0 @@
-{"version":3,"file":"ModelBehaviorError.d.ts","sourceRoot":"","sources":["../../src/errors/ModelBehaviorError.ts"],"names":[],"mappings":"AAAA;;;GAGG;AAEH,qBAAa,kBAAmB,SAAQ,KAAK;IAC3C,SAAgB,QAAQ,EAAE,MAAM,CAAC;gBAErB,QAAQ,EAAE,MAAM,EAAE,OAAO,EAAE,MAAM;IAY7C;;OAEG;IACH,oBAAoB,IAAI,MAAM;CAM/B"}

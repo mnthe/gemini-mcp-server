@@ -1,1 +1,0 @@
-{"version":3,"file":"SecurityError.js","sourceRoot":"","sources":["../../src/errors/SecurityError.ts"],"names":[],"mappings":"AAAA;;;GAGG;AAEH,MAAM,OAAO,aAAc,SAAQ,KAAK;IACtC,YAAY,OAAe;QACzB,KAAK,CAAC,OAAO,CAAC,CAAC;QACf,IAAI,CAAC,IAAI,GAAG,eAAe,CAAC;QAE5B,gFAAgF;QAChF,IAAI,KAAK,CAAC,iBAAiB,EAAE,CAAC;YAC5B,KAAK,CAAC,iBAAiB,CAAC,IAAI,EAAE,aAAa,CAAC,CAAC;QAC/C,CAAC;IACH,CAAC;CACF"}

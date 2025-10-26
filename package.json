@@ -15,7 +15,7 @@
   ],
   "scripts": {
     "build": "tsc && chmod +x build/index.js",
-    "prepare": "npm run build",
+    "postinstall": "npm run build",
     "prepublishOnly": "npm run build",
     "watch": "tsc --watch",
     "dev": "tsx src/index.ts",
