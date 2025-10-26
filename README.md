@@ -455,12 +455,11 @@ src/
 ├── managers/          # Business logic
 │   └── ConversationManager.ts
 │
-├── common/            # Shared utilities
-│   ├── errors/        # Custom errors
-│   ├── types/         # TypeScript types
-│   ├── schemas/       # Zod validation
-│   ├── config/        # Configuration
-│   └── utils/         # Logger
+├── errors/            # Custom error types
+├── types/             # TypeScript type definitions
+├── schemas/           # Zod validation schemas
+├── config/            # Configuration loading
+├── utils/             # Shared utilities (Logger, security)
 │
 └── server/            # MCP server bootstrap
     └── GeminiAIMCPServer.ts

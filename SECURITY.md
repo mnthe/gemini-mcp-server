@@ -344,7 +344,7 @@ The following are outside the scope of this security model:
 - [README.md](README.md) - General usage and configuration
 - [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture
 - [MULTIMODAL.md](MULTIMODAL.md) - Multimodal content documentation
-- [SECURITY_IMPLEMENTATION.md](SECURITY_IMPLEMENTATION.md) - Implementation details
+- See "Appendix: Implementation Details" section above for implementation details
 
 ### Related Issues
 - Issue #13: System Prompt Security Guidelines
