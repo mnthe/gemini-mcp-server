@@ -40,7 +40,7 @@ export function loadConfig(): GeminiAIConfig {
   // Logging configuration
   const logDir = process.env.GEMINI_LOG_DIR;
   const disableLogging = process.env.GEMINI_DISABLE_LOGGING === "true";
-  const logToStderr = process.env.GEMINI_LOG_TO_STDERR === "true";
+  const logToStderr = process.env.GEMINI_LOG_TO_STDERR !== "false";  // Default: true (console logging)
 
   // File URI configuration - allows file:// URLs in CLI environments (Codex, Claude Code, Gemini CLI)
   // Should NOT be enabled in desktop apps (Claude Desktop, ChatGPT App) for security reasons

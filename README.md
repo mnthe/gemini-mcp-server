@@ -128,9 +128,15 @@ export GEMINI_SESSION_TIMEOUT="3600"
 export GEMINI_MAX_HISTORY="10"
 
 # Logging configuration
-export GEMINI_DISABLE_LOGGING="false"      # Set to 'true' to disable file-based logging
-export GEMINI_LOG_DIR="/path/to/logs"      # Custom log directory (default: ./logs)
-export GEMINI_LOG_TO_STDERR="true"         # Set to 'true' to pipe logs to stderr for debugging
+# Default: Console logging to stderr (recommended for npx/MCP usage)
+export GEMINI_LOG_TO_STDERR="true"         # Default: true (console logging)
+
+# For file-based logging instead:
+export GEMINI_LOG_TO_STDERR="false"        # Disable console, use file logging
+export GEMINI_LOG_DIR="./logs"             # Log directory (default: ./logs)
+
+# To disable logging completely:
+export GEMINI_DISABLE_LOGGING="true"
 
 # File URI support (for CLI environments only)
 export GEMINI_ALLOW_FILE_URIS="true"       # Set to 'true' to allow file:// URIs (CLI tools only, NOT for desktop apps)
@@ -501,28 +507,26 @@ Tools from external servers are automatically discovered and made available to t
 
 ### Reasoning Traces
 
-Check logs for detailed execution traces (if logging is enabled):
+**Default: Console Logging**
+
+Logs are sent to stderr by default, making them visible in MCP client logs.
+
+**For File-Based Logging:**
+```bash
+export GEMINI_LOG_TO_STDERR="false"        # Disable console, use files
+export GEMINI_LOG_DIR="./logs"             # Log directory (default: ./logs)
+```
+
+Then check logs:
 ```bash
 tail -f logs/general.log     # All logs
 tail -f logs/reasoning.log   # Gemini thinking process only
 ```
 
-To disable logging when running via npx or in containerized environments:
+**To Disable All Logging:**
 ```bash
 export GEMINI_DISABLE_LOGGING="true"
 ```
-
-To use a custom log directory:
-```bash
-export GEMINI_LOG_DIR="/path/to/custom/logs"
-```
-
-To pipe logs to stderr for debugging (useful for seeing logs in MCP client output):
-```bash
-export GEMINI_LOG_TO_STDERR="true"
-```
-
-**Note:** When `GEMINI_LOG_TO_STDERR` is enabled, logs are written to stderr instead of files. This is useful for debugging MCP server issues as the logs will appear in the MCP client's log output (e.g., Claude Desktop logs).
 
 ### Custom Tool Development
 
@@ -575,38 +579,21 @@ npm run dev
 
 If the MCP server appears to be "dead" or disconnects unexpectedly:
 
-**Enable stderr logging to see what's happening:**
-```json
-{
-  "mcpServers": {
-    "gemini": {
-      "command": "npx",
-      "args": ["-y", "github:mnthe/gemini-mcp-server"],
-      "env": {
-        "GOOGLE_CLOUD_PROJECT": "your-project-id",
-        "GEMINI_LOG_TO_STDERR": "true"
-      }
-    }
-  }
-}
-```
+**Check MCP client logs** (logs are sent to stderr by default):
+- **macOS**: `~/Library/Logs/Claude/mcp*.log`
+- **Windows**: `%APPDATA%\Claude\Logs\mcp*.log`
 
-This will pipe all server logs to stderr, making them visible in your MCP client's logs (e.g., Claude Desktop logs at `~/Library/Logs/Claude/mcp*.log` on macOS). This helps diagnose startup issues, authentication errors, or crashes.
+Server logs will appear in these files automatically.
 
 ### Log Directory Errors
+
 If you encounter errors like `ENOENT: no such file or directory, mkdir './logs'`:
 
-**Quick Fix:** Disable logging when running via npx:
-```bash
-export GEMINI_DISABLE_LOGGING="true"
-```
+**This should not happen with default settings** (console logging is default).
 
-**Alternative:** Set a custom log directory with write permissions:
-```bash
-export GEMINI_LOG_DIR="/tmp/gemini-logs"
-```
+If you enabled file logging (`GEMINI_LOG_TO_STDERR="false"`):
 
-When using Claude Desktop or other MCP clients, add the environment variable:
+**Solution:** Use a writable log directory:
 ```json
 {
   "mcpServers": {
@@ -615,7 +602,8 @@ When using Claude Desktop or other MCP clients, add the environment variable:
       "args": ["-y", "github:mnthe/gemini-mcp-server"],
       "env": {
         "GOOGLE_CLOUD_PROJECT": "your-project-id",
-        "GEMINI_DISABLE_LOGGING": "true"
+        "GEMINI_LOG_TO_STDERR": "false",
+        "GEMINI_LOG_DIR": "/tmp/gemini-logs"
       }
     }
   }
