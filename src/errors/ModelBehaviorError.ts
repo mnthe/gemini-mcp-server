@@ -10,8 +10,6 @@ export class ModelBehaviorError extends BaseError {
 
   constructor(response: string, message: string) {
     super(message);
-
-    this.name = 'ModelBehaviorError';
     this.response = response;
   }
 

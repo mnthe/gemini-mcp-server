@@ -8,6 +8,5 @@ import { BaseError } from './BaseError.js';
 export class SecurityError extends BaseError {
   constructor(message: string) {
     super(message);
-    this.name = 'SecurityError';
   }
 }

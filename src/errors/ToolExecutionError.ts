@@ -14,7 +14,6 @@ export class ToolExecutionError extends BaseError {
     const message = `Tool '${toolName}' failed on attempt ${attempt}: ${originalError.message}`;
     super(message);
 
-    this.name = 'ToolExecutionError';
     this.toolName = toolName;
     this.originalError = originalError;
     this.attempt = attempt;

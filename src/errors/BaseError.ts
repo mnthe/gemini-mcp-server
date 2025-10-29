@@ -7,6 +7,9 @@ export class BaseError extends Error {
   constructor(message: string) {
     super(message);
     
+    // Set the name to the constructor name
+    this.name = this.constructor.name;
+    
     // Set the prototype explicitly for proper instanceof checks
     Object.setPrototypeOf(this, new.target.prototype);
     
