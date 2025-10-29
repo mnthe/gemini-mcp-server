@@ -115,7 +115,8 @@ test('ModelBehaviorError getTruncatedResponse truncates long response', () => {
   const response = 'A'.repeat(300);
   const error = new ModelBehaviorError(response, 'Test');
   const truncated = error.getTruncatedResponse();
-  assert(truncated.length === 203, `Expected length 203 (200 + '...'), got ${truncated.length}`);
+  const expectedLength = 200 + '...'.length; // 200 chars + ellipsis
+  assert(truncated.length === expectedLength, `Expected length ${expectedLength}, got ${truncated.length}`);
   assert(truncated.endsWith('...'), 'Truncated response should end with ...');
 });
 

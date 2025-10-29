@@ -8,6 +8,8 @@ export class BaseError extends Error {
     super(message);
     
     // Set the name to the constructor name
+    // Note: In production with minification, consider explicitly setting name in subclasses
+    // or ensure minifier preserves class names for error types
     this.name = this.constructor.name;
     
     // Set the prototype explicitly for proper instanceof checks
