@@ -8,6 +8,7 @@ import { GeminiAIConfig, MultimodalPart, isSupportedMimeType } from '../types/in
 import { validateSecureUrl } from '../utils/urlSecurity.js';
 import { validateMultimodalFile } from '../utils/fileSecurity.js';
 import { SecurityError } from '../errors/index.js';
+import { getErrorMessage } from '../utils/errorUtils.js';
 
 export interface QueryOptions {
   enableThinking?: boolean;
@@ -65,8 +66,7 @@ export class GeminiAIService {
       console.error('Gemini API query error:', error);
 
       // Return error message instead of throwing
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      throw new Error(`Gemini API error: ${errorMsg}`);
+      throw new Error(`Gemini API error: ${getErrorMessage(error)}`);
     }
   }
 
@@ -187,8 +187,7 @@ export class GeminiAIService {
       console.error("Error extracting response text:", error);
 
       // Safe error message
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      return `Error extracting response: ${errorMsg}`;
+      return `Error extracting response: ${getErrorMessage(error)}`;
     }
   }
 

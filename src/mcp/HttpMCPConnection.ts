@@ -5,6 +5,7 @@
 
 import { Logger } from '../utils/Logger.js';
 import { Tool, ToolResult, JSONSchema } from '../agentic/Tool.js';
+import { BaseMCPConnection } from './BaseMCPConnection.js';
 
 export interface HttpMCPConfig {
   name: string;
@@ -12,13 +13,12 @@ export interface HttpMCPConfig {
   headers?: Record<string, string>;
 }
 
-export class HttpMCPConnection {
+export class HttpMCPConnection extends BaseMCPConnection {
   private config: HttpMCPConfig;
-  private logger: Logger;
 
   constructor(config: HttpMCPConfig, logger: Logger) {
+    super(config.name, logger);
     this.config = config;
-    this.logger = logger;
   }
 
   /**
@@ -47,34 +47,19 @@ export class HttpMCPConnection {
   }
 
   /**
-   * Call a tool on the MCP server
+   * Implement tool call logic for HTTP connection
    */
-  async callTool(toolName: string, args: any): Promise<ToolResult> {
-    this.logger.toolCall(toolName, args);
+  protected async callToolImpl(toolName: string, args: any): Promise<ToolResult> {
+    const response = await this.httpRequest('POST', '/tools/call', {
+      name: toolName,
+      arguments: args,
+    });
 
-    try {
-      const response = await this.httpRequest('POST', '/tools/call', {
-        name: toolName,
-        arguments: args,
-      });
-
-      const result: ToolResult = {
-        status: 'success',
-        content: JSON.stringify(response.content),
-        metadata: { server: this.config.name },
-      };
-
-      this.logger.toolResult(toolName, result);
-      return result;
-    } catch (error) {
-      const errorResult: ToolResult = {
-        status: 'error',
-        content: `Tool execution failed: ${(error as Error).message}`,
-      };
-
-      this.logger.toolResult(toolName, errorResult);
-      return errorResult;
-    }
+    return {
+      status: 'success',
+      content: JSON.stringify(response.content),
+      metadata: { server: this.config.name },
+    };
   }
 
   /**

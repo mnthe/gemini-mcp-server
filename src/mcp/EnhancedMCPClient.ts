@@ -115,33 +115,25 @@ export class EnhancedMCPClient {
     this.discoveredTools = [];
 
     // Discover from stdio servers
-    for (const [serverName, connection] of this.stdioServers.entries()) {
-      try {
-        const tools = await connection.listTools();
-        this.logger.info(`Discovered ${tools.length} tools from stdio server ${serverName}`);
-
-        for (const tool of tools) {
-          this.discoveredTools.push(
-            new MCPToolWrapper(
-              serverName,
-              tool.name,
-              this,
-              `mcp_${serverName}_${tool.name}`,
-              tool.description || `Tool ${tool.name} from ${serverName}`,
-              tool.inputSchema
-            )
-          );
-        }
-      } catch (error) {
-        this.logger.error(`Failed to list tools from stdio server ${serverName}`, error as Error);
-      }
-    }
+    await this.discoverToolsFromConnections(this.stdioServers, 'stdio');
 
     // Discover from HTTP servers
-    for (const [serverName, connection] of this.httpServers.entries()) {
+    await this.discoverToolsFromConnections(this.httpServers, 'HTTP');
+
+    return this.discoveredTools;
+  }
+
+  /**
+   * Helper method to discover tools from a collection of connections
+   */
+  private async discoverToolsFromConnections(
+    connections: Map<string, any>,
+    serverType: string
+  ): Promise<void> {
+    for (const [serverName, connection] of connections.entries()) {
       try {
         const tools = await connection.listTools();
-        this.logger.info(`Discovered ${tools.length} tools from HTTP server ${serverName}`);
+        this.logger.info(`Discovered ${tools.length} tools from ${serverType} server ${serverName}`);
 
         for (const tool of tools) {
           this.discoveredTools.push(
@@ -156,11 +148,9 @@ export class EnhancedMCPClient {
           );
         }
       } catch (error) {
-        this.logger.error(`Failed to list tools from HTTP server ${serverName}`, error as Error);
+        this.logger.error(`Failed to list tools from ${serverType} server ${serverName}`, error as Error);
       }
     }
-
-    return this.discoveredTools;
   }
 
   /**

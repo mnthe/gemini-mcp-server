@@ -7,6 +7,8 @@ import { QueryInput } from '../schemas/index.js';
 import { GeminiAIConfig, Message } from '../types/index.js';
 import { ConversationManager } from '../managers/ConversationManager.js';
 import { AgenticLoop } from '../agentic/AgenticLoop.js';
+import { getErrorMessage } from '../utils/errorUtils.js';
+import { createTextResponse } from '../utils/responseFormatter.js';
 
 export class QueryHandler {
   private conversationManager: ConversationManager;
@@ -73,24 +75,11 @@ export class QueryHandler {
       // Format response
       const responseText = this.formatResponse(result, sessionId);
 
-      return {
-        content: [
-          {
-            type: "text",
-            text: responseText,
-          },
-        ],
-      };
+      return createTextResponse(responseText);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Error in agentic loop: ${errorMessage}`,
-          },
-        ],
-      };
+      return createTextResponse(
+        `Error in agentic loop: ${getErrorMessage(error)}`
+      );
     }
   }
 

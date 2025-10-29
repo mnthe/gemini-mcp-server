@@ -5,6 +5,8 @@
 
 import { FetchInput } from '../schemas/index.js';
 import { FetchResult, CachedDocument } from '../types/index.js';
+import { getErrorMessage } from '../utils/errorUtils.js';
+import { createJsonResponse, createErrorResponse } from '../utils/responseFormatter.js';
 
 export class FetchHandler {
   private searchCache: Map<string, CachedDocument>;
@@ -21,16 +23,9 @@ export class FetchHandler {
       const cachedDoc = this.searchCache.get(input.id);
 
       if (!cachedDoc) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify({
-                error: `Document with id '${input.id}' not found. Please perform a search first.`
-              }),
-            },
-          ],
-        };
+        return createErrorResponse(
+          `Document with id '${input.id}' not found. Please perform a search first.`
+        );
       }
 
       // Return document in OpenAI MCP format
@@ -42,26 +37,11 @@ export class FetchHandler {
         metadata: cachedDoc.metadata
       };
 
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(fetchResult),
-          },
-        ],
-      };
+      return createJsonResponse(fetchResult);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({
-              error: `Error fetching document: ${errorMessage}`
-            }),
-          },
-        ],
-      };
+      return createErrorResponse(
+        `Error fetching document: ${getErrorMessage(error)}`
+      );
     }
   }
 }
