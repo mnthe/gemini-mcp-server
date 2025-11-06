@@ -4,7 +4,7 @@
 
 The Gemini AI MCP Server implements an **intelligent agentic loop** inspired by the OpenAI Agents SDK. The architecture supports turn-based execution, automatic tool selection, parallel tool execution, and robust error handling.
 
-**Last Updated**: 2025-10-26
+**Last Updated**: 2025-11-06
 
 ## Core Architecture
 

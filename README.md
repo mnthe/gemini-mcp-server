@@ -307,7 +307,14 @@ Fetch full content of a search result (OpenAI MCP spec).
 - `id` (string, required): Document ID from search results
 
 **Returns:**
-- `id`, `title`, `text`, `url`, `metadata`
+- `id` (string): Document identifier
+- `title` (string): Document title
+- `text` (string): Full document content
+- `url` (string): Document URL
+- `metadata` (object, optional): Additional metadata including:
+  - `query` (string): Original search query
+  - `timestamp` (string): ISO 8601 timestamp of when the search was performed
+  - `model` (string): Gemini model used for the search
 
 ## Security
 

@@ -4,7 +4,7 @@
 
 The Gemini AI MCP Server is a production-grade intelligent agent that enables AI assistants to query Google AI (Gemini models) via Vertex AI or Google AI Studio with full agentic capabilities - turn-based execution, automatic tool orchestration, and MCP-to-MCP integration.
 
-**Last Updated**: 2025-10-26  
+**Last Updated**: 2025-11-06  
 **Status**: Production-ready
 
 ## What Was Built
