@@ -3,7 +3,10 @@
  * Uses @google/genai unified SDK supporting both Vertex AI and Google AI Studio
  */
 
-import { GenerateContentConfig, GoogleGenAI, Part } from "@google/genai";
+import { GenerateContentConfig, GoogleGenAI, Part, ThinkingLevel } from "@google/genai";
+
+// Re-export ThinkingLevel for consumers
+export { ThinkingLevel } from "@google/genai";
 import { GeminiAIConfig, MultimodalPart, isSupportedMimeType } from '../types/index.js';
 import { validateSecureUrl } from '../utils/urlSecurity.js';
 import { validateMultimodalFile } from '../utils/fileSecurity.js';
@@ -11,6 +14,13 @@ import { SecurityError } from '../errors/index.js';
 
 export interface QueryOptions {
   enableThinking?: boolean;
+  /**
+   * Thinking level for Gemini 3 models: ThinkingLevel.LOW or ThinkingLevel.HIGH
+   * - LOW: Minimizes latency and cost
+   * - HIGH: Maximizes reasoning depth (default for Gemini 3)
+   * Note: For Gemini 2.5 models, use enableThinking with thinkingBudget
+   */
+  thinkingLevel?: ThinkingLevel;
 }
 
 export class GeminiAIService {
@@ -24,6 +34,15 @@ export class GeminiAIService {
       project: config.projectId,
       location: config.location,
     });
+  }
+
+  /**
+   * Check if the model is a Gemini 3 series model
+   * Gemini 3 models use thinkingLevel instead of thinkingBudget
+   */
+  private isGemini3Model(): boolean {
+    const model = this.config.model.toLowerCase();
+    return model.includes('gemini-3') || model.includes('gemini3');
   }
 
   /**
@@ -44,10 +63,20 @@ export class GeminiAIService {
 
       // Enable thinking mode if requested
       if (options.enableThinking) {
-        config.thinkingConfig = {
-          thinkingBudget: -1,  // Auto budget
-          includeThoughts: true,  // Include thought summaries in response
-        };
+        if (this.isGemini3Model()) {
+          // Gemini 3 models use thinkingLevel instead of thinkingBudget
+          // Note: Cannot disable thinking for Gemini 3 Pro
+          config.thinkingConfig = {
+            thinkingLevel: options.thinkingLevel ?? ThinkingLevel.HIGH,
+            includeThoughts: true,
+          };
+        } else {
+          // Gemini 2.5 and earlier use thinkingBudget
+          config.thinkingConfig = {
+            thinkingBudget: -1,  // Auto budget
+            includeThoughts: true,
+          };
+        }
       }
 
       // Build content parts
