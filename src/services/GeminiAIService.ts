@@ -68,13 +68,11 @@ export class GeminiAIService {
           // Note: Cannot disable thinking for Gemini 3 Pro
           config.thinkingConfig = {
             thinkingLevel: options.thinkingLevel ?? ThinkingLevel.HIGH,
-            includeThoughts: true,
           };
         } else {
           // Gemini 2.5 and earlier use thinkingBudget
           config.thinkingConfig = {
             thinkingBudget: -1,  // Auto budget
-            includeThoughts: true,
           };
         }
       }
