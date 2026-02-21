@@ -4,7 +4,7 @@
  */
 
 import { QueryInput } from '../schemas/index.js';
-import { GeminiAIConfig, Message } from '../types/index.js';
+import { Message } from '../types/index.js';
 import { ConversationManager } from '../managers/ConversationManager.js';
 import { AgenticLoop } from '../agentic/AgenticLoop.js';
 
@@ -59,6 +59,7 @@ export class QueryHandler {
           logDir: this.logDir,
           disableLogging: this.disableLogging,
           logToStderr: this.logToStderr,
+          model: input.model,
         },
         input.parts // Pass multimodal parts
       );

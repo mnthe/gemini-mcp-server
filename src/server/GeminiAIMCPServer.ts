@@ -11,7 +11,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 
 import { GeminiAIConfig, CachedDocument, MCPServerConfig } from '../types/index.js';
-import { QuerySchema, SearchSchema, FetchSchema } from '../schemas/index.js';
+import { QuerySchema, SearchSchema, FetchSchema, ImageGenerationSchema } from '../schemas/index.js';
 import { ConversationManager } from '../managers/ConversationManager.js';
 import { GeminiAIService } from '../services/GeminiAIService.js';
 import { EnhancedMCPClient } from '../mcp/EnhancedMCPClient.js';
@@ -21,6 +21,7 @@ import { Logger } from '../utils/Logger.js';
 import { QueryHandler } from '../handlers/QueryHandler.js';
 import { SearchHandler } from '../handlers/SearchHandler.js';
 import { FetchHandler } from '../handlers/FetchHandler.js';
+import { ImageGenerationHandler } from '../handlers/ImageGenerationHandler.js';
 
 export class GeminiAIMCPServer {
   private server: Server;
@@ -38,6 +39,7 @@ export class GeminiAIMCPServer {
   private queryHandler: QueryHandler;
   private searchHandler: SearchHandler;
   private fetchHandler: FetchHandler;
+  private imageGenerationHandler: ImageGenerationHandler;
 
   // Cache
   private searchCache: Map<string, CachedDocument>;
@@ -95,6 +97,7 @@ export class GeminiAIMCPServer {
     );
     this.searchHandler = new SearchHandler(this.geminiAI, this.searchCache);
     this.fetchHandler = new FetchHandler(this.searchCache);
+    this.imageGenerationHandler = new ImageGenerationHandler(this.geminiAI, config);
 
     this.setupHandlers();
   }
@@ -125,6 +128,10 @@ export class GeminiAIMCPServer {
               sessionId: {
                 type: "string",
                 description: "Optional conversation session ID for multi-turn conversations",
+              },
+              model: {
+                type: "string",
+                description: "Optional model override (e.g., gemini-3-flash-preview, gemini-3-pro-preview)",
               },
               parts: {
                 type: "array",
@@ -207,6 +214,38 @@ export class GeminiAIMCPServer {
             required: ["id"],
           },
         },
+        {
+          name: "generate_image",
+          description:
+            "Generate images using Gemini's native image generation (Nano Banana). " +
+            "Supports gemini-2.5-flash-image and gemini-3-pro-image-preview models. " +
+            "Images are saved to disk and returned as base64.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              prompt: {
+                type: "string",
+                description: "Image generation prompt",
+              },
+              model: {
+                type: "string",
+                enum: ["gemini-2.5-flash-image", "gemini-3-pro-image-preview"],
+                description: "Image model (default: gemini-2.5-flash-image)",
+              },
+              aspectRatio: {
+                type: "string",
+                enum: ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"],
+                description: "Aspect ratio (default: 1:1)",
+              },
+              imageSize: {
+                type: "string",
+                enum: ["1K", "2K", "4K"],
+                description: "Resolution (4K is Gemini 3 Pro Image only, default: 1K)",
+              },
+            },
+            required: ["prompt"],
+          },
+        },
       ];
 
       return { tools };
@@ -232,7 +271,12 @@ export class GeminiAIMCPServer {
           const input = FetchSchema.parse(args);
           return await this.fetchHandler.handle(input);
         }
-        
+
+        case "generate_image": {
+          const input = ImageGenerationSchema.parse(args);
+          return await this.imageGenerationHandler.handle(input);
+        }
+
         default:
           throw new Error(`Unknown tool: ${toolName}`);
       }

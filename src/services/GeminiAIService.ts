@@ -3,14 +3,47 @@
  * Uses @google/genai unified SDK supporting both Vertex AI and Google AI Studio
  */
 
-import { GenerateContentConfig, GoogleGenAI, Part } from "@google/genai";
+import { GenerateContentConfig, GoogleGenAI, Part, ThinkingLevel } from "@google/genai";
+
+// Re-export ThinkingLevel for consumers
+export { ThinkingLevel } from "@google/genai";
 import { GeminiAIConfig, MultimodalPart, isSupportedMimeType } from '../types/index.js';
 import { validateSecureUrl } from '../utils/urlSecurity.js';
 import { validateMultimodalFile } from '../utils/fileSecurity.js';
 import { SecurityError } from '../errors/index.js';
 
+export interface ImageGenerationOptions {
+  model?: string;
+  aspectRatio?: string;
+  imageSize?: string;
+}
+
+export interface GeneratedImage {
+  data: string;      // base64
+  mimeType: string;  // image/png
+}
+
 export interface QueryOptions {
   enableThinking?: boolean;
+  /**
+   * Thinking level for Gemini 3 models
+   * - MINIMAL: Absolute minimum thinking
+   * - LOW: Minimizes latency and cost
+   * - MEDIUM: Balanced reasoning
+   * - HIGH: Maximizes reasoning depth (default for Gemini 3)
+   * Note: For Gemini 2.5 models, use enableThinking with thinkingBudget
+   */
+  thinkingLevel?: ThinkingLevel;
+  /**
+   * Media resolution for Gemini 3 models: 'low' | 'medium' | 'high'
+   * Controls the resolution of media inputs (images, video frames)
+   */
+  mediaResolution?: string;
+  /**
+   * Optional model override for per-request model selection.
+   * When provided, overrides the ENV-configured model.
+   */
+  model?: string;
 }
 
 export class GeminiAIService {
@@ -27,6 +60,15 @@ export class GeminiAIService {
   }
 
   /**
+   * Check if the model is a Gemini 3 series model
+   * Gemini 3 models use thinkingLevel instead of thinkingBudget
+   */
+  private isGemini3Model(modelOverride?: string): boolean {
+    const model = (modelOverride || this.config.model).toLowerCase();
+    return /gemini[-_]?3/.test(model);
+  }
+
+  /**
    * Query Vertex AI with a prompt and optional multimodal content
    */
   async query(
@@ -35,6 +77,8 @@ export class GeminiAIService {
     multimodalParts?: MultimodalPart[]
   ): Promise<string> {
     try {
+      const effectiveModel = options.model || this.config.model;
+
       const config: GenerateContentConfig = {
         temperature: this.config.temperature,
         maxOutputTokens: this.config.maxTokens,
@@ -44,17 +88,25 @@ export class GeminiAIService {
 
       // Enable thinking mode if requested
       if (options.enableThinking) {
-        config.thinkingConfig = {
-          thinkingBudget: -1,  // Auto budget
-          includeThoughts: true,  // Include thought summaries in response
-        };
+        if (this.isGemini3Model(effectiveModel)) {
+          // Gemini 3 models use thinkingLevel instead of thinkingBudget
+          // Note: Cannot disable thinking for Gemini 3 Pro
+          config.thinkingConfig = {
+            thinkingLevel: options.thinkingLevel ?? ThinkingLevel.HIGH,
+          };
+        } else {
+          // Gemini 2.5 and earlier use thinkingBudget
+          config.thinkingConfig = {
+            thinkingBudget: -1,  // Auto budget
+          };
+        }
       }
 
       // Build content parts
       const contents = await this.buildContents(prompt, multimodalParts);
 
       const response = await this.client.models.generateContent({
-        model: this.config.model,
+        model: effectiveModel,
         contents,
         config,
       });
@@ -190,6 +242,59 @@ export class GeminiAIService {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
       return `Error extracting response: ${errorMsg}`;
     }
+  }
+
+  /**
+   * Generate images using Gemini image models
+   */
+  async generateImage(
+    prompt: string,
+    options: ImageGenerationOptions = {}
+  ): Promise<{ images: GeneratedImage[]; text?: string }> {
+    const model = options.model || 'gemini-2.5-flash-image';
+    const response = await this.client.models.generateContent({
+      model,
+      contents: prompt,
+      config: {
+        responseModalities: ['TEXT', 'IMAGE'],
+        imageConfig: {
+          aspectRatio: options.aspectRatio || '1:1',
+          imageSize: options.imageSize,
+        },
+      },
+    });
+    return this.extractImages(response);
+  }
+
+  /**
+   * Extract images and text from a Gemini response containing inline data
+   */
+  private extractImages(response: any): { images: GeneratedImage[]; text?: string } {
+    const images: GeneratedImage[] = [];
+    let text: string | undefined;
+
+    const candidates = response?.candidates || [];
+    for (const candidate of candidates) {
+      const parts = candidate?.content?.parts || [];
+      for (const part of parts) {
+        if (part.inlineData) {
+          images.push({
+            data: part.inlineData.data,
+            mimeType: part.inlineData.mimeType || 'image/png',
+          });
+        }
+        if (part.text) {
+          text = text ? text + '\n' + part.text : part.text;
+        }
+      }
+    }
+
+    // Also check response.text as fallback
+    if (!text && response?.text) {
+      text = response.text;
+    }
+
+    return { images, text };
   }
 
   /**

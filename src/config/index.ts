@@ -22,7 +22,7 @@ export function loadConfig(): GeminiAIConfig {
   const location = process.env.GOOGLE_CLOUD_LOCATION || "global";
 
   // Model and parameters - use GEMINI_* environment variables
-  const model = process.env.GEMINI_MODEL || "gemini-2.5-pro";
+  const model = process.env.GEMINI_MODEL || "gemini-3-flash-preview";
   const temperature = parseFloat(process.env.GEMINI_TEMPERATURE || "1.0");
   const maxTokens = parseInt(process.env.GEMINI_MAX_TOKENS || "8192", 10);
   const topP = parseFloat(process.env.GEMINI_TOP_P || "0.95");
@@ -49,6 +49,12 @@ export function loadConfig(): GeminiAIConfig {
   // System prompt override - allows customization of AI assistant behavior
   const systemPrompt = process.env.GEMINI_SYSTEM_PROMPT;
 
+  // Media resolution for Gemini 3 models
+  const mediaResolution = process.env.GEMINI_MEDIA_RESOLUTION;
+
+  // Image output directory - where generated images are saved
+  const imageOutputDir = process.env.GEMINI_IMAGE_OUTPUT_DIR;
+
   return {
     projectId,
     location,
@@ -67,5 +73,7 @@ export function loadConfig(): GeminiAIConfig {
     logToStderr,
     allowFileUris,
     systemPrompt,
+    mediaResolution,
+    imageOutputDir,
   };
 }

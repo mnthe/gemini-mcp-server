@@ -20,6 +20,8 @@ export interface GeminiAIConfig {
   logToStderr: boolean;
   allowFileUris: boolean;
   systemPrompt?: string;
+  mediaResolution?: string;
+  imageOutputDir?: string;
 }
 
 // Legacy alias for backward compatibility
