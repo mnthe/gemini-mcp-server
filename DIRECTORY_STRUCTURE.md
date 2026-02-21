@@ -33,6 +33,7 @@ src/
 │   └── ConversationManager.ts
 │
 ├── errors/            # Custom error types
+│   ├── index.ts
 │   ├── SecurityError.ts
 │   └── ModelBehaviorError.ts
 │
