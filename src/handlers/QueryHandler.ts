@@ -59,6 +59,7 @@ export class QueryHandler {
           logDir: this.logDir,
           disableLogging: this.disableLogging,
           logToStderr: this.logToStderr,
+          model: input.model,
         },
         input.parts // Pass multimodal parts
       );

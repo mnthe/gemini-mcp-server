@@ -26,6 +26,7 @@ const MultimodalPartSchema = z.object({
 export const QuerySchema = z.object({
   prompt: z.string().describe("The text prompt to send to Vertex AI"),
   sessionId: z.string().optional().describe("Optional conversation session ID for multi-turn conversations"),
+  model: z.string().optional().describe("Optional model override (e.g., gemini-3-flash-preview, gemini-3-pro-preview)"),
   parts: z.array(MultimodalPartSchema).optional().describe("Optional multimodal content parts (images, audio, video, documents)"),
 });
 

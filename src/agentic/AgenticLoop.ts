@@ -71,9 +71,10 @@ export class AgenticLoop {
       // 3. Call Gemini AI (with multimodal parts on first turn only)
       const isFirstTurn = state.currentTurn === 1;
       const response = await this.geminiAI.query(
-        fullPrompt, 
+        fullPrompt,
         {
           enableThinking: useThinking,
+          model: options.model,
         },
         isFirstTurn ? multimodalParts : undefined
       );

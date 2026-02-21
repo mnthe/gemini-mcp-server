@@ -39,6 +39,11 @@ export interface QueryOptions {
    * Controls the resolution of media inputs (images, video frames)
    */
   mediaResolution?: string;
+  /**
+   * Optional model override for per-request model selection.
+   * When provided, overrides the ENV-configured model.
+   */
+  model?: string;
 }
 
 export class GeminiAIService {
@@ -58,8 +63,8 @@ export class GeminiAIService {
    * Check if the model is a Gemini 3 series model
    * Gemini 3 models use thinkingLevel instead of thinkingBudget
    */
-  private isGemini3Model(): boolean {
-    const model = this.config.model.toLowerCase();
+  private isGemini3Model(modelOverride?: string): boolean {
+    const model = (modelOverride || this.config.model).toLowerCase();
     return /gemini[-_]?3/.test(model);
   }
 
@@ -72,6 +77,8 @@ export class GeminiAIService {
     multimodalParts?: MultimodalPart[]
   ): Promise<string> {
     try {
+      const effectiveModel = options.model || this.config.model;
+
       const config: GenerateContentConfig = {
         temperature: this.config.temperature,
         maxOutputTokens: this.config.maxTokens,
@@ -81,7 +88,7 @@ export class GeminiAIService {
 
       // Enable thinking mode if requested
       if (options.enableThinking) {
-        if (this.isGemini3Model()) {
+        if (this.isGemini3Model(effectiveModel)) {
           // Gemini 3 models use thinkingLevel instead of thinkingBudget
           // Note: Cannot disable thinking for Gemini 3 Pro
           config.thinkingConfig = {
@@ -99,7 +106,7 @@ export class GeminiAIService {
       const contents = await this.buildContents(prompt, multimodalParts);
 
       const response = await this.client.models.generateContent({
-        model: this.config.model,
+        model: effectiveModel,
         contents,
         config,
       });

@@ -35,6 +35,7 @@ export interface RunOptions {
   logDir?: string;
   disableLogging?: boolean;
   logToStderr?: boolean;
+  model?: string;
 }
 
 export class RunState {

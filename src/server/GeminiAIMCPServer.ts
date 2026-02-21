@@ -129,6 +129,10 @@ export class GeminiAIMCPServer {
                 type: "string",
                 description: "Optional conversation session ID for multi-turn conversations",
               },
+              model: {
+                type: "string",
+                description: "Optional model override (e.g., gemini-3-flash-preview, gemini-3-pro-preview)",
+              },
               parts: {
                 type: "array",
                 description: "Optional multimodal content parts (images, audio, video, documents)",
