@@ -20,19 +20,20 @@ src/
 │   └── ToolRegistry.ts
 │
 ├── services/          # External service integrations
-│   └── GeminiAIService.ts
+│   ├── GeminiAIService.ts
+│   └── GeminiAIService.test.ts
 │
 ├── handlers/          # MCP tool request handlers
 │   ├── QueryHandler.ts
 │   ├── SearchHandler.ts
-│   └── FetchHandler.ts
+│   ├── FetchHandler.ts
+│   └── ImageGenerationHandler.ts
 │
 ├── managers/          # Business logic managers
 │   └── ConversationManager.ts
 │
 ├── errors/            # Custom error types
 │   ├── SecurityError.ts
-│   ├── ToolExecutionError.ts
 │   └── ModelBehaviorError.ts
 │
 ├── types/             # TypeScript type definitions
@@ -40,7 +41,8 @@ src/
 │   ├── conversation.ts
 │   ├── search.ts
 │   ├── multimodal.ts
-│   └── mcp.ts
+│   ├── mcp.ts
+│   └── index.ts
 │
 ├── schemas/           # Zod validation schemas
 │   └── index.ts
@@ -51,10 +53,12 @@ src/
 ├── utils/             # Shared utilities
 │   ├── Logger.ts
 │   ├── urlSecurity.ts
-│   └── fileSecurity.ts
+│   ├── fileSecurity.ts
+│   └── imageSaver.ts
 │
 ├── server/            # MCP server bootstrap
-│   └── GeminiAIMCPServer.ts
+│   ├── GeminiAIMCPServer.ts
+│   └── GeminiAIMCPServer.test.ts
 │
 └── index.ts           # Application entry point
 ```
@@ -71,10 +75,10 @@ Contains the **heart of the agentic system** - the loop, state management, and t
 **Tool implementations** - WebFetch and ToolRegistry for managing and executing tools in parallel with retry logic.
 
 ### services/
-**External service integrations** - Gemini AI API service for model interactions.
+**External service integrations** - Gemini AI API service for model interactions. Includes integration tests co-located with the service.
 
 ### handlers/
-**MCP request handlers** - process tool call requests from MCP clients (query, search, fetch).
+**MCP request handlers** - process tool call requests from MCP clients (query, search, fetch, image generation).
 
 ### managers/
 **Business logic managers** - ConversationManager maintains multi-turn conversation state.
@@ -83,7 +87,7 @@ Contains the **heart of the agentic system** - the loop, state management, and t
 **Shared primitives** - custom errors, TypeScript types, validation schemas, and configuration loading. Pure, reusable code.
 
 ### utils/
-**Utility functions** - Logger for observability, URL/file security validators for SSRF protection.
+**Utility functions** - Logger for observability, URL/file security validators for SSRF protection, imageSaver for persisting generated images to disk.
 
 ### server/
-**Application bootstrap** - server initialization and wiring. Single responsibility: start the MCP server.
+**Application bootstrap** - server initialization and wiring. Single responsibility: start the MCP server. Includes integration tests co-located with the server.
