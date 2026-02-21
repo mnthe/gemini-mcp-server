@@ -12,15 +12,33 @@ import { validateSecureUrl } from '../utils/urlSecurity.js';
 import { validateMultimodalFile } from '../utils/fileSecurity.js';
 import { SecurityError } from '../errors/index.js';
 
+export interface ImageGenerationOptions {
+  model?: string;
+  aspectRatio?: string;
+  imageSize?: string;
+}
+
+export interface GeneratedImage {
+  data: string;      // base64
+  mimeType: string;  // image/png
+}
+
 export interface QueryOptions {
   enableThinking?: boolean;
   /**
-   * Thinking level for Gemini 3 models: ThinkingLevel.LOW or ThinkingLevel.HIGH
+   * Thinking level for Gemini 3 models
+   * - MINIMAL: Absolute minimum thinking
    * - LOW: Minimizes latency and cost
+   * - MEDIUM: Balanced reasoning
    * - HIGH: Maximizes reasoning depth (default for Gemini 3)
    * Note: For Gemini 2.5 models, use enableThinking with thinkingBudget
    */
   thinkingLevel?: ThinkingLevel;
+  /**
+   * Media resolution for Gemini 3 models: 'low' | 'medium' | 'high'
+   * Controls the resolution of media inputs (images, video frames)
+   */
+  mediaResolution?: string;
 }
 
 export class GeminiAIService {
@@ -42,7 +60,7 @@ export class GeminiAIService {
    */
   private isGemini3Model(): boolean {
     const model = this.config.model.toLowerCase();
-    return model.includes('gemini-3') || model.includes('gemini3');
+    return /gemini[-_]?3/.test(model);
   }
 
   /**
@@ -217,6 +235,59 @@ export class GeminiAIService {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
       return `Error extracting response: ${errorMsg}`;
     }
+  }
+
+  /**
+   * Generate images using Gemini image models
+   */
+  async generateImage(
+    prompt: string,
+    options: ImageGenerationOptions = {}
+  ): Promise<{ images: GeneratedImage[]; text?: string }> {
+    const model = options.model || 'gemini-2.5-flash-image';
+    const response = await this.client.models.generateContent({
+      model,
+      contents: prompt,
+      config: {
+        responseModalities: ['TEXT', 'IMAGE'],
+        imageConfig: {
+          aspectRatio: options.aspectRatio || '1:1',
+          imageSize: options.imageSize,
+        },
+      },
+    });
+    return this.extractImages(response);
+  }
+
+  /**
+   * Extract images and text from a Gemini response containing inline data
+   */
+  private extractImages(response: any): { images: GeneratedImage[]; text?: string } {
+    const images: GeneratedImage[] = [];
+    let text: string | undefined;
+
+    const candidates = response?.candidates || [];
+    for (const candidate of candidates) {
+      const parts = candidate?.content?.parts || [];
+      for (const part of parts) {
+        if (part.inlineData) {
+          images.push({
+            data: part.inlineData.data,
+            mimeType: part.inlineData.mimeType || 'image/png',
+          });
+        }
+        if (part.text) {
+          text = text ? text + '\n' + part.text : part.text;
+        }
+      }
+    }
+
+    // Also check response.text as fallback
+    if (!text && response?.text) {
+      text = response.text;
+    }
+
+    return { images, text };
   }
 
   /**
