@@ -4,7 +4,7 @@
 
 The Gemini AI MCP Server implements an **intelligent agentic loop** inspired by the OpenAI Agents SDK. The architecture supports turn-based execution, automatic tool selection, parallel tool execution, and robust error handling.
 
-**Last Updated**: 2025-10-26
+**Last Updated**: 2026-02-21
 
 ## Core Architecture
 
@@ -169,17 +169,81 @@ ARGUMENTS: {"url": "https://example.com", "extract": true}
 **Location**: `src/services/GeminiAIService.ts`
 
 **Responsibilities**:
-- Gemini API communication via gen-ai SDK
-- ThinkingConfig support for reasoning mode
-- Response text extraction
+- Gemini API communication via `@google/genai` SDK
+- ThinkingConfig support for reasoning mode (Gemini 2.5 and 3 series)
+- Image generation via native image models
+- Response text and image extraction
+
+**Key Methods**:
+```typescript
+async query(
+  prompt: string,
+  options: QueryOptions,
+  multimodalParts?: MultimodalPart[]
+): Promise<string>
+
+async generateImage(
+  prompt: string,
+  options: ImageGenerationOptions
+): Promise<{ images: GeneratedImage[]; text?: string }>
+```
+
+**QueryOptions**:
+```typescript
+interface QueryOptions {
+  enableThinking?: boolean;
+  thinkingLevel?: ThinkingLevel;  // Gemini 3 models: MINIMAL | LOW | MEDIUM | HIGH
+  mediaResolution?: string;       // Gemini 3 models: 'low' | 'medium' | 'high'
+  model?: string;                 // Per-request model override
+}
+```
+
+**ImageGenerationOptions**:
+```typescript
+interface ImageGenerationOptions {
+  model?: string;        // Default: 'gemini-2.5-flash-image'
+  aspectRatio?: string;  // e.g., '1:1', '16:9', '9:16'
+  imageSize?: string;    // '1K' | '2K' | '4K'
+}
+```
+
+**Gemini 3 Model Detection**:
+- Models matching `/gemini[-_]?3/` pattern use `thinkingLevel` (not `thinkingBudget`)
+- `ThinkingLevel.HIGH` is the default for Gemini 3 models
+- Gemini 2.5 and earlier models use `thinkingBudget: -1` (auto)
 
 **Features**:
 - Dynamic generation config per query
-- Thinking mode activation
+- Model-aware thinking config (Gemini 2.5 vs Gemini 3 API differences)
+- Image generation with base64 inline data extraction
 - Response parsing with error handling
-- Supports both Vertex AI and Google AI Studio modes
+- Vertex AI mode via `@google/genai` SDK
 
-### 8. Logger (File-based Logging)
+### 8. ImageGenerationHandler (Image Requests)
+
+**Location**: `src/handlers/ImageGenerationHandler.ts`
+
+**Responsibilities**:
+- Validate and route image generation requests
+- Coordinate with GeminiAIService to generate images
+- Save generated images to local filesystem via imageSaver
+- Return image data and file paths as MCP content blocks
+
+**Key Method**:
+```typescript
+async handle(
+  input: ImageGenerationInput
+): Promise<{ content: Array<{ type: string; text?: string; data?: string; mimeType?: string }> }>
+```
+
+**Response Format**:
+Returns an array of MCP content blocks:
+1. `text` block: JSON with `{ images: [{ filePath, mimeType }], text }`
+2. `image` block(s): base64-encoded image data with MIME type
+
+**Configuration**: Uses `config.imageOutputDir` (defaults to `getDefaultImageDir()` from imageSaver)
+
+### 9. Logger (File-based Logging)
 
 **Location**: `src/utils/Logger.ts`
 
@@ -192,6 +256,31 @@ ARGUMENTS: {"url": "https://example.com", "extract": true}
 **Log Files**:
 - `logs/general.log`: All logs (info, error, tool calls)
 - `logs/reasoning.log`: Thinking traces only
+
+### 10. imageSaver (Image File Utilities)
+
+**Location**: `src/utils/imageSaver.ts`
+
+**Responsibilities**:
+- Determine platform-appropriate default image output directory
+- Save base64-encoded image data to disk
+- Generate timestamped, indexed filenames for images
+
+**Exported Functions**:
+```typescript
+// Returns ~/Pictures/gemini-generated on macOS, Windows, Linux
+// Falls back to ~/gemini-generated on other platforms
+function getDefaultImageDir(): string
+
+// Decodes base64 data and writes to outputDir/filename
+// Creates output directory if it does not exist
+function saveImage(base64Data: string, outputDir: string, filename: string): string
+
+// Returns e.g. "img-20260221143000-001.png" or "img-20260221143000-001.jpg"
+function generateImageFilename(index: number, mimeType: string): string
+```
+
+**Filename Format**: `img-{YYYYMMDDHHmmss}-{NNN}.{ext}` where ext is `jpg` for `image/jpeg`, `png` otherwise.
 
 ## Data Flow
 
@@ -226,6 +315,29 @@ ARGUMENTS: {"url": "https://example.com", "extract": true}
 7. Return to MCP client
 ```
 
+### Image Generation Flow
+
+```
+1. MCP Client → GeminiAIMCPServer (gemini_generate_image tool call)
+   ↓
+2. ImageGenerationSchema.parse(input) → validated ImageGenerationInput
+   ↓
+3. ImageGenerationHandler.handle(input)
+   ├─ GeminiAIService.generateImage(prompt, { model, aspectRatio, imageSize })
+   │  ├─ Calls Vertex AI with responseModalities: ['TEXT', 'IMAGE']
+   │  └─ extractImages() → { images: GeneratedImage[], text? }
+   │
+   ├─ For each image:
+   │  ├─ generateImageFilename(index, mimeType) → "img-{timestamp}-{NNN}.png"
+   │  └─ saveImage(base64Data, imageOutputDir, filename) → saved file path
+   │
+   └─ Build MCP content blocks:
+      ├─ text block: JSON { images: [{ filePath, mimeType }], text }
+      └─ image block(s): { type: 'image', data: base64, mimeType }
+   ↓
+4. Return content array to MCP client
+```
+
 ### Tool Execution Flow
 
 ```
@@ -247,6 +359,40 @@ ToolRegistry.executeTools() [parallel]
 All failed? → Fallback prompt to Gemini
 Any succeeded? → Continue loop with results
 ```
+
+## Schemas
+
+All tool inputs are validated via Zod schemas defined in `src/schemas/index.ts`.
+
+### QuerySchema
+
+Validates the `gemini_query` tool input:
+
+```typescript
+z.object({
+  prompt: z.string(),
+  sessionId: z.string().optional(),
+  model: z.string().optional(),  // e.g., 'gemini-3-flash-preview', 'gemini-3-pro-preview'
+  parts: z.array(MultimodalPartSchema).optional(),
+})
+```
+
+### ImageGenerationSchema
+
+Validates the `gemini_generate_image` tool input:
+
+```typescript
+z.object({
+  prompt: z.string(),
+  model: z.enum(['gemini-2.5-flash-image', 'gemini-3-pro-image-preview']).optional(),
+  aspectRatio: z.enum(['1:1','2:3','3:2','3:4','4:3','4:5','5:4','9:16','16:9','21:9']).optional(),
+  imageSize: z.enum(['1K', '2K', '4K']).optional(),  // 4K is Gemini 3 Pro Image only
+})
+```
+
+### SearchSchema / FetchSchema
+
+Validate `gemini_search` and `gemini_fetch` tool inputs (simple string wrappers).
 
 ## Design Principles
 
@@ -393,8 +539,11 @@ Each runs as separate process with independent:
 - `agentic/` folder (AgenticLoop, RunState, ResponseProcessor, Tool)
 - `mcp/` folder (EnhancedMCPClient, Stdio/HTTP connections)
 - `tools/` folder (WebFetchTool, ToolRegistry)
-- `errors/` folder (SecurityError, ToolExecutionError, ModelBehaviorError)
-- `utils/` folder (Logger)
+- `errors/` folder (SecurityError, ModelBehaviorError)
+- `utils/` folder (Logger, imageSaver)
+- `handlers/` folder (QueryHandler, SearchHandler, FetchHandler, ImageGenerationHandler)
+- Gemini 3 model support (`gemini-3-flash-preview` default, `thinkingLevel` API)
+- Image generation tool (`gemini_generate_image`) with filesystem persistence
 
 **Benefits**:
 - Keyword-based → LLM-driven decisions
