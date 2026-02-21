@@ -5,7 +5,6 @@
 
 import { Tool, ToolResult, RunContext, ToolDefinition } from '../agentic/Tool.js';
 import { ToolCall } from '../agentic/ResponseProcessor.js';
-import { ToolExecutionError } from '../errors/index.js';
 import { Logger } from '../utils/Logger.js';
 import { WebFetchTool } from './WebFetchTool.js';
 import { EnhancedMCPClient } from '../mcp/EnhancedMCPClient.js';

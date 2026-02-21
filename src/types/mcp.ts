@@ -16,14 +16,3 @@ export interface MCPServerConfig {
   headers?: Record<string, string>;
 }
 
-export interface ReasoningStep {
-  step: number;
-  thought: string;
-  result: string;
-}
-
-export interface PromptAnalysisResult {
-  needsReasoning: boolean;
-  needsDelegation: boolean;
-  targetServer?: string;
-}

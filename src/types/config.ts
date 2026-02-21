@@ -23,6 +23,3 @@ export interface GeminiAIConfig {
   mediaResolution?: string;
   imageOutputDir?: string;
 }
-
-// Legacy alias for backward compatibility
-export type VertexAIConfig = GeminiAIConfig;
