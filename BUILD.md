@@ -281,13 +281,52 @@ ls -la build/
 - Dependencies: ~50 MB (not included in package)
 - Total install: ~50 MB
 
+## Testing
+
+### Test Files
+
+The project has unit test files alongside source code:
+
+- `src/server/GeminiAIMCPServer.test.ts` - MCP server integration tests
+- `src/services/GeminiAIService.test.ts` - Gemini AI service unit tests
+
+There is no automated test framework configured yet. Tests are run manually during development.
+
+### Manual Test Scripts
+
+The `test/` directory contains manual test scripts. The following npm scripts are available for testing via `package.json`:
+
+```bash
+# Launch MCP Inspector for interactive testing
+npm run test:mcp
+
+# List all available tools via MCP protocol
+npm run test:list
+
+# Send a test query via MCP protocol
+npm run test:query
+
+# Check environment variable configuration
+npm run test:env
+```
+
+### Running Unit Tests
+
+The test files use the project's TypeScript setup. To run them, build the project first:
+
+```bash
+npm run build
+```
+
+Then execute specific test files directly or integrate with a test runner of your choice.
+
 ## Future Improvements
 
 ### Planned Enhancements
 
 1. **Automated Testing**
-   - Unit tests for all modules
-   - Integration tests for MCP protocol
+   - Configure a test runner (e.g., Vitest or Jest)
+   - CI integration to run unit tests on every push
    - End-to-end tests with Gemini AI
 
 2. **Code Quality**

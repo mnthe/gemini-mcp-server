@@ -4,7 +4,7 @@
 
 The Gemini AI MCP Server is a production-grade intelligent agent that enables AI assistants to query Google AI (Gemini models) via Vertex AI or Google AI Studio with full agentic capabilities - turn-based execution, automatic tool orchestration, and MCP-to-MCP integration.
 
-**Last Updated**: 2025-10-26  
+**Last Updated**: 2026-02-21
 **Status**: Production-ready
 
 ## What Was Built
@@ -83,6 +83,8 @@ The Gemini AI MCP Server is a production-grade intelligent agent that enables AI
 - Dynamic generation config per query
 - Response text extraction
 - Supports both Vertex AI and Google AI Studio modes
+- Image generation via Imagen API (`generateImage`)
+- Supports Gemini 3 models (gemini-3.0-pro-preview and later)
 
 **Logger.ts** (`src/utils/`)
 - File-based logging (`logs/general.log`, `logs/reasoning.log`)
@@ -90,9 +92,13 @@ The Gemini AI MCP Server is a production-grade intelligent agent that enables AI
 - Structured log entries
 - Automatic directory creation
 
+**imageSaver.ts** (`src/utils/`)
+- Platform-aware default output directory (~/Pictures/gemini-generated on macOS/Windows/Linux)
+- Base64-to-file decoding and persistence
+- Timestamped filename generation with zero-padded index
+
 **Error Types** (`src/errors/`)
 - `SecurityError`: Security violations
-- `ToolExecutionError`: Tool failures with retry info
 - `ModelBehaviorError`: Invalid model responses
 
 #### 5. Handlers (`src/handlers/`)
@@ -104,6 +110,12 @@ The Gemini AI MCP Server is a production-grade intelligent agent that enables AI
 
 **SearchHandler.ts** - Search tool (OpenAI spec)
 **FetchHandler.ts** - Fetch tool (OpenAI spec)
+
+**ImageGenerationHandler.ts** - Image generation entrypoint
+- Calls `GeminiAIService.generateImage` with prompt and options
+- Saves generated images to disk via `imageSaver`
+- Returns structured content with file paths and base64 image data
+- Supports aspect ratio, image size, and model selection
 
 #### 6. Business Logic (`src/managers/`)
 
@@ -157,16 +169,30 @@ User Input → Turn 1..10 Loop:
 - 100% backward compatible (optional feature)
 - Supports multi-persona setups (multiple servers with different roles)
 
+### 8. Image Generation (`generate_image` tool)
+- Generates images via Google Imagen API
+- Configurable aspect ratio, image size, and model
+- Automatically saves output to disk with timestamped filenames
+- Returns both base64 image data and local file paths
+
+### 9. Gemini 3 Model Support
+- Full support for `gemini-3.0-pro-preview` and subsequent Gemini 3 models
+- Automatic model detection for thinking level configuration
+- `mediaResolution` parameter support for multimodal inputs
+
 ## Technical Achievements
 
 ### Dependencies
 ```json
 {
-  "@google/genai": "^1.27.0",                 // Google Gen AI SDK (Vertex AI & Google AI Studio)
-  "@modelcontextprotocol/sdk": "^1.20.1",     // MCP protocol
-  "zod": "^3.25.76"                            // Schema validation
+  "@google/genai": "^1.42.0",                 // Google Gen AI SDK (Vertex AI & Google AI Studio)
+  "@modelcontextprotocol/sdk": "^1.26.0",     // MCP protocol
+  "zod": "^4.3.6",                            // Schema validation (migrated to Zod v4)
+  "dotenv": "^17.3.1"                         // Environment variable loading
 }
 ```
+
+> **Note**: Zod was upgraded from v3 to v4 (breaking change). Zod v4 has a different import style and changed several validation APIs. All schemas in `src/schemas/index.ts` have been updated for compatibility.
 
 ### TypeScript Configuration
 - ES2022 target with Node16 module resolution
