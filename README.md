@@ -8,9 +8,11 @@ This server provides:
 - **Agentic Loop**: Turn-based execution with automatic tool selection and reasoning
 - **Query Gemini**: Access Gemini models via Vertex AI or Google AI Studio for cross-validation
 - **Multimodal Support**: Send images, audio, video, and code files alongside text prompts
+- **Image Generation**: Generate images using Gemini image models (gemini-2.5-flash-image, gemini-3-pro-image-preview)
 - **Tool Execution**: Built-in WebFetch + integration with external MCP servers
 - **Multi-turn Conversations**: Maintain context across queries with session management
 - **Reasoning Traces**: File-based logging of AI thinking processes
+- **Gemini 3 Support**: Full support for Gemini 3 models including thinkingLevel parameter
 
 ## Key Features
 
@@ -38,9 +40,23 @@ Inspired by OpenAI Agents SDK, the server operates as an autonomous agent:
 - **Parallel tool execution** with retry logic
 - **Smart fallback** to Gemini knowledge when tools fail
 
+### 🔮 Gemini 3 Model Support
+Full support for Gemini 3 generation models:
+- **gemini-3-flash-preview**: Default model — fast and capable
+- **gemini-3-pro-preview**: High-capability reasoning model
+- **thinkingLevel**: Per-query thinking budget control for Gemini 3 models
+- **GEMINI_MEDIA_RESOLUTION**: Control media quality for multimodal inputs
+
 ### 🛠️ Built-in Tools
 - **WebFetch**: Secure HTTPS-only web content fetching with private IP blocking
 - **MCP Integration**: Dynamic discovery and execution of external MCP server tools
+
+### 🖼️ Image Generation
+Generate images directly from text prompts using Gemini image models:
+- **gemini-2.5-flash-image**: Fast image generation with resolutions up to 2K
+- **gemini-3-pro-image-preview**: High-quality generation with 4K resolution support
+- Configurable aspect ratios: 1:1, 16:9, 9:16, 4:3, and more
+- Images automatically saved to configurable output directory
 
 ### 🔐 Security First
 
@@ -110,7 +126,7 @@ export GOOGLE_CLOUD_LOCATION="us-central1"
 
 **Optional Model Settings:**
 ```bash
-export GEMINI_MODEL="gemini-2.5-pro"
+export GEMINI_MODEL="gemini-3-flash-preview"  # Default model
 export GEMINI_TEMPERATURE="1.0"
 export GEMINI_MAX_TOKENS="8192"
 export GEMINI_TOP_P="0.95"
@@ -140,6 +156,12 @@ export GEMINI_DISABLE_LOGGING="true"
 
 # File URI support (for CLI environments only)
 export GEMINI_ALLOW_FILE_URIS="true"       # Set to 'true' to allow file:// URIs (CLI tools only, NOT for desktop apps)
+
+# Media resolution for Gemini 3 models (videoMetadata and image quality)
+export GEMINI_MEDIA_RESOLUTION="medium"    # Options: low, medium, high (default: not set)
+
+# Image generation output directory
+export GEMINI_IMAGE_OUTPUT_DIR="/path/to/images"  # Default: ~/Pictures on macOS, ~/images on Linux
 
 # External MCP servers (for tool delegation)
 export GEMINI_MCP_SERVERS='[
@@ -171,7 +193,7 @@ Add to your MCP client configuration:
       "env": {
         "GOOGLE_CLOUD_PROJECT": "your-gcp-project-id",
         "GOOGLE_CLOUD_LOCATION": "us-central1",
-        "GEMINI_MODEL": "gemini-2.5-pro",
+        "GEMINI_MODEL": "gemini-3-flash-preview",
         "GEMINI_ENABLE_CONVERSATIONS": "true"
       }
     }
@@ -189,7 +211,7 @@ Add to your MCP client configuration:
       "env": {
         "GOOGLE_CLOUD_PROJECT": "your-gcp-project-id",
         "GOOGLE_CLOUD_LOCATION": "us-central1",
-        "GEMINI_MODEL": "gemini-2.5-pro"
+        "GEMINI_MODEL": "gemini-3-flash-preview"
       }
     }
   }
@@ -238,6 +260,8 @@ See [PROMPT_CUSTOMIZATION.md](PROMPT_CUSTOMIZATION.md) for comprehensive guide a
 
 ## Available Tools
 
+The server exposes four MCP tools: `query`, `search`, `fetch`, and `generate_image`.
+
 ### query
 
 Main agentic entrypoint that handles multi-turn execution with automatic tool selection and **multimodal input support**.
@@ -245,6 +269,7 @@ Main agentic entrypoint that handles multi-turn execution with automatic tool se
 **Parameters:**
 - `prompt` (string, required): The text prompt to send
 - `sessionId` (string, optional): Conversation session ID
+- `model` (string, optional): Model override (e.g., `gemini-3-flash-preview`, `gemini-3-pro-preview`)
 - `parts` (array, optional): Multimodal content parts (images, audio, video, documents)
 
 **How It Works:**
@@ -308,6 +333,34 @@ Fetch full content of a search result (OpenAI MCP spec).
 
 **Returns:**
 - `id`, `title`, `text`, `url`, `metadata`
+
+### generate_image
+
+Generate images from text prompts using Gemini image models.
+
+**Parameters:**
+- `prompt` (string, required): Image generation prompt describing what to generate
+- `model` (string, optional): Image model to use. Options:
+  - `gemini-2.5-flash-image` (default) — fast generation, supports 1K and 2K
+  - `gemini-3-pro-image-preview` — high quality, supports 4K resolution
+- `aspectRatio` (string, optional): Image aspect ratio. Default: `1:1`. Options: `1:1`, `2:3`, `3:2`, `3:4`, `4:3`, `4:5`, `5:4`, `9:16`, `16:9`, `21:9`
+- `imageSize` (string, optional): Output resolution. Default: `1K`. Options: `1K`, `2K`, `4K` (4K requires `gemini-3-pro-image-preview`)
+
+**Behavior:**
+- Generated images are saved to `GEMINI_IMAGE_OUTPUT_DIR` (defaults to `~/Pictures` on macOS, `~/images` on Linux)
+- Returns image data (base64) along with file paths of saved images
+
+**Examples:**
+```
+# Generate a square image with default model
+generate_image: "A serene mountain landscape at sunset"
+
+# Generate a wide-format image with Gemini 3 Pro at 4K
+generate_image: "Futuristic cityscape at night"
+model: "gemini-3-pro-image-preview"
+aspectRatio: "16:9"
+imageSize: "4K"
+```
 
 ## Security
 
@@ -451,21 +504,22 @@ src/
 │   └── ToolRegistry.ts      # Tool management + parallel execution
 │
 ├── services/          # External services
-│   └── GeminiAIService.ts   # Gemini API (with thinkingConfig)
+│   └── GeminiAIService.ts   # Gemini API (with thinkingConfig, image generation)
 │
 ├── handlers/          # MCP tool handlers
 │   ├── QueryHandler.ts
 │   ├── SearchHandler.ts
-│   └── FetchHandler.ts
+│   ├── FetchHandler.ts
+│   └── ImageGenerationHandler.ts  # Image generation via Gemini image models
 │
 ├── managers/          # Business logic
 │   └── ConversationManager.ts
 │
 ├── errors/            # Custom error types
 ├── types/             # TypeScript type definitions
-├── schemas/           # Zod validation schemas
+├── schemas/           # Zod validation schemas (including ImageGenerationSchema)
 ├── config/            # Configuration loading
-├── utils/             # Shared utilities (Logger, security)
+├── utils/             # Shared utilities (Logger, security, imageSaver)
 │
 └── server/            # MCP server bootstrap
     └── GeminiAIMCPServer.ts
