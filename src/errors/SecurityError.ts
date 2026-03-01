@@ -3,14 +3,10 @@
  * Used for URL validation, IP filtering, etc.
  */
 
-export class SecurityError extends Error {
+import { BaseError } from './BaseError.js';
+
+export class SecurityError extends BaseError {
   constructor(message: string) {
     super(message);
-    this.name = 'SecurityError';
-
-    // Maintain proper stack trace for where error was thrown (only available in V8)
-    if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, SecurityError);
-    }
   }
 }

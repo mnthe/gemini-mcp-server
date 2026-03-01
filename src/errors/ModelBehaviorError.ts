@@ -3,19 +3,14 @@
  * Used for invalid responses, malformed tool calls, etc.
  */
 
-export class ModelBehaviorError extends Error {
+import { BaseError } from './BaseError.js';
+
+export class ModelBehaviorError extends BaseError {
   public readonly response: string;
 
   constructor(response: string, message: string) {
     super(message);
-
-    this.name = 'ModelBehaviorError';
     this.response = response;
-
-    // Maintain proper stack trace for where error was thrown (only available in V8)
-    if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, ModelBehaviorError);
-    }
   }
 
   /**

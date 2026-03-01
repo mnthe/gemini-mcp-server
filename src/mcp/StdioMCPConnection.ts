@@ -6,6 +6,7 @@
 import { spawn, ChildProcess } from 'child_process';
 import { Logger } from '../utils/Logger.js';
 import { Tool, ToolResult, JSONSchema } from '../agentic/Tool.js';
+import { BaseMCPConnection } from './BaseMCPConnection.js';
 
 export interface StdioMCPConfig {
   name: string;
@@ -13,10 +14,9 @@ export interface StdioMCPConfig {
   args: string[];   // e.g., ["@modelcontextprotocol/server-filesystem", "./data"]
 }
 
-export class StdioMCPConnection {
+export class StdioMCPConnection extends BaseMCPConnection {
   private config: StdioMCPConfig;
   private process: ChildProcess | null = null;
-  private logger: Logger;
   private messageId: number = 0;
   private pendingRequests: Map<number, {
     resolve: (value: any) => void;
@@ -24,8 +24,8 @@ export class StdioMCPConnection {
   }> = new Map();
 
   constructor(config: StdioMCPConfig, logger: Logger) {
+    super(config.name, logger);
     this.config = config;
-    this.logger = logger;
   }
 
   /**
@@ -97,39 +97,24 @@ export class StdioMCPConnection {
   }
 
   /**
-   * Call a tool on the MCP server
+   * Implement tool call logic for stdio connection
    */
-  async callTool(toolName: string, args: any): Promise<ToolResult> {
-    this.logger.toolCall(toolName, args);
+  protected async callToolImpl(toolName: string, args: any): Promise<ToolResult> {
+    const response = await this.sendRequest({
+      jsonrpc: '2.0',
+      id: this.nextMessageId(),
+      method: 'tools/call',
+      params: {
+        name: toolName,
+        arguments: args,
+      },
+    });
 
-    try {
-      const response = await this.sendRequest({
-        jsonrpc: '2.0',
-        id: this.nextMessageId(),
-        method: 'tools/call',
-        params: {
-          name: toolName,
-          arguments: args,
-        },
-      });
-
-      const result: ToolResult = {
-        status: 'success',
-        content: JSON.stringify(response.content),
-        metadata: { server: this.config.name },
-      };
-
-      this.logger.toolResult(toolName, result);
-      return result;
-    } catch (error) {
-      const errorResult: ToolResult = {
-        status: 'error',
-        content: `Tool execution failed: ${(error as Error).message}`,
-      };
-
-      this.logger.toolResult(toolName, errorResult);
-      return errorResult;
-    }
+    return {
+      status: 'success',
+      content: JSON.stringify(response.content),
+      metadata: { server: this.config.name },
+    };
   }
 
   /**

@@ -6,6 +6,8 @@
 import { SearchInput } from '../schemas/index.js';
 import { SearchResult, CachedDocument } from '../types/index.js';
 import { GeminiAIService } from '../services/GeminiAIService.js';
+import { getErrorMessage } from '../utils/errorUtils.js';
+import { createJsonResponse } from '../utils/responseFormatter.js';
 
 export class SearchHandler {
   private geminiAI: GeminiAIService;
@@ -45,27 +47,12 @@ Return your response as a structured list of relevant topics or documents with b
         this.searchCache.set(result.id, cachedDoc);
       });
 
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({ results }),
-          },
-        ],
-      };
+      return createJsonResponse({ results });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({ 
-              results: [],
-              error: `Error searching with Gemini: ${errorMessage}`
-            }),
-          },
-        ],
-      };
+      return createJsonResponse({ 
+        results: [],
+        error: `Error searching with Gemini: ${getErrorMessage(error)}`
+      });
     }
   }
 

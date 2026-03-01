@@ -3,7 +3,9 @@
  * Includes retry attempt information for debugging
  */
 
-export class ToolExecutionError extends Error {
+import { BaseError } from './BaseError.js';
+
+export class ToolExecutionError extends BaseError {
   public readonly toolName: string;
   public readonly originalError: Error;
   public readonly attempt: number;
@@ -12,15 +14,9 @@ export class ToolExecutionError extends Error {
     const message = `Tool '${toolName}' failed on attempt ${attempt}: ${originalError.message}`;
     super(message);
 
-    this.name = 'ToolExecutionError';
     this.toolName = toolName;
     this.originalError = originalError;
     this.attempt = attempt;
-
-    // Maintain proper stack trace for where error was thrown (only available in V8)
-    if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, ToolExecutionError);
-    }
   }
 
   /**
