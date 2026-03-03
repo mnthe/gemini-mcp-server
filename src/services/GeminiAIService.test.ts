@@ -13,8 +13,8 @@ import { describe, it, expect } from 'vitest';
 const isGemini3Pattern = /gemini[-_]?3/;
 
 describe('isGemini3Model regex pattern', () => {
-  it('matches gemini-3-pro-preview', () => {
-    expect(isGemini3Pattern.test('gemini-3-pro-preview')).toBe(true);
+  it('matches gemini-3.1-pro-preview', () => {
+    expect(isGemini3Pattern.test('gemini-3.1-pro-preview')).toBe(true);
   });
 
   it('matches gemini-3.1-pro-preview', () => {
@@ -25,8 +25,8 @@ describe('isGemini3Model regex pattern', () => {
     expect(isGemini3Pattern.test('gemini-3-flash-preview')).toBe(true);
   });
 
-  it('matches gemini-3-pro-image-preview', () => {
-    expect(isGemini3Pattern.test('gemini-3-pro-image-preview')).toBe(true);
+  it('matches gemini-3.1-pro-image-preview', () => {
+    expect(isGemini3Pattern.test('gemini-3.1-pro-image-preview')).toBe(true);
   });
 
   it('matches gemini3 (no separator)', () => {
