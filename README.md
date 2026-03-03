@@ -8,7 +8,7 @@ This server provides:
 - **Agentic Loop**: Turn-based execution with automatic tool selection and reasoning
 - **Query Gemini**: Access Gemini models via Vertex AI or Google AI Studio for cross-validation
 - **Multimodal Support**: Send images, audio, video, and code files alongside text prompts
-- **Image Generation**: Generate images using Gemini image models (gemini-2.5-flash-image, gemini-3.1-pro-image-preview)
+- **Image Generation**: Generate images using Gemini image models (gemini-2.5-flash-image, gemini-3-pro-image-preview, gemini-3.1-flash-image-preview)
 - **Tool Execution**: Built-in WebFetch + integration with external MCP servers
 - **Multi-turn Conversations**: Maintain context across queries with session management
 - **Reasoning Traces**: File-based logging of AI thinking processes
@@ -54,7 +54,8 @@ Full support for Gemini 3 generation models:
 ### 🖼️ Image Generation
 Generate images directly from text prompts using Gemini image models:
 - **gemini-2.5-flash-image**: Fast image generation with resolutions up to 2K
-- **gemini-3.1-pro-image-preview**: High-quality generation with 4K resolution support
+- **gemini-3-pro-image-preview**: Professional asset production with 4K resolution support
+- **gemini-3.1-flash-image-preview**: High-efficiency generation with 4K resolution and reference images
 - Configurable aspect ratios: 1:1, 16:9, 9:16, 4:3, and more
 - Images automatically saved to configurable output directory
 
@@ -342,9 +343,10 @@ Generate images from text prompts using Gemini image models.
 - `prompt` (string, required): Image generation prompt describing what to generate
 - `model` (string, optional): Image model to use. Options:
   - `gemini-2.5-flash-image` (default) — fast generation, supports 1K and 2K
-  - `gemini-3.1-pro-image-preview` — high quality, supports 4K resolution
+  - `gemini-3-pro-image-preview` — professional quality, supports up to 4K resolution
+  - `gemini-3.1-flash-image-preview` — high-efficiency with 4K and reference image support
 - `aspectRatio` (string, optional): Image aspect ratio. Default: `1:1`. Options: `1:1`, `2:3`, `3:2`, `3:4`, `4:3`, `4:5`, `5:4`, `9:16`, `16:9`, `21:9`
-- `imageSize` (string, optional): Output resolution. Default: `1K`. Options: `1K`, `2K`, `4K` (4K requires `gemini-3.1-pro-image-preview`)
+- `imageSize` (string, optional): Output resolution. Default: `1K`. Options: `1K`, `2K`, `4K` (4K requires `gemini-3-pro-image-preview` or `gemini-3.1-flash-image-preview`)
 
 **Behavior:**
 - Generated images are saved to `GEMINI_IMAGE_OUTPUT_DIR` (defaults to `~/Pictures` on macOS, `~/images` on Linux)
@@ -355,9 +357,9 @@ Generate images from text prompts using Gemini image models.
 # Generate a square image with default model
 generate_image: "A serene mountain landscape at sunset"
 
-# Generate a wide-format image with Gemini 3 Pro at 4K
+# Generate a wide-format image with Nano Banana 2 at 4K
 generate_image: "Futuristic cityscape at night"
-model: "gemini-3.1-pro-image-preview"
+model: "gemini-3.1-flash-image-preview"
 aspectRatio: "16:9"
 imageSize: "4K"
 ```

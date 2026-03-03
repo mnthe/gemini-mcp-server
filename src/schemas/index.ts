@@ -40,7 +40,8 @@ export const FetchSchema = z.object({
 
 const ALLOWED_IMAGE_MODELS = [
   'gemini-2.5-flash-image',
-  'gemini-3.1-pro-image-preview',
+  'gemini-3-pro-image-preview',
+  'gemini-3.1-flash-image-preview',
 ] as const;
 
 export const ImageGenerationSchema = z.object({
@@ -51,7 +52,7 @@ export const ImageGenerationSchema = z.object({
     '1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'
   ]).optional().describe("Aspect ratio (default: 1:1)"),
   imageSize: z.enum(['1K', '2K', '4K']).optional()
-    .describe("Resolution (4K is Gemini 3 Pro Image only, default: 1K)"),
+    .describe("Resolution (4K requires gemini-3-pro-image-preview or gemini-3.1-flash-image-preview, default: 1K)"),
 });
 
 export type QueryInput = z.infer<typeof QuerySchema>;

@@ -218,7 +218,7 @@ export class GeminiAIMCPServer {
           name: "generate_image",
           description:
             "Generate images using Gemini's native image generation (Nano Banana). " +
-            "Supports gemini-2.5-flash-image and gemini-3.1-pro-image-preview models. " +
+            "Supports gemini-2.5-flash-image, gemini-3-pro-image-preview, and gemini-3.1-flash-image-preview models. " +
             "Images are saved to disk and returned as base64.",
           inputSchema: {
             type: "object",
@@ -229,7 +229,7 @@ export class GeminiAIMCPServer {
               },
               model: {
                 type: "string",
-                enum: ["gemini-2.5-flash-image", "gemini-3.1-pro-image-preview"],
+                enum: ["gemini-2.5-flash-image", "gemini-3-pro-image-preview", "gemini-3.1-flash-image-preview"],
                 description: "Image model (default: gemini-2.5-flash-image)",
               },
               aspectRatio: {
@@ -240,7 +240,7 @@ export class GeminiAIMCPServer {
               imageSize: {
                 type: "string",
                 enum: ["1K", "2K", "4K"],
-                description: "Resolution (4K is Gemini 3 Pro Image only, default: 1K)",
+                description: "Resolution (4K requires gemini-3-pro-image-preview or gemini-3.1-flash-image-preview, default: 1K)",
               },
             },
             required: ["prompt"],

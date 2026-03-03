@@ -384,9 +384,9 @@ Validates the `gemini_generate_image` tool input:
 ```typescript
 z.object({
   prompt: z.string(),
-  model: z.enum(['gemini-2.5-flash-image', 'gemini-3.1-pro-image-preview']).optional(),
+  model: z.enum(['gemini-2.5-flash-image', 'gemini-3-pro-image-preview', 'gemini-3.1-flash-image-preview']).optional(),
   aspectRatio: z.enum(['1:1','2:3','3:2','3:4','4:3','4:5','5:4','9:16','16:9','21:9']).optional(),
-  imageSize: z.enum(['1K', '2K', '4K']).optional(),  // 4K is Gemini 3 Pro Image only
+  imageSize: z.enum(['1K', '2K', '4K']).optional(),  // 4K requires gemini-3-pro-image-preview or gemini-3.1-flash-image-preview
 })
 ```
 

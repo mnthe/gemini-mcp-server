@@ -45,14 +45,15 @@ Two image generation models are available:
 | Model | Description |
 |-------|-------------|
 | `gemini-2.5-flash-image` | Default. Faster generation, supports 1K and 2K resolution |
-| `gemini-3.1-pro-image-preview` | Higher quality, supports up to 4K resolution |
+| `gemini-3-pro-image-preview` | Professional asset production, supports up to 4K resolution |
+| `gemini-3.1-flash-image-preview` | High-efficiency with 4K, reference images, and new aspect ratios |
 
 ```typescript
 const request = {
   name: "generate_image",
   arguments: {
     prompt: "A photorealistic portrait of a red fox in a forest",
-    model: "gemini-3.1-pro-image-preview"
+    model: "gemini-3.1-flash-image-preview"
   }
 };
 ```
@@ -92,14 +93,14 @@ The `imageSize` parameter sets the output resolution. Defaults to `1K`.
 |-------|------------|-----------------|
 | `1K` | ~1024px (default) | Both models |
 | `2K` | ~2048px | Both models |
-| `4K` | ~4096px | `gemini-3.1-pro-image-preview` only |
+| `4K` | ~4096px | `gemini-3-pro-image-preview` or `gemini-3.1-flash-image-preview` |
 
 ```typescript
 const request = {
   name: "generate_image",
   arguments: {
     prompt: "Ultra-detailed macro photograph of a butterfly wing",
-    model: "gemini-3.1-pro-image-preview",
+    model: "gemini-3.1-flash-image-preview",
     imageSize: "4K"
   }
 };
@@ -112,7 +113,7 @@ const request = {
   name: "generate_image",
   arguments: {
     prompt: "A dramatic oil painting of a Viking longship on stormy seas, massive waves, lightning in the background, cinematic composition",
-    model: "gemini-3.1-pro-image-preview",
+    model: "gemini-3-pro-image-preview",
     aspectRatio: "21:9",
     imageSize: "4K"
   }
@@ -162,4 +163,4 @@ export GEMINI_IMAGE_OUTPUT_DIR="/path/to/output/directory"
 1. **Be specific** - Include style, lighting, mood, and composition details
 2. **Use artistic references** - "in the style of impressionism", "cinematic lighting", "golden hour"
 3. **Specify what to avoid** - Some models support negative prompts in the main prompt field
-4. **For 4K results** - Use `gemini-3.1-pro-image-preview` with `imageSize: "4K"`; prompts with fine detail benefit most from higher resolution
+4. **For 4K results** - Use `gemini-3-pro-image-preview` or `gemini-3.1-flash-image-preview` with `imageSize: "4K"`; prompts with fine detail benefit most from higher resolution

@@ -17,16 +17,16 @@ describe('isGemini3Model regex pattern', () => {
     expect(isGemini3Pattern.test('gemini-3.1-pro-preview')).toBe(true);
   });
 
-  it('matches gemini-3.1-pro-preview', () => {
-    expect(isGemini3Pattern.test('gemini-3.1-pro-preview')).toBe(true);
-  });
-
   it('matches gemini-3-flash-preview', () => {
     expect(isGemini3Pattern.test('gemini-3-flash-preview')).toBe(true);
   });
 
-  it('matches gemini-3.1-pro-image-preview', () => {
-    expect(isGemini3Pattern.test('gemini-3.1-pro-image-preview')).toBe(true);
+  it('matches gemini-3-pro-image-preview', () => {
+    expect(isGemini3Pattern.test('gemini-3-pro-image-preview')).toBe(true);
+  });
+
+  it('matches gemini-3.1-flash-image-preview', () => {
+    expect(isGemini3Pattern.test('gemini-3.1-flash-image-preview')).toBe(true);
   });
 
   it('matches gemini3 (no separator)', () => {
