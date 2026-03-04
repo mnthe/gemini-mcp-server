@@ -243,7 +243,37 @@ Returns an array of MCP content blocks:
 
 **Configuration**: Uses `config.imageOutputDir` (defaults to `getDefaultImageDir()` from imageSaver)
 
-### 9. Logger (File-based Logging)
+### 9. VideoGenerationHandler (Video Requests)
+
+**Location**: `src/handlers/VideoGenerationHandler.ts`
+
+**Responsibilities**:
+- Validate and route video generation requests
+- Coordinate with GeminiAIService to generate videos
+- Save generated videos to local filesystem via videoSaver
+- Return file paths and MIME types as MCP content blocks
+
+**Key Method**:
+```typescript
+async handle(
+  input: VideoGenerationInput
+): Promise<{ content: Array<{ type: string; text: string }> }>
+```
+
+**Features**:
+- Text-to-video generation from text prompts
+- Image-to-video animation from local image files
+- Interpolation between start and end frames
+- Reference images for style/asset guidance (max 3, Veo 3.1)
+- Default model: `veo-3.1-fast-generate-001`
+- Audio generation enabled by default
+
+**Response Format**:
+Returns an array with text block containing JSON: `{ videos: [{ filePath, mimeType }] }`
+
+**Configuration**: Uses `config.videoOutputDir` (defaults to `getDefaultVideoDir()` from videoSaver)
+
+### 10. Logger (File-based Logging)
 
 **Location**: `src/utils/Logger.ts`
 
@@ -257,30 +287,43 @@ Returns an array of MCP content blocks:
 - `logs/general.log`: All logs (info, error, tool calls)
 - `logs/reasoning.log`: Thinking traces only
 
-### 10. imageSaver (Image File Utilities)
+### 11. imageSaver & videoSaver (Media File Utilities)
 
-**Location**: `src/utils/imageSaver.ts`
+**Locations**: `src/utils/imageSaver.ts`, `src/utils/videoSaver.ts`
 
 **Responsibilities**:
-- Determine platform-appropriate default image output directory
-- Save base64-encoded image data to disk
-- Generate timestamped, indexed filenames for images
+- Determine platform-appropriate default output directories
+- Save media data (images or videos) to disk
+- Generate timestamped, indexed filenames
 
-**Exported Functions**:
+**imageSaver Exported Functions**:
 ```typescript
 // Returns ~/Pictures/gemini-generated on macOS, Windows, Linux
 // Falls back to ~/gemini-generated on other platforms
 function getDefaultImageDir(): string
 
 // Decodes base64 data and writes to outputDir/filename
-// Creates output directory if it does not exist
 function saveImage(base64Data: string, outputDir: string, filename: string): string
 
 // Returns e.g. "img-20260221143000-001.png" or "img-20260221143000-001.jpg"
 function generateImageFilename(index: number, mimeType: string): string
 ```
 
-**Filename Format**: `img-{YYYYMMDDHHmmss}-{NNN}.{ext}` where ext is `jpg` for `image/jpeg`, `png` otherwise.
+**videoSaver Exported Functions**:
+```typescript
+// Returns ~/Movies/gemini-generated on macOS, ~/Videos/gemini-generated elsewhere
+function getDefaultVideoDir(): string
+
+// Writes buffer data to outputDir/filename
+function saveVideo(data: Buffer, outputDir: string, filename: string): string
+
+// Returns e.g. "vid-20260304120000-001.mp4"
+function generateVideoFilename(index: number): string
+```
+
+**Filename Formats**:
+- Images: `img-{YYYYMMDDHHmmss}-{NNN}.{ext}` (jpg for image/jpeg, png otherwise)
+- Videos: `vid-{YYYYMMDDHHmmss}-{NNN}.mp4`
 
 ## Data Flow
 
@@ -338,6 +381,30 @@ function generateImageFilename(index: number, mimeType: string): string
 4. Return content array to MCP client
 ```
 
+### Video Generation Flow
+
+```
+1. MCP Client → GeminiAIMCPServer (generate_video tool call)
+   ↓
+2. VideoGenerationSchema.parse(input) → validated VideoGenerationInput
+   ↓
+3. VideoGenerationHandler.handle(input)
+   ├─ GeminiAIService.generateVideo(prompt, { model, imagePath, lastFramePath, referenceImagePaths, ... })
+   │  ├─ Read image files and encode as base64 (imagePath, lastFramePath, referenceImagePaths)
+   │  ├─ Calls client.models.generateVideos() → async operation
+   │  ├─ Polling: client.operations.getVideosOperation() every 10 seconds until done
+   │  └─ extractVideos() → { videos: GeneratedVideo[], data: Buffer, mimeType }
+   │
+   ├─ For each video:
+   │  ├─ generateVideoFilename(index) → "vid-{timestamp}-{NNN}.mp4"
+   │  └─ saveVideo(data, videoOutputDir, filename) → saved file path
+   │
+   └─ Build MCP content block:
+      └─ text block: JSON { videos: [{ filePath, mimeType }] }
+   ↓
+4. Return content array to MCP client
+```
+
 ### Tool Execution Flow
 
 ```
@@ -389,6 +456,32 @@ z.object({
   imageSize: z.enum(['1K', '2K', '4K']).optional(),  // 4K requires gemini-3-pro-image-preview or gemini-3.1-flash-image-preview
 })
 ```
+
+### VideoGenerationSchema
+
+Validates the `generate_video` tool input:
+
+```typescript
+z.object({
+  prompt: z.string(),
+  model: z.enum(['veo-3.1-fast-generate-001', 'veo-3.1-generate-preview']).optional(),
+  aspectRatio: z.enum(['16:9', '9:16']).optional(),
+  durationSeconds: z.enum(['4', '6', '8']).optional(),
+  resolution: z.enum(['720p', '1080p', '4k']).optional(),
+  generateAudio: z.boolean().optional(),  // default: true
+  negativePrompt: z.string().optional(),
+  seed: z.number().optional(),
+  numberOfVideos: z.number().optional(),
+  imagePath: z.string().optional(),         // image-to-video
+  lastFramePath: z.string().optional(),     // interpolation (requires imagePath)
+  referenceImagePaths: z.array(z.string()).optional(),  // max 3, Veo 3.1 only
+})
+```
+
+**Validation Refines**:
+- 1080p/4k resolution requires durationSeconds to be '8'
+- `lastFramePath` requires `imagePath` (interpolation mode constraint)
+- Maximum 3 reference images allowed
 
 ### SearchSchema / FetchSchema
 

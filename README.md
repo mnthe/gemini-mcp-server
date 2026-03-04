@@ -260,7 +260,7 @@ See [PROMPT_CUSTOMIZATION.md](PROMPT_CUSTOMIZATION.md) for comprehensive guide a
 
 ## Available Tools
 
-The server exposes four MCP tools: `query`, `search`, `fetch`, and `generate_image`.
+The server exposes five MCP tools: `query`, `search`, `fetch`, `generate_image`, and `generate_video`.
 
 ### query
 
@@ -360,6 +360,57 @@ generate_image: "Futuristic cityscape at night"
 model: "gemini-3.1-flash-image-preview"
 aspectRatio: "16:9"
 imageSize: "4K"
+```
+
+### generate_video
+
+Generate videos from text prompts using Veo video generation models.
+
+**Parameters:**
+- `prompt` (string, required): Video generation prompt describing what to generate
+- `model` (string, optional): Video model to use. Default: `veo-3.1-fast-generate-001`. Options:
+  - `veo-3.1-fast-generate-001` (default) — fast video generation
+  - `veo-3.1-generate-preview` — higher quality generation
+- `aspectRatio` (string, optional): Video aspect ratio. Default: `16:9`. Options: `16:9`, `9:16`
+- `durationSeconds` (string, optional): Video duration. Default: `8`. Options: `4`, `6`, `8` (1080p/4k require 8)
+- `resolution` (string, optional): Video resolution. Default: `720p`. Options: `720p`, `1080p`, `4k` (1080p/4k require 8 second duration)
+- `generateAudio` (boolean, optional): Generate audio for the video. Default: `true`
+- `negativePrompt` (string, optional): Description of what to exclude from the video
+- `seed` (number, optional): Random seed for reproducibility
+- `numberOfVideos` (number, optional): Number of videos to generate. Default: `1`
+- `imagePath` (string, optional): Local file path of input image for image-to-video generation
+- `lastFramePath` (string, optional): Local file path of last frame for interpolation (requires `imagePath`)
+- `referenceImagePaths` (array, optional): Local file paths of reference images for style guidance (max 3, Veo 3.1 only)
+
+**Behavior:**
+- Generated videos are saved to `GEMINI_VIDEO_OUTPUT_DIR` (defaults to `~/Movies/gemini-generated` on macOS, `~/Videos/gemini-generated` elsewhere)
+- Returns file paths of saved videos
+- Supports text-to-video, image-to-video, interpolation, and style reference modes
+
+**Examples:**
+```
+# Simple text-to-video
+generate_video: "A dancing robot in a cyberpunk city"
+
+# Text-to-video with custom settings
+generate_video: "Ocean waves crashing on a beach"
+model: "veo-3.1-generate-preview"
+aspectRatio: "16:9"
+durationSeconds: "8"
+resolution: "1080p"
+
+# Image-to-video (animation)
+generate_video: "Animate this image"
+imagePath: "/path/to/image.jpg"
+
+# Interpolation (morph between two frames)
+generate_video: "Smooth transition"
+imagePath: "/path/to/start_frame.jpg"
+lastFramePath: "/path/to/end_frame.jpg"
+
+# Video with reference images for style
+generate_video: "Generate a video with cyberpunk aesthetic"
+referenceImagePaths: ["/path/to/style1.jpg", "/path/to/style2.jpg"]
 ```
 
 ## Security
