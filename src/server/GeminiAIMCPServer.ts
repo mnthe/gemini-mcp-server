@@ -11,7 +11,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 
 import { GeminiAIConfig, CachedDocument, MCPServerConfig } from '../types/index.js';
-import { QuerySchema, SearchSchema, FetchSchema, ImageGenerationSchema } from '../schemas/index.js';
+import { QuerySchema, SearchSchema, FetchSchema, ImageGenerationSchema, VideoGenerationSchema } from '../schemas/index.js';
 import { ConversationManager } from '../managers/ConversationManager.js';
 import { GeminiAIService } from '../services/GeminiAIService.js';
 import { EnhancedMCPClient } from '../mcp/EnhancedMCPClient.js';
@@ -22,6 +22,7 @@ import { QueryHandler } from '../handlers/QueryHandler.js';
 import { SearchHandler } from '../handlers/SearchHandler.js';
 import { FetchHandler } from '../handlers/FetchHandler.js';
 import { ImageGenerationHandler } from '../handlers/ImageGenerationHandler.js';
+import { VideoGenerationHandler } from '../handlers/VideoGenerationHandler.js';
 
 export class GeminiAIMCPServer {
   private server: Server;
@@ -40,6 +41,7 @@ export class GeminiAIMCPServer {
   private searchHandler: SearchHandler;
   private fetchHandler: FetchHandler;
   private imageGenerationHandler: ImageGenerationHandler;
+  private videoGenerationHandler: VideoGenerationHandler;
 
   // Cache
   private searchCache: Map<string, CachedDocument>;
@@ -98,6 +100,7 @@ export class GeminiAIMCPServer {
     this.searchHandler = new SearchHandler(this.geminiAI, this.searchCache);
     this.fetchHandler = new FetchHandler(this.searchCache);
     this.imageGenerationHandler = new ImageGenerationHandler(this.geminiAI, config);
+    this.videoGenerationHandler = new VideoGenerationHandler(this.geminiAI, config);
 
     this.setupHandlers();
   }
@@ -251,6 +254,73 @@ export class GeminiAIMCPServer {
             required: ["prompt"],
           },
         },
+        {
+          name: "generate_video",
+          description:
+            "Generate videos using Google's Veo models. " +
+            "Supports text-to-video, image-to-video (with imagePath), interpolation (imagePath + lastFramePath), " +
+            "and reference images (referenceImagePaths, max 3, Veo 3.1 only). " +
+            `Videos are saved to ${this.videoGenerationHandler.getVideoOutputDir()} and file paths are returned.`,
+          inputSchema: {
+            type: "object",
+            properties: {
+              prompt: {
+                type: "string",
+                description: "Video generation prompt",
+              },
+              model: {
+                type: "string",
+                enum: ["veo-3.1-fast-generate-001", "veo-3.1-generate-preview"],
+                description: "Video model (default: veo-3.1-fast-generate-001)",
+              },
+              aspectRatio: {
+                type: "string",
+                enum: ["16:9", "9:16"],
+                description: "Aspect ratio (default: 16:9)",
+              },
+              durationSeconds: {
+                type: "string",
+                enum: ["4", "6", "8"],
+                description: "Video duration in seconds (default: 8)",
+              },
+              resolution: {
+                type: "string",
+                enum: ["720p", "1080p", "4k"],
+                description: "Video resolution (1080p/4k requires 8s duration, default: 720p)",
+              },
+              generateAudio: {
+                type: "boolean",
+                description: "Generate audio for the video (default: true)",
+              },
+              negativePrompt: {
+                type: "string",
+                description: "Text describing what to exclude from the video",
+              },
+              seed: {
+                type: "number",
+                description: "Random seed for reproducibility",
+              },
+              numberOfVideos: {
+                type: "number",
+                description: "Number of videos to generate (default: 1)",
+              },
+              imagePath: {
+                type: "string",
+                description: "Local file path of input image for image-to-video generation",
+              },
+              lastFramePath: {
+                type: "string",
+                description: "Local file path of last frame image for interpolation (requires imagePath)",
+              },
+              referenceImagePaths: {
+                type: "array",
+                items: { type: "string" },
+                description: "Local file paths of reference images for style/asset guidance (max 3, Veo 3.1 only)",
+              },
+            },
+            required: ["prompt"],
+          },
+        },
       ];
 
       return { tools };
@@ -280,6 +350,11 @@ export class GeminiAIMCPServer {
         case "generate_image": {
           const input = ImageGenerationSchema.parse(args);
           return await this.imageGenerationHandler.handle(input);
+        }
+
+        case "generate_video": {
+          const input = VideoGenerationSchema.parse(args);
+          return await this.videoGenerationHandler.handle(input);
         }
 
         default:

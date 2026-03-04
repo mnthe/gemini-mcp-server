@@ -1,14 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-/**
- * Tests for generate_image tool wiring in GeminiAIMCPServer.
- *
- * We cannot instantiate the full server (requires API keys, transport, etc.)
- * so we test indirectly: import the module, mock dependencies, and verify
- * the tool registration and routing.
- */
+// We test the server wiring for generate_video tool here,
+// following the same pattern as GeminiAIMCPServer.test.ts.
 
-// Mock all heavy dependencies to isolate the wiring logic
 vi.mock('@modelcontextprotocol/sdk/server/index.js', () => {
   return {
     Server: class MockServer {
@@ -35,6 +29,7 @@ vi.mock('../managers/ConversationManager.js', () => ({
 vi.mock('../services/GeminiAIService.js', () => ({
   GeminiAIService: class {
     generateImage = vi.fn();
+    generateVideo = vi.fn();
     constructor() {}
   },
 }));
@@ -90,18 +85,18 @@ vi.mock('../handlers/FetchHandler.js', () => ({
   },
 }));
 
-const mockImageGenHandle = vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] });
 vi.mock('../handlers/ImageGenerationHandler.js', () => ({
   ImageGenerationHandler: class {
-    handle = mockImageGenHandle;
+    handle = vi.fn();
     getImageOutputDir = vi.fn().mockReturnValue('/tmp/images');
     constructor() {}
   },
 }));
 
+const mockVideoGenHandle = vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] });
 vi.mock('../handlers/VideoGenerationHandler.js', () => ({
   VideoGenerationHandler: class {
-    handle = vi.fn();
+    handle = mockVideoGenHandle;
     getVideoOutputDir = vi.fn().mockReturnValue('/tmp/videos');
     constructor() {}
   },
@@ -113,7 +108,13 @@ vi.mock('../utils/imageSaver.js', () => ({
   generateImageFilename: vi.fn(),
 }));
 
-import { GeminiAIMCPServer } from './GeminiAIMCPServer.js';
+vi.mock('../utils/videoSaver.js', () => ({
+  getDefaultVideoDir: vi.fn().mockReturnValue('/tmp/videos'),
+  saveVideo: vi.fn(),
+  generateVideoFilename: vi.fn(),
+}));
+
+import { GeminiAIMCPServer } from '../server/GeminiAIMCPServer.js';
 
 function createTestConfig() {
   return {
@@ -131,10 +132,6 @@ function createTestConfig() {
   } as any;
 }
 
-/**
- * Helper: extract handlers registered via server.setRequestHandler
- * The mock Server stores calls on its setRequestHandler vi.fn().
- */
 function getHandlers(serverInstance: any) {
   const calls = serverInstance.setRequestHandler.mock.calls as any[][];
   const listHandler = calls.find(
@@ -146,67 +143,62 @@ function getHandlers(serverInstance: any) {
   return { listHandler, callHandler };
 }
 
-describe('GeminiAIMCPServer generate_image wiring', () => {
+describe('GeminiAIMCPServer generate_video wiring', () => {
   let mcpServer: GeminiAIMCPServer;
   let listHandler: Function;
   let callHandler: Function;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockImageGenHandle.mockClear();
+    mockVideoGenHandle.mockClear();
     mcpServer = new GeminiAIMCPServer(createTestConfig());
-    // Access the internal Server mock instance via the private field
     const internalServer = (mcpServer as any).server;
     const handlers = getHandlers(internalServer);
     listHandler = handlers.listHandler;
     callHandler = handlers.callHandler;
   });
 
-  it('includes generate_image in tools/list', async () => {
+  it('includes generate_video in tools/list', async () => {
     expect(listHandler).toBeDefined();
 
     const result = await listHandler();
     const toolNames = result.tools.map((t: any) => t.name);
 
-    expect(toolNames).toContain('generate_image');
+    expect(toolNames).toContain('generate_video');
   });
 
-  it('generate_image tool has correct inputSchema with required prompt', async () => {
+  it('generate_video tool has correct inputSchema with required prompt', async () => {
     const result = await listHandler();
-    const imageGenTool = result.tools.find((t: any) => t.name === 'generate_image');
+    const videoGenTool = result.tools.find((t: any) => t.name === 'generate_video');
 
-    expect(imageGenTool).toBeDefined();
-    expect(imageGenTool.inputSchema.required).toContain('prompt');
-    expect(imageGenTool.inputSchema.properties.prompt).toBeDefined();
-    expect(imageGenTool.inputSchema.properties.model).toBeDefined();
-    expect(imageGenTool.inputSchema.properties.aspectRatio).toBeDefined();
-    expect(imageGenTool.inputSchema.properties.imageSize).toBeDefined();
+    expect(videoGenTool).toBeDefined();
+    expect(videoGenTool.inputSchema.required).toContain('prompt');
+    expect(videoGenTool.inputSchema.properties.prompt).toBeDefined();
+    expect(videoGenTool.inputSchema.properties.model).toBeDefined();
+    expect(videoGenTool.inputSchema.properties.aspectRatio).toBeDefined();
+    expect(videoGenTool.inputSchema.properties.durationSeconds).toBeDefined();
+    expect(videoGenTool.inputSchema.properties.resolution).toBeDefined();
+    expect(videoGenTool.inputSchema.properties.generateAudio).toBeDefined();
+    expect(videoGenTool.inputSchema.properties.negativePrompt).toBeDefined();
+    expect(videoGenTool.inputSchema.properties.seed).toBeDefined();
+    expect(videoGenTool.inputSchema.properties.numberOfVideos).toBeDefined();
+    expect(videoGenTool.inputSchema.properties.imagePath).toBeDefined();
+    expect(videoGenTool.inputSchema.properties.lastFramePath).toBeDefined();
+    expect(videoGenTool.inputSchema.properties.referenceImagePaths).toBeDefined();
   });
 
-  it('routes generate_image call to ImageGenerationHandler', async () => {
+  it('routes generate_video call to VideoGenerationHandler', async () => {
     expect(callHandler).toBeDefined();
 
     const request = {
       params: {
-        name: 'generate_image',
-        arguments: { prompt: 'a cat' },
+        name: 'generate_video',
+        arguments: { prompt: 'a dancing cat' },
       },
     };
 
     await callHandler(request);
 
-    // Verify the mock handle function was called with parsed args
-    expect(mockImageGenHandle).toHaveBeenCalledWith({ prompt: 'a cat' });
-  });
-
-  it('throws for unknown tool names', async () => {
-    const request = {
-      params: {
-        name: 'nonexistent_tool',
-        arguments: {},
-      },
-    };
-
-    await expect(callHandler(request)).rejects.toThrow('Unknown tool: nonexistent_tool');
+    expect(mockVideoGenHandle).toHaveBeenCalledWith({ prompt: 'a dancing cat' });
   });
 });
