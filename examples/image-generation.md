@@ -44,8 +44,7 @@ Two image generation models are available:
 
 | Model | Description |
 |-------|-------------|
-| `gemini-2.5-flash-image` | Default. Faster generation, supports 1K and 2K resolution |
-| `gemini-3-pro-image-preview` | Professional asset production, supports up to 4K resolution |
+| `gemini-3-pro-image-preview` | Default. Professional asset production, supports up to 4K resolution |
 | `gemini-3.1-flash-image-preview` | High-efficiency with 4K, reference images, and new aspect ratios |
 
 ```typescript

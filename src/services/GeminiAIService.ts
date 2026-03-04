@@ -251,7 +251,7 @@ export class GeminiAIService {
     prompt: string,
     options: ImageGenerationOptions = {}
   ): Promise<{ images: GeneratedImage[]; text?: string }> {
-    const model = options.model || 'gemini-2.5-flash-image';
+    const model = options.model || 'gemini-3-pro-image-preview';
     const response = await this.client.models.generateContent({
       model,
       contents: prompt,

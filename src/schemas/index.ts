@@ -39,7 +39,6 @@ export const FetchSchema = z.object({
 });
 
 const ALLOWED_IMAGE_MODELS = [
-  'gemini-2.5-flash-image',
   'gemini-3-pro-image-preview',
   'gemini-3.1-flash-image-preview',
 ] as const;
@@ -47,7 +46,7 @@ const ALLOWED_IMAGE_MODELS = [
 export const ImageGenerationSchema = z.object({
   prompt: z.string().describe("Image generation prompt"),
   model: z.enum(ALLOWED_IMAGE_MODELS).optional()
-    .describe("Image model (default: gemini-2.5-flash-image)"),
+    .describe("Image model (default: gemini-3-pro-image-preview)"),
   aspectRatio: z.enum([
     '1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'
   ]).optional().describe("Aspect ratio (default: 1:1)"),
