@@ -26,6 +26,25 @@ export interface GeneratedImage {
   mimeType: string;  // image/png
 }
 
+export interface VideoGenerationOptions {
+  model?: string;
+  aspectRatio?: string;
+  durationSeconds?: string;
+  resolution?: string;
+  generateAudio?: boolean;
+  negativePrompt?: string;
+  seed?: number;
+  numberOfVideos?: number;
+  imagePath?: string;
+  lastFramePath?: string;
+  referenceImagePaths?: string[];
+}
+
+export interface GeneratedVideo {
+  data: Buffer;
+  mimeType: string;
+}
+
 export interface QueryOptions {
   enableThinking?: boolean;
   /**
@@ -292,6 +311,9 @@ export class GeminiAIService {
       '.gif': 'image/gif',
       '.webp': 'image/webp',
       '.bmp': 'image/bmp',
+      '.mp4': 'video/mp4',
+      '.webm': 'video/webm',
+      '.mov': 'video/quicktime',
     };
     return map[ext.toLowerCase()] || 'image/png';
   }
@@ -325,6 +347,91 @@ export class GeminiAIService {
     }
 
     return { images, text };
+  }
+
+  /**
+   * Generate videos using Gemini video models (Veo)
+   */
+  async generateVideo(
+    prompt: string,
+    options: VideoGenerationOptions = {}
+  ): Promise<{ videos: GeneratedVideo[] }> {
+    const model = options.model || 'veo-3.1-fast-generate-001';
+
+    // Build request parameters
+    const params: any = {
+      model,
+      prompt,
+      config: {
+        aspectRatio: options.aspectRatio || '16:9',
+        durationSeconds: parseInt(options.durationSeconds || '8'),
+        resolution: options.resolution,
+        generateAudio: options.generateAudio ?? true,
+        negativePrompt: options.negativePrompt,
+        seed: options.seed,
+        numberOfVideos: options.numberOfVideos || 1,
+      },
+    };
+
+    // Image-to-video: attach input image
+    if (options.imagePath) {
+      const data = readFileSync(options.imagePath).toString('base64');
+      const mimeType = this.getMimeTypeFromExtension(extname(options.imagePath));
+      params.image = { bytesBase64: data, mimeType };
+    }
+
+    // Interpolation: attach last frame
+    if (options.lastFramePath) {
+      const data = readFileSync(options.lastFramePath).toString('base64');
+      const mimeType = this.getMimeTypeFromExtension(extname(options.lastFramePath));
+      params.config.lastFrame = { bytesBase64: data, mimeType };
+    }
+
+    // Reference images (max 3)
+    if (options.referenceImagePaths && options.referenceImagePaths.length > 0) {
+      params.config.referenceImages = options.referenceImagePaths.map((filePath: string) => ({
+        referenceType: 'asset',
+        image: {
+          bytesBase64: readFileSync(filePath).toString('base64'),
+          mimeType: this.getMimeTypeFromExtension(extname(filePath)),
+        },
+      }));
+    }
+
+    // 1. Start async operation
+    let operation = await this.client.models.generateVideos(params);
+
+    // 2. Poll for completion (10s interval)
+    while (!operation.done) {
+      await new Promise(resolve => setTimeout(resolve, 10000));
+      operation = await this.client.operations.getVideosOperation({ operation });
+    }
+
+    // 3. Error check
+    if (operation.error) {
+      throw new Error(`Video generation failed: ${JSON.stringify(operation.error)}`);
+    }
+
+    // 4. Extract video data from response
+    const videos: GeneratedVideo[] = [];
+    for (const genVideo of (operation.response?.generatedVideos || [])) {
+      const video = genVideo.video;
+      if (video?.videoBytes) {
+        videos.push({
+          data: Buffer.from(video.videoBytes, 'base64'),
+          mimeType: video.mimeType || 'video/mp4',
+        });
+      } else if (video?.uri) {
+        const resp = await fetch(video.uri);
+        const arrayBuf = await resp.arrayBuffer();
+        videos.push({
+          data: Buffer.from(arrayBuf),
+          mimeType: 'video/mp4',
+        });
+      }
+    }
+
+    return { videos };
   }
 
   /**
