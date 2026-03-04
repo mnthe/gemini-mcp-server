@@ -52,6 +52,8 @@ export const ImageGenerationSchema = z.object({
   ]).optional().describe("Aspect ratio (default: 1:1)"),
   imageSize: z.enum(['1K', '2K', '4K']).optional()
     .describe("Resolution (4K requires gemini-3-pro-image-preview or gemini-3.1-flash-image-preview, default: 1K)"),
+  imagePaths: z.array(z.string()).optional()
+    .describe("Local file paths of reference images to include as input (e.g., for image editing or style transfer)"),
 });
 
 export type QueryInput = z.infer<typeof QuerySchema>;

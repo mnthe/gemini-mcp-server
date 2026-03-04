@@ -12,11 +12,16 @@ export class ImageGenerationHandler {
     this.imageOutputDir = config.imageOutputDir || getDefaultImageDir();
   }
 
+  getImageOutputDir(): string {
+    return this.imageOutputDir;
+  }
+
   async handle(input: ImageGenerationInput): Promise<{ content: Array<{ type: string; text?: string; data?: string; mimeType?: string }> }> {
     const result = await this.geminiService.generateImage(input.prompt, {
       model: input.model,
       aspectRatio: input.aspectRatio,
       imageSize: input.imageSize,
+      imagePaths: input.imagePaths,
     });
 
     const content: Array<{ type: string; text?: string; data?: string; mimeType?: string }> = [];

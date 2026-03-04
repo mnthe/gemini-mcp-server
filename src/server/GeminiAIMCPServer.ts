@@ -219,7 +219,7 @@ export class GeminiAIMCPServer {
           description:
             "Generate images using Gemini's native image generation (Nano Banana). " +
             "Supports gemini-3-pro-image-preview and gemini-3.1-flash-image-preview models. " +
-            "Images are saved to disk and returned as base64.",
+            `Images are saved to ${this.imageGenerationHandler.getImageOutputDir()} and returned as base64.`,
           inputSchema: {
             type: "object",
             properties: {
@@ -241,6 +241,11 @@ export class GeminiAIMCPServer {
                 type: "string",
                 enum: ["1K", "2K", "4K"],
                 description: "Resolution (4K requires gemini-3-pro-image-preview or gemini-3.1-flash-image-preview, default: 1K)",
+              },
+              imagePaths: {
+                type: "array",
+                items: { type: "string" },
+                description: "Local file paths of reference images to include as input (e.g., for image editing or style transfer)",
               },
             },
             required: ["prompt"],

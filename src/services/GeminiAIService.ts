@@ -4,6 +4,8 @@
  */
 
 import { GenerateContentConfig, GoogleGenAI, Part, ThinkingLevel } from "@google/genai";
+import { readFileSync } from "node:fs";
+import { extname } from "node:path";
 
 // Re-export ThinkingLevel for consumers
 export { ThinkingLevel } from "@google/genai";
@@ -16,6 +18,7 @@ export interface ImageGenerationOptions {
   model?: string;
   aspectRatio?: string;
   imageSize?: string;
+  imagePaths?: string[];
 }
 
 export interface GeneratedImage {
@@ -252,9 +255,24 @@ export class GeminiAIService {
     options: ImageGenerationOptions = {}
   ): Promise<{ images: GeneratedImage[]; text?: string }> {
     const model = options.model || 'gemini-3-pro-image-preview';
+
+    // Build contents: text prompt + optional reference images
+    let contents: any;
+    if (options.imagePaths && options.imagePaths.length > 0) {
+      const parts: Part[] = [{ text: prompt }];
+      for (const filePath of options.imagePaths) {
+        const data = readFileSync(filePath).toString('base64');
+        const mimeType = this.getMimeTypeFromExtension(extname(filePath));
+        parts.push({ inlineData: { data, mimeType } });
+      }
+      contents = [{ role: 'user', parts }];
+    } else {
+      contents = prompt;
+    }
+
     const response = await this.client.models.generateContent({
       model,
-      contents: prompt,
+      contents,
       config: {
         responseModalities: ['TEXT', 'IMAGE'],
         imageConfig: {
@@ -264,6 +282,18 @@ export class GeminiAIService {
       },
     });
     return this.extractImages(response);
+  }
+
+  private getMimeTypeFromExtension(ext: string): string {
+    const map: Record<string, string> = {
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp',
+      '.bmp': 'image/bmp',
+    };
+    return map[ext.toLowerCase()] || 'image/png';
   }
 
   /**
