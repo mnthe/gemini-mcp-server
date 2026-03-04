@@ -56,7 +56,63 @@ export const ImageGenerationSchema = z.object({
     .describe("Local file paths of reference images to include as input (e.g., for image editing or style transfer)"),
 });
 
+const ALLOWED_VIDEO_MODELS = [
+  'veo-3.1-fast-generate-001',
+  'veo-3.1-generate-preview',
+] as const;
+
+export const VideoGenerationSchema = z.object({
+  prompt: z.string().describe("Video generation prompt"),
+  model: z.enum(ALLOWED_VIDEO_MODELS).optional()
+    .describe("Video model (default: veo-3.1-fast-generate-001)"),
+  aspectRatio: z.enum(['16:9', '9:16']).optional()
+    .describe("Aspect ratio (default: 16:9)"),
+  durationSeconds: z.enum(['4', '6', '8']).optional()
+    .describe("Duration in seconds (1080p/4k requires '8')"),
+  resolution: z.enum(['720p', '1080p', '4k']).optional()
+    .describe("Video resolution (1080p/4k requires durationSeconds='8')"),
+  generateAudio: z.boolean().optional()
+    .describe("Whether to generate audio"),
+  negativePrompt: z.string().optional()
+    .describe("Negative prompt for generation"),
+  seed: z.number().optional()
+    .describe("Random seed for reproducibility"),
+  numberOfVideos: z.number().optional()
+    .describe("Number of videos to generate"),
+  imagePath: z.string().optional()
+    .describe("Local file path of reference image (first frame)"),
+  lastFramePath: z.string().optional()
+    .describe("Local file path of reference image (last frame, requires imagePath)"),
+  referenceImagePaths: z.array(z.string()).optional()
+    .describe("Local file paths of reference images (max 3)"),
+}).refine(
+  (data) => {
+    if (data.resolution === '1080p' || data.resolution === '4k') {
+      return data.durationSeconds === '8';
+    }
+    return true;
+  },
+  { message: "resolution '1080p' or '4k' requires durationSeconds='8'" }
+).refine(
+  (data) => {
+    if (data.lastFramePath) {
+      return !!data.imagePath;
+    }
+    return true;
+  },
+  { message: "lastFramePath requires imagePath" }
+).refine(
+  (data) => {
+    if (data.referenceImagePaths) {
+      return data.referenceImagePaths.length <= 3;
+    }
+    return true;
+  },
+  { message: "referenceImagePaths must have at most 3 items" }
+);
+
 export type QueryInput = z.infer<typeof QuerySchema>;
 export type SearchInput = z.infer<typeof SearchSchema>;
 export type FetchInput = z.infer<typeof FetchSchema>;
 export type ImageGenerationInput = z.infer<typeof ImageGenerationSchema>;
+export type VideoGenerationInput = z.infer<typeof VideoGenerationSchema>;

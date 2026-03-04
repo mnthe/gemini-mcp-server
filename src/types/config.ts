@@ -22,4 +22,5 @@ export interface GeminiAIConfig {
   systemPrompt?: string;
   mediaResolution?: string;
   imageOutputDir?: string;
+  videoOutputDir?: string;
 }

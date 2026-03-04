@@ -55,6 +55,9 @@ export function loadConfig(): GeminiAIConfig {
   // Image output directory - where generated images are saved
   const imageOutputDir = process.env.GEMINI_IMAGE_OUTPUT_DIR;
 
+  // Video output directory - where generated videos are saved
+  const videoOutputDir = process.env.GEMINI_VIDEO_OUTPUT_DIR;
+
   return {
     projectId,
     location,
@@ -75,5 +78,6 @@ export function loadConfig(): GeminiAIConfig {
     systemPrompt,
     mediaResolution,
     imageOutputDir,
+    videoOutputDir,
   };
 }
