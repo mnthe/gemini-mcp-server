@@ -258,7 +258,9 @@ export class GeminiAIMCPServer {
           name: "generate_video",
           description:
             "Start video generation using Google's Veo models. Returns an operationId immediately. " +
+            "Video generation typically takes 1-3 minutes. " +
             "Use check_video with the operationId to poll for completion and download results. " +
+            "Recommended polling interval: 30 seconds. " +
             "Supports text-to-video, image-to-video (with imagePath), interpolation (imagePath + lastFramePath), " +
             "and reference images (referenceImagePaths, max 3, Veo 3.1 only).",
           inputSchema: {
@@ -326,6 +328,7 @@ export class GeminiAIMCPServer {
           description:
             "Check the status of a video generation operation. " +
             "Returns status: 'running' (still generating), 'completed' (with saved file paths), or 'failed' (with error). " +
+            "If status is 'running', wait ~30 seconds before checking again. " +
             `Completed videos are saved to ${this.videoGenerationHandler.getVideoOutputDir()}.`,
           inputSchema: {
             type: "object",
