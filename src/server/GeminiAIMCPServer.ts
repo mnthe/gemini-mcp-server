@@ -11,7 +11,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 
 import { GeminiAIConfig, CachedDocument, MCPServerConfig } from '../types/index.js';
-import { QuerySchema, SearchSchema, FetchSchema, ImageGenerationSchema, VideoGenerationSchema } from '../schemas/index.js';
+import { QuerySchema, SearchSchema, FetchSchema, ImageGenerationSchema, VideoGenerationSchema, CheckVideoSchema } from '../schemas/index.js';
 import { ConversationManager } from '../managers/ConversationManager.js';
 import { GeminiAIService } from '../services/GeminiAIService.js';
 import { EnhancedMCPClient } from '../mcp/EnhancedMCPClient.js';
@@ -257,10 +257,10 @@ export class GeminiAIMCPServer {
         {
           name: "generate_video",
           description:
-            "Generate videos using Google's Veo models. " +
+            "Start video generation using Google's Veo models. Returns an operationId immediately. " +
+            "Use check_video with the operationId to poll for completion and download results. " +
             "Supports text-to-video, image-to-video (with imagePath), interpolation (imagePath + lastFramePath), " +
-            "and reference images (referenceImagePaths, max 3, Veo 3.1 only). " +
-            `Videos are saved to ${this.videoGenerationHandler.getVideoOutputDir()} and file paths are returned.`,
+            "and reference images (referenceImagePaths, max 3, Veo 3.1 only).",
           inputSchema: {
             type: "object",
             properties: {
@@ -321,6 +321,23 @@ export class GeminiAIMCPServer {
             required: ["prompt"],
           },
         },
+        {
+          name: "check_video",
+          description:
+            "Check the status of a video generation operation. " +
+            "Returns status: 'running' (still generating), 'completed' (with saved file paths), or 'failed' (with error). " +
+            `Completed videos are saved to ${this.videoGenerationHandler.getVideoOutputDir()}.`,
+          inputSchema: {
+            type: "object",
+            properties: {
+              operationId: {
+                type: "string",
+                description: "Operation ID returned by generate_video",
+              },
+            },
+            required: ["operationId"],
+          },
+        },
       ];
 
       return { tools };
@@ -336,12 +353,12 @@ export class GeminiAIMCPServer {
           const input = QuerySchema.parse(args);
           return await this.queryHandler.handle(input);
         }
-        
+
         case "search": {
           const input = SearchSchema.parse(args);
           return await this.searchHandler.handle(input);
         }
-        
+
         case "fetch": {
           const input = FetchSchema.parse(args);
           return await this.fetchHandler.handle(input);
@@ -355,6 +372,11 @@ export class GeminiAIMCPServer {
         case "generate_video": {
           const input = VideoGenerationSchema.parse(args);
           return await this.videoGenerationHandler.handle(input);
+        }
+
+        case "check_video": {
+          const input = CheckVideoSchema.parse(args);
+          return await this.videoGenerationHandler.handleCheck(input);
         }
 
         default:

@@ -1,4 +1,4 @@
-import { VideoGenerationInput } from '../schemas/index.js';
+import { VideoGenerationInput, CheckVideoInput } from '../schemas/index.js';
 import { GeminiAIService } from '../services/GeminiAIService.js';
 import { GeminiAIConfig } from '../types/index.js';
 import { getDefaultVideoDir, saveVideo, generateVideoFilename } from '../utils/videoSaver.js';
@@ -31,24 +31,55 @@ export class VideoGenerationHandler {
       referenceImagePaths: input.referenceImagePaths,
     });
 
+    return {
+      content: [{
+        type: 'text',
+        text: JSON.stringify({ operationId: result.operationId }),
+      }],
+    };
+  }
+
+  async handleCheck(input: CheckVideoInput): Promise<{ content: Array<{ type: string; text: string }> }> {
+    const result = await this.geminiService.checkVideoOperation(input.operationId);
+
+    if (!result.done) {
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({ status: 'running' }),
+        }],
+      };
+    }
+
+    if (result.error) {
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({ status: 'failed', error: result.error }),
+        }],
+      };
+    }
+
+    // Save completed videos to disk
     const savedPaths: string[] = [];
-    for (let i = 0; i < result.videos.length; i++) {
-      const vid = result.videos[i];
+    for (let i = 0; i < (result.videos?.length || 0); i++) {
+      const vid = result.videos![i];
       const filename = generateVideoFilename(i + 1);
       const filePath = saveVideo(vid.data, this.videoOutputDir, filename);
       savedPaths.push(filePath);
     }
 
-    const content: Array<{ type: string; text: string }> = [{
-      type: 'text',
-      text: JSON.stringify({
-        videos: savedPaths.map((fp, i) => ({
-          filePath: fp,
-          mimeType: result.videos[i].mimeType,
-        })),
-      }),
-    }];
-
-    return { content };
+    return {
+      content: [{
+        type: 'text',
+        text: JSON.stringify({
+          status: 'completed',
+          videos: savedPaths.map((fp, i) => ({
+            filePath: fp,
+            mimeType: result.videos![i].mimeType,
+          })),
+        }),
+      }],
+    };
   }
 }

@@ -116,3 +116,9 @@ export type SearchInput = z.infer<typeof SearchSchema>;
 export type FetchInput = z.infer<typeof FetchSchema>;
 export type ImageGenerationInput = z.infer<typeof ImageGenerationSchema>;
 export type VideoGenerationInput = z.infer<typeof VideoGenerationSchema>;
+
+export const CheckVideoSchema = z.object({
+  operationId: z.string().describe("Operation ID returned by generate_video"),
+});
+
+export type CheckVideoInput = z.infer<typeof CheckVideoSchema>;

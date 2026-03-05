@@ -355,7 +355,7 @@ export class GeminiAIService {
   async generateVideo(
     prompt: string,
     options: VideoGenerationOptions = {}
-  ): Promise<{ videos: GeneratedVideo[] }> {
+  ): Promise<{ operationId: string }> {
     const model = options.model || 'veo-3.1-fast-generate-001';
 
     // Build request parameters
@@ -398,21 +398,39 @@ export class GeminiAIService {
       }));
     }
 
-    // 1. Start async operation
-    let operation = await this.client.models.generateVideos(params);
+    // Start async operation
+    const operation = await this.client.models.generateVideos(params);
 
-    // 2. Poll for completion (10s interval)
-    while (!operation.done) {
-      await new Promise(resolve => setTimeout(resolve, 10000));
-      operation = await this.client.operations.getVideosOperation({ operation });
+    // Extract UUID from operation name
+    // Format: "projects/{project}/locations/{location}/operations/{uuid}"
+    const name = operation.name || '';
+    const operationId = name.split('/').pop() || name;
+
+    return { operationId };
+  }
+
+  /**
+   * Check the status of a video generation operation and download results if complete
+   */
+  async checkVideoOperation(
+    operationId: string
+  ): Promise<{ done: boolean; videos?: GeneratedVideo[]; error?: string }> {
+    // Reconstruct full operation name from UUID
+    const name = `projects/${this.config.projectId}/locations/${this.config.location}/operations/${operationId}`;
+
+    const operation = await this.client.operations.getVideosOperation({
+      operation: { name } as any,
+    });
+
+    if (!operation.done) {
+      return { done: false };
     }
 
-    // 3. Error check
     if (operation.error) {
-      throw new Error(`Video generation failed: ${JSON.stringify(operation.error)}`);
+      return { done: true, error: JSON.stringify(operation.error) };
     }
 
-    // 4. Extract video data from response
+    // Extract video data from completed operation
     const videos: GeneratedVideo[] = [];
     for (const genVideo of (operation.response?.generatedVideos || [])) {
       const video = genVideo.video;
@@ -431,7 +449,7 @@ export class GeminiAIService {
       }
     }
 
-    return { videos };
+    return { done: true, videos };
   }
 
   /**
