@@ -71,6 +71,7 @@ export interface QueryOptions {
 export class GeminiAIService {
   private client: GoogleGenAI;
   private config: GeminiAIConfig;
+  private pendingVideoOps = new Map<string, any>();
 
   constructor(config: GeminiAIConfig) {
     this.config = config;
@@ -401,8 +402,13 @@ export class GeminiAIService {
     // Start async operation
     const operation = await this.client.models.generateVideos(params);
 
-    // Return full operation name to avoid location mismatch on check
-    const operationId = operation.name || '';
+    // Extract UUID from operation name for a cleaner external ID
+    // Format: "projects/{project}/locations/{location}/publishers/.../operations/{uuid}"
+    const fullName = operation.name || '';
+    const operationId = fullName.split('/').pop() || fullName;
+
+    // Cache the full operation object for polling (SDK requires the actual instance)
+    this.pendingVideoOps.set(operationId, operation);
 
     return { operationId };
   }
@@ -413,14 +419,24 @@ export class GeminiAIService {
   async checkVideoOperation(
     operationId: string
   ): Promise<{ done: boolean; videos?: GeneratedVideo[]; error?: string }> {
-    // Use the full operation name directly (passed through from generateVideos)
+    // Retrieve cached operation object (SDK requires actual operation instance for polling)
+    const cachedOp = this.pendingVideoOps.get(operationId);
+    if (!cachedOp) {
+      return { done: true, error: `Unknown operation: ${operationId}. Operation may have been created in a previous server session.` };
+    }
+
     const operation = await this.client.operations.getVideosOperation({
-      operation: { name: operationId } as any,
+      operation: cachedOp,
     });
 
     if (!operation.done) {
+      // Update cached operation with latest state for next poll
+      this.pendingVideoOps.set(operationId, operation);
       return { done: false };
     }
+
+    // Operation finished, clean up cache
+    this.pendingVideoOps.delete(operationId);
 
     if (operation.error) {
       return { done: true, error: JSON.stringify(operation.error) };
