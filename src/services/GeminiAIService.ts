@@ -401,10 +401,8 @@ export class GeminiAIService {
     // Start async operation
     const operation = await this.client.models.generateVideos(params);
 
-    // Extract UUID from operation name
-    // Format: "projects/{project}/locations/{location}/operations/{uuid}"
-    const name = operation.name || '';
-    const operationId = name.split('/').pop() || name;
+    // Return full operation name to avoid location mismatch on check
+    const operationId = operation.name || '';
 
     return { operationId };
   }
@@ -415,11 +413,9 @@ export class GeminiAIService {
   async checkVideoOperation(
     operationId: string
   ): Promise<{ done: boolean; videos?: GeneratedVideo[]; error?: string }> {
-    // Reconstruct full operation name from UUID
-    const name = `projects/${this.config.projectId}/locations/${this.config.location}/operations/${operationId}`;
-
+    // Use the full operation name directly (passed through from generateVideos)
     const operation = await this.client.operations.getVideosOperation({
-      operation: { name } as any,
+      operation: { name: operationId } as any,
     });
 
     if (!operation.done) {
