@@ -5,6 +5,7 @@ import {
   QuerySchema,
   SpeechGenerationSchema,
   VideoGenerationSchema,
+  buildVideoGenerationSchema,
 } from './index.js';
 
 describe('QuerySchema model controls', () => {
@@ -54,24 +55,41 @@ describe('ImageGenerationSchema model compatibility', () => {
     })).toThrow(/imageSize is not supported/);
   });
 
-  it('limits image references to 14 and restricts thinkingLevel to gemini-3.1-flash-image-preview', () => {
+  it('limits image references and restricts thinkingLevel to official image-model values', () => {
     expect(() => ImageGenerationSchema.parse({
       prompt: 'compose these references',
       imagePaths: Array.from({ length: 15 }, (_, index) => `/tmp/ref-${index}.png`),
+    })).toThrow();
+
+    expect(() => ImageGenerationSchema.parse({
+      prompt: 'fast image edit',
+      model: 'gemini-2.5-flash-image',
+      imagePaths: [
+        '/tmp/ref-1.png',
+        '/tmp/ref-2.png',
+        '/tmp/ref-3.png',
+        '/tmp/ref-4.png',
+      ],
+    })).toThrow(/at most 3 reference images/);
+
+    expect(() => ImageGenerationSchema.parse({
+      prompt: 'flash image',
+      model: 'gemini-3.1-flash-image-preview',
+      thinkingLevel: 'medium',
     })).toThrow();
 
     // gemini-2.5-flash-image rejects thinkingLevel
     expect(() => ImageGenerationSchema.parse({
       prompt: 'fast image',
       model: 'gemini-2.5-flash-image',
-      thinkingLevel: 'low',
+      thinkingLevel: 'high',
     })).toThrow(/gemini-3\.1-flash-image-preview/);
 
     // gemini-3-pro-image-preview (default) also rejects thinkingLevel — Vertex API does not support it
     expect(() => ImageGenerationSchema.parse({
       prompt: 'pro image',
       model: 'gemini-3-pro-image-preview',
-      thinkingLevel: 'medium',
+      thinkingLevel: 'high',
     })).toThrow(/gemini-3\.1-flash-image-preview/);
 
     // Default (no model) also rejects thinkingLevel — default resolves to gemini-3-pro-image-preview server-side
@@ -166,6 +184,68 @@ describe('VideoGenerationSchema current Veo models', () => {
       videoPath: '/tmp/veo-output.mp4',
       numberOfVideos: 2,
     })).toThrow(/single video/);
+  });
+});
+
+describe('VideoGenerationSchema Gemini Developer API compatibility', () => {
+  const GeminiApiVideoSchema = buildVideoGenerationSchema(false);
+
+  it('accepts Gemini API preview Veo 3.1 models and rejects Vertex model IDs', () => {
+    expect(GeminiApiVideoSchema.parse({
+      prompt: 'ocean waves',
+      model: 'veo-3.1-generate-preview',
+    }).model).toBe('veo-3.1-generate-preview');
+
+    expect(GeminiApiVideoSchema.parse({
+      prompt: 'quick draft',
+      model: 'veo-3.1-lite-generate-preview',
+    }).model).toBe('veo-3.1-lite-generate-preview');
+
+    expect(() => GeminiApiVideoSchema.parse({
+      prompt: 'vertex model',
+      model: 'veo-3.1-generate-001',
+    })).toThrow();
+  });
+
+  it('rejects Gemini API generateVideos options that the SDK does not support', () => {
+    expect(() => GeminiApiVideoSchema.parse({
+      prompt: 'video with explicit audio',
+      generateAudio: true,
+    })).toThrow(/generateAudio/);
+
+    expect(() => GeminiApiVideoSchema.parse({
+      prompt: 'seeded video',
+      seed: 123,
+    })).toThrow(/seed/);
+
+    expect(() => GeminiApiVideoSchema.parse({
+      prompt: 'multiple videos',
+      numberOfVideos: 2,
+    })).toThrow();
+  });
+
+  it('uses Gemini API personGeneration values by input mode', () => {
+    expect(GeminiApiVideoSchema.parse({
+      prompt: 'person walking',
+      personGeneration: 'allow_all',
+    }).personGeneration).toBe('allow_all');
+
+    expect(() => GeminiApiVideoSchema.parse({
+      prompt: 'person walking',
+      personGeneration: 'allow_adult',
+    })).toThrow(/allow_all/);
+
+    expect(GeminiApiVideoSchema.parse({
+      prompt: 'animate this portrait',
+      imagePath: '/tmp/frame.png',
+      personGeneration: 'allow_adult',
+    }).personGeneration).toBe('allow_adult');
+
+    expect(() => GeminiApiVideoSchema.parse({
+      prompt: 'animate this portrait',
+      imagePath: '/tmp/frame.png',
+      personGeneration: 'allow_all',
+    })).toThrow(/allow_adult/);
   });
 });
 

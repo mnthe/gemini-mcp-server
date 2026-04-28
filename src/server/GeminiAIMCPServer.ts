@@ -18,8 +18,10 @@ import {
   ImageGenerationSchema,
   SpeechGenerationSchema,
   MusicGenerationSchema,
-  VideoGenerationSchema,
   CheckVideoSchema,
+  buildVideoGenerationSchema,
+  getAllowedVideoModels,
+  getDefaultVideoModel,
 } from '../schemas/index.js';
 import { ConversationManager } from '../managers/ConversationManager.js';
 import { GeminiAIService } from '../services/GeminiAIService.js';
@@ -128,6 +130,10 @@ export class GeminiAIMCPServer {
   private setupHandlers(): void {
     // List available tools
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+      const videoModelEnum = getAllowedVideoModels(this.config.useVertexAI);
+      const defaultVideoModel = getDefaultVideoModel(this.config.useVertexAI);
+      const maxVideoCount = this.config.useVertexAI ? 4 : 1;
+
       const tools = [
         {
           name: "query",
@@ -284,7 +290,7 @@ export class GeminiAIMCPServer {
               },
               thinkingLevel: {
                 type: "string",
-                enum: ["minimal", "low", "medium", "high", "MINIMAL", "LOW", "MEDIUM", "HIGH"],
+                enum: ["minimal", "high", "MINIMAL", "HIGH"],
                 description: "Optional Gemini 3 image thinking level",
               },
               mediaResolution: {
@@ -426,8 +432,8 @@ export class GeminiAIMCPServer {
               },
               model: {
                 type: "string",
-                enum: ["veo-3.1-fast-generate-001", "veo-3.1-generate-001", "veo-3.1-lite-generate-001"],
-                description: "Video model (default: veo-3.1-fast-generate-001)",
+                enum: videoModelEnum,
+                description: `Video model (default: ${defaultVideoModel})`,
               },
               aspectRatio: {
                 type: "string",
@@ -446,7 +452,9 @@ export class GeminiAIMCPServer {
               },
               generateAudio: {
                 type: "boolean",
-                description: "Generate audio for the video (default: true)",
+                description: this.config.useVertexAI
+                  ? "Generate audio for the video (default: true)"
+                  : "Not configurable in Gemini Developer API mode; Veo 3.1 audio is always on",
               },
               enhancePrompt: {
                 type: "boolean",
@@ -454,7 +462,7 @@ export class GeminiAIMCPServer {
               },
               personGeneration: {
                 type: "string",
-                enum: ["allow_adult", "dont_allow"],
+                enum: ["allow_all", "allow_adult", "dont_allow"],
                 description: "Optional person generation control",
               },
               negativePrompt: {
@@ -467,7 +475,9 @@ export class GeminiAIMCPServer {
               },
               numberOfVideos: {
                 type: "number",
-                description: "Number of videos to generate (default: 1)",
+                minimum: 1,
+                maximum: maxVideoCount,
+                description: `Number of videos to generate (default: 1, max: ${maxVideoCount})`,
               },
               imagePath: {
                 type: "string",
@@ -551,7 +561,7 @@ export class GeminiAIMCPServer {
         }
 
         case "generate_video": {
-          const input = VideoGenerationSchema.parse(args);
+          const input = buildVideoGenerationSchema(this.config.useVertexAI).parse(args);
           return await this.videoGenerationHandler.handle(input);
         }
 

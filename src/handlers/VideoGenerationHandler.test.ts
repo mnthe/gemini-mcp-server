@@ -116,10 +116,11 @@ vi.mock('../utils/videoSaver.js', () => ({
 
 import { GeminiAIMCPServer } from '../server/GeminiAIMCPServer.js';
 
-function createTestConfig() {
+function createTestConfig(overrides: Record<string, unknown> = {}) {
   return {
     model: 'gemini-2.5-pro',
     apiKey: 'test-key',
+    useVertexAI: true,
     sessionTimeout: 3600000,
     maxHistory: 100,
     enableConversations: false,
@@ -129,6 +130,7 @@ function createTestConfig() {
     systemPrompt: '',
     mcpServers: [],
     disableLogging: true,
+    ...overrides,
   } as any;
 }
 
@@ -180,10 +182,11 @@ describe('GeminiAIMCPServer generate_video wiring', () => {
     expect(videoGenTool.inputSchema.properties.resolution).toBeDefined();
     expect(videoGenTool.inputSchema.properties.generateAudio).toBeDefined();
     expect(videoGenTool.inputSchema.properties.enhancePrompt).toBeDefined();
-    expect(videoGenTool.inputSchema.properties.personGeneration.enum).toEqual(['allow_adult', 'dont_allow']);
+    expect(videoGenTool.inputSchema.properties.personGeneration.enum).toEqual(['allow_all', 'allow_adult', 'dont_allow']);
     expect(videoGenTool.inputSchema.properties.negativePrompt).toBeDefined();
     expect(videoGenTool.inputSchema.properties.seed).toBeDefined();
     expect(videoGenTool.inputSchema.properties.numberOfVideos).toBeDefined();
+    expect(videoGenTool.inputSchema.properties.numberOfVideos.maximum).toBe(4);
     expect(videoGenTool.inputSchema.properties.imagePath).toBeDefined();
     expect(videoGenTool.inputSchema.properties.lastFramePath).toBeDefined();
     expect(videoGenTool.inputSchema.properties.referenceImagePaths).toBeDefined();
@@ -195,6 +198,22 @@ describe('GeminiAIMCPServer generate_video wiring', () => {
       'veo-3.1-lite-generate-001',
     ]);
     expect(videoGenTool.inputSchema.properties.model.enum).not.toContain('veo-3.1-generate-preview');
+  });
+
+  it('uses Gemini Developer API video schema when Vertex mode is disabled', async () => {
+    const aiStudioServer = new GeminiAIMCPServer(createTestConfig({ useVertexAI: false }));
+    const handlers = getHandlers((aiStudioServer as any).server);
+    const result = await handlers.listHandler();
+    const videoGenTool = result.tools.find((t: any) => t.name === 'generate_video');
+
+    expect(videoGenTool.inputSchema.properties.model.enum).toEqual([
+      'veo-3.1-fast-generate-preview',
+      'veo-3.1-generate-preview',
+      'veo-3.1-lite-generate-preview',
+    ]);
+    expect(videoGenTool.inputSchema.properties.model.enum).not.toContain('veo-3.1-generate-001');
+    expect(videoGenTool.inputSchema.properties.numberOfVideos.maximum).toBe(1);
+    expect(videoGenTool.inputSchema.properties.generateAudio.description).toMatch(/Not configurable/);
   });
 
   it('routes generate_video call to VideoGenerationHandler', async () => {
@@ -210,5 +229,35 @@ describe('GeminiAIMCPServer generate_video wiring', () => {
     await callHandler(request);
 
     expect(mockVideoGenHandle).toHaveBeenCalledWith({ prompt: 'a dancing cat' });
+  });
+
+  it('validates generate_video calls against Gemini Developer API mode', async () => {
+    const aiStudioServer = new GeminiAIMCPServer(createTestConfig({ useVertexAI: false }));
+    const handlers = getHandlers((aiStudioServer as any).server);
+
+    await handlers.callHandler({
+      params: {
+        name: 'generate_video',
+        arguments: {
+          prompt: 'a dancing cat',
+          model: 'veo-3.1-fast-generate-preview',
+        },
+      },
+    });
+
+    expect(mockVideoGenHandle).toHaveBeenCalledWith({
+      prompt: 'a dancing cat',
+      model: 'veo-3.1-fast-generate-preview',
+    });
+
+    await expect(handlers.callHandler({
+      params: {
+        name: 'generate_video',
+        arguments: {
+          prompt: 'a dancing cat',
+          model: 'veo-3.1-fast-generate-001',
+        },
+      },
+    })).rejects.toThrow();
   });
 });

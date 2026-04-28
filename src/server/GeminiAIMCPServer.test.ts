@@ -133,10 +133,11 @@ vi.mock('../utils/imageSaver.js', () => ({
 
 import { GeminiAIMCPServer } from './GeminiAIMCPServer.js';
 
-function createTestConfig() {
+function createTestConfig(overrides: Record<string, unknown> = {}) {
   return {
     model: 'gemini-2.5-pro',
     apiKey: 'test-key',
+    useVertexAI: true,
     sessionTimeout: 3600000,
     maxHistory: 100,
     enableConversations: false,
@@ -146,6 +147,7 @@ function createTestConfig() {
     systemPrompt: '',
     mcpServers: [],
     disableLogging: true,
+    ...overrides,
   } as any;
 }
 
@@ -212,6 +214,7 @@ describe('GeminiAIMCPServer generate_image wiring', () => {
     expect(imageGenTool.inputSchema.properties.imagePaths.maxItems).toBe(14);
     expect(imageGenTool.inputSchema.properties.systemInstruction).toBeDefined();
     expect(imageGenTool.inputSchema.properties.thinkingLevel.enum).toContain('high');
+    expect(imageGenTool.inputSchema.properties.thinkingLevel.enum).not.toContain('medium');
     expect(imageGenTool.inputSchema.properties.mediaResolution.enum).toContain('medium');
   });
 

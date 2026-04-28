@@ -14,6 +14,7 @@ import { validateSecureUrl } from '../utils/urlSecurity.js';
 import { validateMultimodalFile } from '../utils/fileSecurity.js';
 import { resolveOutputDirs } from '../utils/generatedFileSaver.js';
 import { SecurityError } from '../errors/index.js';
+import { getDefaultVideoModel } from '../schemas/index.js';
 
 export interface ImageGenerationOptions {
   model?: string;
@@ -662,7 +663,7 @@ export class GeminiAIService {
     prompt: string,
     options: VideoGenerationOptions = {}
   ): Promise<{ operationId: string }> {
-    const model = options.model || 'veo-3.1-fast-generate-001';
+    const model = options.model || getDefaultVideoModel(this.config.useVertexAI);
 
     // Build request parameters
     const params: any = {
@@ -672,14 +673,17 @@ export class GeminiAIService {
         aspectRatio: options.aspectRatio || '16:9',
         durationSeconds: options.videoPath ? undefined : parseInt(options.durationSeconds || '8'),
         resolution: options.videoPath ? (options.resolution || '720p') : options.resolution,
-        generateAudio: options.generateAudio ?? true,
         enhancePrompt: options.enhancePrompt,
         personGeneration: options.personGeneration,
         negativePrompt: options.negativePrompt,
-        seed: options.seed,
         numberOfVideos: options.videoPath ? 1 : (options.numberOfVideos || 1),
       },
     };
+
+    if (this.config.useVertexAI) {
+      params.config.generateAudio = options.generateAudio ?? true;
+      params.config.seed = options.seed;
+    }
 
     // Video extension: attach a Veo-generated input video.
     if (options.videoPath) {

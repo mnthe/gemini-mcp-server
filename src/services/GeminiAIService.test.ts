@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { GeminiAIService } from './GeminiAIService.js';
 
 /**
  * Tests for Gemini model param compatibility + default model change
@@ -191,6 +192,74 @@ describe('generated audio output config', () => {
       if (savedUseVertex !== undefined) process.env.GOOGLE_GENAI_USE_VERTEXAI = savedUseVertex;
       else delete process.env.GOOGLE_GENAI_USE_VERTEXAI;
     }
+  });
+});
+
+describe('generateVideo backend compatibility', () => {
+  function createServiceConfig(overrides: Record<string, unknown> = {}) {
+    return {
+      projectId: 'test-project',
+      location: 'us-central1',
+      apiKey: 'test-api-key',
+      useVertexAI: true,
+      model: 'gemini-3-flash-preview',
+      temperature: 0.7,
+      maxTokens: 8192,
+      topP: 0.95,
+      topK: 40,
+      enableConversations: false,
+      sessionTimeout: 3600000,
+      maxHistory: 100,
+      enableReasoning: false,
+      maxReasoningSteps: 5,
+      disableLogging: true,
+      logToStderr: false,
+      allowFileUris: false,
+      ...overrides,
+    } as any;
+  }
+
+  function stubGenerateVideos(service: GeminiAIService) {
+    const generateVideos = vi.fn().mockResolvedValue({
+      name: 'projects/test-project/locations/us-central1/operations/op-123',
+    });
+    (service as any).client = {
+      models: { generateVideos },
+    };
+    return generateVideos;
+  }
+
+  it('uses Vertex Veo 3.1 GA defaults and sends Vertex-only config fields', async () => {
+    const service = new GeminiAIService(createServiceConfig());
+    const generateVideos = stubGenerateVideos(service);
+
+    const result = await service.generateVideo('a cinematic ocean shot', {
+      seed: 123,
+    });
+
+    const params = generateVideos.mock.calls[0][0];
+    expect(result.operationId).toBe('op-123');
+    expect(params.model).toBe('veo-3.1-fast-generate-001');
+    expect(params.config.generateAudio).toBe(true);
+    expect(params.config.seed).toBe(123);
+  });
+
+  it('uses Gemini API preview defaults and omits unsupported config fields', async () => {
+    const service = new GeminiAIService(createServiceConfig({
+      useVertexAI: false,
+      projectId: undefined,
+    }));
+    const generateVideos = stubGenerateVideos(service);
+
+    await service.generateVideo('a cinematic ocean shot', {
+      generateAudio: false,
+      seed: 123,
+    });
+
+    const params = generateVideos.mock.calls[0][0];
+    expect(params.model).toBe('veo-3.1-fast-generate-preview');
+    expect(params.config).not.toHaveProperty('generateAudio');
+    expect(params.config).not.toHaveProperty('seed');
   });
 });
 

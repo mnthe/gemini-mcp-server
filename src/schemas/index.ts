@@ -66,7 +66,7 @@ export const ImageGenerationSchema = z.object({
     .describe("Local file paths of reference images to include as input (max 14; e.g., for image editing or style transfer)"),
   systemInstruction: z.string().optional()
     .describe("Optional system instruction for Gemini 3 image models"),
-  thinkingLevel: z.enum(['minimal', 'low', 'medium', 'high', 'MINIMAL', 'LOW', 'MEDIUM', 'HIGH']).optional()
+  thinkingLevel: z.enum(['minimal', 'high', 'MINIMAL', 'HIGH']).optional()
     .describe("Optional thinking level; only supported by gemini-3.1-flash-image-preview"),
   mediaResolution: z.enum(['low', 'medium', 'high', 'LOW', 'MEDIUM', 'HIGH']).optional()
     .describe("Optional media resolution for reference image inputs"),
@@ -94,13 +94,32 @@ export const ImageGenerationSchema = z.object({
     return !data.thinkingLevel || data.model === 'gemini-3.1-flash-image-preview';
   },
   { message: "thinkingLevel is only supported by model='gemini-3.1-flash-image-preview'" }
+).refine(
+  (data) => {
+    return data.model !== 'gemini-2.5-flash-image' || !data.imagePaths || data.imagePaths.length <= 3;
+  },
+  { message: "gemini-2.5-flash-image supports at most 3 reference images" }
 );
 
-const ALLOWED_VIDEO_MODELS = [
+const ALLOWED_VERTEX_VIDEO_MODELS = [
   'veo-3.1-fast-generate-001',
   'veo-3.1-generate-001',
   'veo-3.1-lite-generate-001',
 ] as const;
+
+const ALLOWED_GEMINI_API_VIDEO_MODELS = [
+  'veo-3.1-fast-generate-preview',
+  'veo-3.1-generate-preview',
+  'veo-3.1-lite-generate-preview',
+] as const;
+
+export function getAllowedVideoModels(useVertexAI: boolean): readonly string[] {
+  return useVertexAI ? ALLOWED_VERTEX_VIDEO_MODELS : ALLOWED_GEMINI_API_VIDEO_MODELS;
+}
+
+export function getDefaultVideoModel(useVertexAI: boolean): string {
+  return useVertexAI ? ALLOWED_VERTEX_VIDEO_MODELS[0] : ALLOWED_GEMINI_API_VIDEO_MODELS[0];
+}
 
 const ALLOWED_SPEECH_MODELS = [
   'gemini-3.1-flash-tts-preview',
@@ -164,102 +183,141 @@ export const MusicGenerationSchema = z.object({
   { message: "instrumental cannot be combined with lyrics or vocalStyle" }
 );
 
-export const VideoGenerationSchema = z.object({
-  prompt: z.string().describe("Video generation prompt"),
-  model: z.enum(ALLOWED_VIDEO_MODELS).optional()
-    .describe("Video model (default: veo-3.1-fast-generate-001)"),
-  aspectRatio: z.enum(['16:9', '9:16']).optional()
-    .describe("Aspect ratio (default: 16:9)"),
-  durationSeconds: z.enum(['4', '6', '8']).optional()
-    .describe("Duration in seconds (1080p/4k requires '8')"),
-  resolution: z.enum(['720p', '1080p', '4k']).optional()
-    .describe("Video resolution (1080p/4k requires durationSeconds='8')"),
-  generateAudio: z.boolean().optional()
-    .describe("Whether to generate audio"),
-  enhancePrompt: z.boolean().optional()
-    .describe("Whether to use Veo prompt rewriting/enhancement"),
-  personGeneration: z.enum(['allow_adult', 'dont_allow']).optional()
-    .describe("Optional person generation control"),
-  negativePrompt: z.string().optional()
-    .describe("Negative prompt for generation"),
-  seed: z.number().int().min(0).max(4294967295).optional()
-    .describe("Random seed for reproducibility (0-4294967295)"),
-  numberOfVideos: z.number().int().min(1).max(4).optional()
-    .describe("Number of videos to generate (1-4)"),
-  imagePath: z.string().optional()
-    .describe("Local file path of reference image (first frame)"),
-  lastFramePath: z.string().optional()
-    .describe("Local file path of reference image (last frame, requires imagePath)"),
-  referenceImagePaths: z.array(z.string()).optional()
-    .describe("Local file paths of reference images (max 3)"),
-  videoPath: z.string().optional()
-    .describe("Local file path of a Veo-generated 720p video to extend"),
-}).refine(
-  (data) => {
-    if (data.resolution === '1080p' || data.resolution === '4k') {
-      return data.durationSeconds === '8';
-    }
-    return true;
-  },
-  { message: "resolution '1080p' or '4k' requires durationSeconds='8'" }
-).refine(
-  (data) => {
-    if (data.lastFramePath) {
-      return !!data.imagePath;
-    }
-    return true;
-  },
-  { message: "lastFramePath requires imagePath" }
-).refine(
-  (data) => {
-    if (data.referenceImagePaths) {
-      return data.referenceImagePaths.length <= 3;
-    }
-    return true;
-  },
-  { message: "referenceImagePaths must have at most 3 items" }
-).refine(
-  (data) => {
-    if (!data.referenceImagePaths?.length) {
+export function buildVideoGenerationSchema(useVertexAI: boolean = true) {
+  const allowedVideoModels = useVertexAI ? ALLOWED_VERTEX_VIDEO_MODELS : ALLOWED_GEMINI_API_VIDEO_MODELS;
+  const maxVideoCount = useVertexAI ? 4 : 1;
+
+  return z.object({
+    prompt: z.string().describe("Video generation prompt"),
+    model: z.enum(allowedVideoModels).optional()
+      .describe(`Video model (default: ${getDefaultVideoModel(useVertexAI)})`),
+    aspectRatio: z.enum(['16:9', '9:16']).optional()
+      .describe("Aspect ratio (default: 16:9)"),
+    durationSeconds: z.enum(['4', '6', '8']).optional()
+      .describe("Duration in seconds (1080p/4k requires '8')"),
+    resolution: z.enum(['720p', '1080p', '4k']).optional()
+      .describe("Video resolution (1080p/4k requires durationSeconds='8')"),
+    generateAudio: z.boolean().optional()
+      .describe("Whether to generate audio"),
+    enhancePrompt: z.boolean().optional()
+      .describe("Whether to use Veo prompt rewriting/enhancement"),
+    personGeneration: z.enum(['allow_all', 'allow_adult', 'dont_allow']).optional()
+      .describe("Optional person generation control"),
+    negativePrompt: z.string().optional()
+      .describe("Negative prompt for generation"),
+    seed: z.number().int().min(0).max(4294967295).optional()
+      .describe("Random seed for reproducibility (0-4294967295)"),
+    numberOfVideos: z.number().int().min(1).max(maxVideoCount).optional()
+      .describe(`Number of videos to generate (1-${maxVideoCount})`),
+    imagePath: z.string().optional()
+      .describe("Local file path of reference image (first frame)"),
+    lastFramePath: z.string().optional()
+      .describe("Local file path of reference image (last frame, requires imagePath)"),
+    referenceImagePaths: z.array(z.string()).optional()
+      .describe("Local file paths of reference images (max 3)"),
+    videoPath: z.string().optional()
+      .describe("Local file path of a Veo-generated 720p video to extend"),
+  }).refine(
+    (data) => {
+      if (data.resolution === '1080p' || data.resolution === '4k') {
+        return data.durationSeconds === undefined || data.durationSeconds === '8';
+      }
       return true;
-    }
-    return data.model !== 'veo-3.1-lite-generate-001';
-  },
-  { message: "referenceImagePaths are not supported by model='veo-3.1-lite-generate-001'" }
-).refine(
-  (data) => {
-    if (!data.videoPath) {
+    },
+    { message: "resolution '1080p' or '4k' requires durationSeconds='8'" }
+  ).refine(
+    (data) => {
+      if (!data.referenceImagePaths?.length) {
+        return true;
+      }
+      return data.durationSeconds === undefined || data.durationSeconds === '8';
+    },
+    { message: "referenceImagePaths require durationSeconds='8'" }
+  ).refine(
+    (data) => {
+      if (data.lastFramePath) {
+        return !!data.imagePath;
+      }
       return true;
-    }
-    return !data.imagePath && !data.lastFramePath && !data.referenceImagePaths?.length;
-  },
-  { message: "videoPath cannot be used with imagePath, lastFramePath, or referenceImagePaths" }
-).refine(
-  (data) => {
-    if (!data.referenceImagePaths?.length) {
+    },
+    { message: "lastFramePath requires imagePath" }
+  ).refine(
+    (data) => {
+      if (data.referenceImagePaths) {
+        return data.referenceImagePaths.length <= 3;
+      }
       return true;
-    }
-    return !data.imagePath && !data.lastFramePath && !data.videoPath;
-  },
-  { message: "referenceImagePaths cannot be used with imagePath, lastFramePath, or videoPath" }
-).refine(
-  (data) => {
-    if (!data.videoPath || !data.resolution) {
-      return true;
-    }
-    return data.resolution === '720p';
-  },
-  { message: "videoPath extension only supports resolution='720p'" }
-).refine(
-  (data) => !data.videoPath || !data.durationSeconds,
-  { message: "durationSeconds cannot be used with videoPath; Veo extension adds 7 seconds" }
-).refine(
-  (data) => !data.videoPath || data.numberOfVideos === undefined || data.numberOfVideos === 1,
-  { message: "videoPath extension returns a single video; omit numberOfVideos or set it to 1" }
-).refine(
-  (data) => data.model !== 'veo-3.1-lite-generate-001' || data.resolution !== '4k',
-  { message: "resolution '4k' is not supported by model='veo-3.1-lite-generate-001'" }
-);
+    },
+    { message: "referenceImagePaths must have at most 3 items" }
+  ).refine(
+    (data) => {
+      if (!data.referenceImagePaths?.length) {
+        return true;
+      }
+      return data.model !== 'veo-3.1-lite-generate-001';
+    },
+    { message: "referenceImagePaths are not supported by model='veo-3.1-lite-generate-001'" }
+  ).refine(
+    (data) => {
+      if (!data.videoPath) {
+        return true;
+      }
+      return !data.imagePath && !data.lastFramePath && !data.referenceImagePaths?.length;
+    },
+    { message: "videoPath cannot be used with imagePath, lastFramePath, or referenceImagePaths" }
+  ).refine(
+    (data) => {
+      if (!data.referenceImagePaths?.length) {
+        return true;
+      }
+      return !data.imagePath && !data.lastFramePath && !data.videoPath;
+    },
+    { message: "referenceImagePaths cannot be used with imagePath, lastFramePath, or videoPath" }
+  ).refine(
+    (data) => {
+      if (!data.videoPath || !data.resolution) {
+        return true;
+      }
+      return data.resolution === '720p';
+    },
+    { message: "videoPath extension only supports resolution='720p'" }
+  ).refine(
+    (data) => !data.videoPath || !data.durationSeconds,
+    { message: "durationSeconds cannot be used with videoPath; Veo extension adds 7 seconds" }
+  ).refine(
+    (data) => !data.videoPath || data.numberOfVideos === undefined || data.numberOfVideos === 1,
+    { message: "videoPath extension returns a single video; omit numberOfVideos or set it to 1" }
+  ).refine(
+    (data) => data.model !== 'veo-3.1-lite-generate-001' || data.resolution !== '4k',
+    { message: "resolution '4k' is not supported by model='veo-3.1-lite-generate-001'" }
+  ).refine(
+    (data) => data.model !== 'veo-3.1-lite-generate-preview' || data.resolution !== '4k',
+    { message: "resolution '4k' is not supported by model='veo-3.1-lite-generate-preview'" }
+  ).refine(
+    (data) => useVertexAI || data.generateAudio === undefined,
+    { message: "generateAudio is always on and cannot be configured in Gemini Developer API mode" }
+  ).refine(
+    (data) => useVertexAI || data.seed === undefined,
+    { message: "seed is not supported by @google/genai generateVideos in Gemini Developer API mode" }
+  ).refine(
+    (data) => useVertexAI || data.numberOfVideos === undefined || data.numberOfVideos === 1,
+    { message: "Gemini Developer API Veo 3.1 returns a single video; omit numberOfVideos or set it to 1" }
+  ).refine(
+    (data) => {
+      if (useVertexAI || !data.personGeneration) {
+        return true;
+      }
+      const usesImageMode = !!data.imagePath || !!data.lastFramePath || !!data.referenceImagePaths?.length;
+      if (usesImageMode) {
+        return data.personGeneration === 'allow_adult';
+      }
+      return data.personGeneration === 'allow_all';
+    },
+    { message: "Gemini Developer API Veo 3.1 uses personGeneration='allow_all' for text/video extension and 'allow_adult' for image/reference modes" }
+  );
+}
+
+export const VideoGenerationSchema = buildVideoGenerationSchema(true);
 
 export type QueryInput = z.infer<typeof QuerySchema>;
 export type SearchInput = z.infer<typeof SearchSchema>;
