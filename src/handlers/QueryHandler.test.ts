@@ -57,7 +57,7 @@ describe('QueryHandler conversations', () => {
     ]);
   });
 
-  it('does not display a session label when conversation storage is disabled', async () => {
+  it('warns the caller when sessionId is supplied but conversation storage is disabled', async () => {
     const conversationManager = new ConversationManager(3600, 10);
     const agenticLoop = new RecordingAgenticLoop();
     const handler = new QueryHandler(conversationManager, agenticLoop as any, false, './logs', true);
@@ -65,6 +65,20 @@ describe('QueryHandler conversations', () => {
     const response = await handler.handle({ prompt: 'hello', sessionId: 'disabled-session' });
 
     expect(agenticLoop.runs[0].options.sessionId).toBeUndefined();
-    expect(response.content[0].text).not.toContain('[Session: disabled-session]');
+    expect(response.content[0].text).not.toContain('[Session: disabled-session]\n');
+    expect(response.content[0].text).toContain("[Session: disabled");
+    expect(response.content[0].text).toContain("disabled-session");
+    expect(response.content[0].text).toContain('GEMINI_ENABLE_CONVERSATIONS');
+  });
+
+  it('omits the session warning when sessionId is not supplied and conversation storage is disabled', async () => {
+    const conversationManager = new ConversationManager(3600, 10);
+    const agenticLoop = new RecordingAgenticLoop();
+    const handler = new QueryHandler(conversationManager, agenticLoop as any, false, './logs', true);
+
+    const response = await handler.handle({ prompt: 'hello' });
+
+    expect(response.content[0].text).not.toContain('[Session');
+    expect(response.content[0].text).not.toContain('GEMINI_ENABLE_CONVERSATIONS');
   });
 });

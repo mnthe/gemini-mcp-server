@@ -54,17 +54,38 @@ describe('ImageGenerationSchema model compatibility', () => {
     })).toThrow(/imageSize is not supported/);
   });
 
-  it('limits image references to 14 and rejects thinking controls on gemini-2.5-flash-image', () => {
+  it('limits image references to 14 and restricts thinkingLevel to gemini-3.1-flash-image-preview', () => {
     expect(() => ImageGenerationSchema.parse({
       prompt: 'compose these references',
       imagePaths: Array.from({ length: 15 }, (_, index) => `/tmp/ref-${index}.png`),
     })).toThrow();
 
+    // gemini-2.5-flash-image rejects thinkingLevel
     expect(() => ImageGenerationSchema.parse({
       prompt: 'fast image',
       model: 'gemini-2.5-flash-image',
       thinkingLevel: 'low',
-    })).toThrow(/thinkingLevel is only supported/);
+    })).toThrow(/gemini-3\.1-flash-image-preview/);
+
+    // gemini-3-pro-image-preview (default) also rejects thinkingLevel — Vertex API does not support it
+    expect(() => ImageGenerationSchema.parse({
+      prompt: 'pro image',
+      model: 'gemini-3-pro-image-preview',
+      thinkingLevel: 'medium',
+    })).toThrow(/gemini-3\.1-flash-image-preview/);
+
+    // Default (no model) also rejects thinkingLevel — default resolves to gemini-3-pro-image-preview server-side
+    expect(() => ImageGenerationSchema.parse({
+      prompt: 'default image',
+      thinkingLevel: 'high',
+    })).toThrow(/gemini-3\.1-flash-image-preview/);
+
+    // Only gemini-3.1-flash-image-preview accepts thinkingLevel
+    expect(ImageGenerationSchema.parse({
+      prompt: 'flash image',
+      model: 'gemini-3.1-flash-image-preview',
+      thinkingLevel: 'high',
+    }).thinkingLevel).toBe('high');
   });
 });
 

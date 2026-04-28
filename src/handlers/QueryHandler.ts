@@ -73,7 +73,7 @@ export class QueryHandler {
       }
 
       // Format response
-      const responseText = this.formatResponse(result, sessionId);
+      const responseText = this.formatResponse(result, sessionId, input.sessionId);
 
       return {
         content: [
@@ -99,12 +99,16 @@ export class QueryHandler {
   /**
    * Format agentic loop result for response
    */
-  private formatResponse(result: any, sessionId?: string): string {
+  private formatResponse(result: any, sessionId?: string, requestedSessionId?: string): string {
     const parts: string[] = [];
 
     // Session info
     if (sessionId) {
       parts.push(`[Session: ${sessionId}]`);
+    } else if (requestedSessionId) {
+      parts.push(
+        `[Session: disabled — sessionId='${requestedSessionId}' was ignored. Set GEMINI_ENABLE_CONVERSATIONS=true to persist multi-turn history.]`
+      );
     }
 
     // Stats

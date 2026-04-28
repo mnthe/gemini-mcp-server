@@ -67,7 +67,7 @@ export const ImageGenerationSchema = z.object({
   systemInstruction: z.string().optional()
     .describe("Optional system instruction for Gemini 3 image models"),
   thinkingLevel: z.enum(['minimal', 'low', 'medium', 'high', 'MINIMAL', 'LOW', 'MEDIUM', 'HIGH']).optional()
-    .describe("Optional Gemini 3 image thinking level"),
+    .describe("Optional thinking level; only supported by gemini-3.1-flash-image-preview"),
   mediaResolution: z.enum(['low', 'medium', 'high', 'LOW', 'MEDIUM', 'HIGH']).optional()
     .describe("Optional media resolution for reference image inputs"),
 }).refine(
@@ -91,9 +91,9 @@ export const ImageGenerationSchema = z.object({
   { message: "imageSize is not supported by model='gemini-2.5-flash-image'; omit imageSize for its 1K output" }
 ).refine(
   (data) => {
-    return !data.thinkingLevel || data.model !== 'gemini-2.5-flash-image';
+    return !data.thinkingLevel || data.model === 'gemini-3.1-flash-image-preview';
   },
-  { message: "thinkingLevel is only supported by Gemini 3 image models; omit it for model='gemini-2.5-flash-image'" }
+  { message: "thinkingLevel is only supported by model='gemini-3.1-flash-image-preview'" }
 );
 
 const ALLOWED_VIDEO_MODELS = [
