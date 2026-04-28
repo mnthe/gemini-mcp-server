@@ -134,7 +134,17 @@ export class GeminiAIMCPServer {
               },
               model: {
                 type: "string",
-                description: "Optional model override (e.g., gemini-3-flash-preview, gemini-3.1-pro-preview)",
+                description: "Optional model override (e.g., gemini-3-flash-preview, gemini-3.1-pro-preview, gemini-3.1-flash-lite-preview, gemini-3.1-pro-preview-customtools)",
+              },
+              thinkingLevel: {
+                type: "string",
+                enum: ["minimal", "low", "medium", "high", "MINIMAL", "LOW", "MEDIUM", "HIGH"],
+                description: "Optional Gemini 3 thinking level override",
+              },
+              mediaResolution: {
+                type: "string",
+                enum: ["low", "medium", "high", "LOW", "MEDIUM", "HIGH"],
+                description: "Optional global media resolution for multimodal inputs",
               },
               parts: {
                 type: "array",
@@ -221,7 +231,7 @@ export class GeminiAIMCPServer {
           name: "generate_image",
           description:
             "Generate images using Gemini's native image generation (Nano Banana). " +
-            "Supports gemini-3-pro-image-preview and gemini-3.1-flash-image-preview models. " +
+            "Supports gemini-3-pro-image-preview, gemini-3.1-flash-image-preview, and gemini-2.5-flash-image models. " +
             `Images are saved to ${this.imageGenerationHandler.getImageOutputDir()} and returned as base64.`,
           inputSchema: {
             type: "object",
@@ -232,18 +242,18 @@ export class GeminiAIMCPServer {
               },
               model: {
                 type: "string",
-                enum: ["gemini-3-pro-image-preview", "gemini-3.1-flash-image-preview"],
-                description: "Image model (default: gemini-3-pro-image-preview)",
+                enum: ["gemini-3-pro-image-preview", "gemini-3.1-flash-image-preview", "gemini-2.5-flash-image"],
+                description: "Image model (default: gemini-3-pro-image-preview; gemini-2.5-flash-image ignores imageSize)",
               },
               aspectRatio: {
                 type: "string",
-                enum: ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"],
-                description: "Aspect ratio (default: 1:1)",
+                enum: ["1:1", "1:4", "1:8", "2:3", "3:2", "3:4", "4:1", "4:3", "4:5", "5:4", "8:1", "9:16", "16:9", "21:9"],
+                description: "Aspect ratio (default: 1:1; 1:4, 1:8, 4:1, and 8:1 require gemini-3.1-flash-image-preview)",
               },
               imageSize: {
                 type: "string",
-                enum: ["1K", "2K", "4K"],
-                description: "Resolution (4K requires gemini-3-pro-image-preview or gemini-3.1-flash-image-preview, default: 1K)",
+                enum: ["0.5K", "1K", "2K", "4K"],
+                description: "Resolution (0.5K requires gemini-3.1-flash-image-preview, default: 1K)",
               },
               imagePaths: {
                 type: "array",
@@ -272,7 +282,7 @@ export class GeminiAIMCPServer {
               },
               model: {
                 type: "string",
-                enum: ["veo-3.1-fast-generate-001", "veo-3.1-generate-preview"],
+                enum: ["veo-3.1-fast-generate-001", "veo-3.1-generate-001", "veo-3.1-lite-generate-001"],
                 description: "Video model (default: veo-3.1-fast-generate-001)",
               },
               aspectRatio: {

@@ -73,8 +73,10 @@ export class AgenticLoop {
       const response = await this.geminiAI.query(
         fullPrompt,
         {
-          enableThinking: useThinking,
+          enableThinking: useThinking || !!options.thinkingLevel,
           model: options.model,
+          thinkingLevel: options.thinkingLevel,
+          mediaResolution: options.mediaResolution,
         },
         isFirstTurn ? multimodalParts : undefined
       );
@@ -121,7 +123,12 @@ export class AgenticLoop {
 
           // Build fallback prompt
           const fallbackPrompt = this.buildFallbackPrompt(state, processed.toolCalls, results);
-          const fallbackResponse = await this.geminiAI.query(fallbackPrompt);
+          const fallbackResponse = await this.geminiAI.query(fallbackPrompt, {
+            enableThinking: useThinking || !!options.thinkingLevel,
+            model: options.model,
+            thinkingLevel: options.thinkingLevel,
+            mediaResolution: options.mediaResolution,
+          });
 
           // Add fallback response as final output
           state.addMessage({

@@ -185,6 +185,12 @@ describe('GeminiAIMCPServer generate_video wiring', () => {
     expect(videoGenTool.inputSchema.properties.imagePath).toBeDefined();
     expect(videoGenTool.inputSchema.properties.lastFramePath).toBeDefined();
     expect(videoGenTool.inputSchema.properties.referenceImagePaths).toBeDefined();
+    expect(videoGenTool.inputSchema.properties.model.enum).toEqual([
+      'veo-3.1-fast-generate-001',
+      'veo-3.1-generate-001',
+      'veo-3.1-lite-generate-001',
+    ]);
+    expect(videoGenTool.inputSchema.properties.model.enum).not.toContain('veo-3.1-generate-preview');
   });
 
   it('routes generate_video call to VideoGenerationHandler', async () => {

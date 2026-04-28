@@ -60,6 +60,8 @@ export class QueryHandler {
           disableLogging: this.disableLogging,
           logToStderr: this.logToStderr,
           model: input.model,
+          thinkingLevel: input.thinkingLevel,
+          mediaResolution: input.mediaResolution,
         },
         input.parts // Pass multimodal parts
       );

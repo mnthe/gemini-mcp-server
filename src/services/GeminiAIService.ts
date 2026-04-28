@@ -3,7 +3,7 @@
  * Uses @google/genai unified SDK supporting both Vertex AI and Google AI Studio
  */
 
-import { GenerateContentConfig, GoogleGenAI, Part, ThinkingLevel } from "@google/genai";
+import { GenerateContentConfig, GoogleGenAI, MediaResolution, Part, ThinkingLevel } from "@google/genai";
 import { readFileSync } from "node:fs";
 import { extname } from "node:path";
 
@@ -55,10 +55,10 @@ export interface QueryOptions {
    * - HIGH: Maximizes reasoning depth (default for Gemini 3)
    * Note: For Gemini 2.5 models, use enableThinking with thinkingBudget
    */
-  thinkingLevel?: ThinkingLevel;
+  thinkingLevel?: ThinkingLevel | string;
   /**
-   * Media resolution for Gemini 3 models: 'low' | 'medium' | 'high'
-   * Controls the resolution of media inputs (images, video frames)
+   * Media resolution for multimodal inputs: 'low' | 'medium' | 'high'
+   * Controls the resolution of media inputs (images, video frames, PDFs)
    */
   mediaResolution?: string;
   /**
@@ -106,8 +106,20 @@ export class GeminiAIService {
         temperature: this.config.temperature,
         maxOutputTokens: this.config.maxTokens,
         topP: this.config.topP,
-        topK: this.config.topK,
       };
+
+      // Gemini 3 exposes topK as a fixed model default. Sending a custom value
+      // can be rejected by newer model endpoints, so only send it to older models.
+      if (!this.isGemini3Model(effectiveModel)) {
+        config.topK = this.config.topK;
+      }
+
+      const mediaResolution = this.resolveMediaResolution(
+        options.mediaResolution || this.config.mediaResolution
+      );
+      if (mediaResolution) {
+        config.mediaResolution = mediaResolution;
+      }
 
       // Enable thinking mode if requested
       if (options.enableThinking) {
@@ -115,7 +127,7 @@ export class GeminiAIService {
           // Gemini 3 models use thinkingLevel instead of thinkingBudget
           // Note: Cannot disable thinking for Gemini 3 Pro
           config.thinkingConfig = {
-            thinkingLevel: options.thinkingLevel ?? ThinkingLevel.HIGH,
+            thinkingLevel: this.resolveThinkingLevel(options.thinkingLevel) ?? ThinkingLevel.HIGH,
           };
         } else {
           // Gemini 2.5 and earlier use thinkingBudget
@@ -142,6 +154,55 @@ export class GeminiAIService {
       // Return error message instead of throwing
       const errorMsg = error instanceof Error ? error.message : String(error);
       throw new Error(`Gemini API error: ${errorMsg}`);
+    }
+  }
+
+  private resolveThinkingLevel(level?: ThinkingLevel | string): ThinkingLevel | undefined {
+    if (!level) {
+      return undefined;
+    }
+
+    const normalized = String(level).trim().toUpperCase();
+    switch (normalized) {
+      case 'MINIMAL':
+        return ThinkingLevel.MINIMAL;
+      case 'LOW':
+        return ThinkingLevel.LOW;
+      case 'MEDIUM':
+        return ThinkingLevel.MEDIUM;
+      case 'HIGH':
+        return ThinkingLevel.HIGH;
+      default:
+        throw new Error(
+          `Invalid thinkingLevel: ${level}. Expected one of minimal, low, medium, high.`
+        );
+    }
+  }
+
+  private resolveMediaResolution(resolution?: string): MediaResolution | undefined {
+    if (!resolution) {
+      return undefined;
+    }
+
+    const normalized = resolution
+      .trim()
+      .toUpperCase()
+      .replace(/[-\s]/g, '_')
+      .replace(/^MEDIA_RESOLUTION_/, '');
+
+    switch (normalized) {
+      case 'UNSPECIFIED':
+        return MediaResolution.MEDIA_RESOLUTION_UNSPECIFIED;
+      case 'LOW':
+        return MediaResolution.MEDIA_RESOLUTION_LOW;
+      case 'MEDIUM':
+        return MediaResolution.MEDIA_RESOLUTION_MEDIUM;
+      case 'HIGH':
+        return MediaResolution.MEDIA_RESOLUTION_HIGH;
+      default:
+        throw new Error(
+          `Invalid mediaResolution: ${resolution}. Expected one of low, medium, high, unspecified.`
+        );
     }
   }
 

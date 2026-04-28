@@ -36,6 +36,8 @@ export interface RunOptions {
   disableLogging?: boolean;
   logToStderr?: boolean;
   model?: string;
+  thinkingLevel?: string;
+  mediaResolution?: string;
 }
 
 export class RunState {

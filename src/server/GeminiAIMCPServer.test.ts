@@ -181,6 +181,14 @@ describe('GeminiAIMCPServer generate_image wiring', () => {
     expect(imageGenTool.inputSchema.properties.model).toBeDefined();
     expect(imageGenTool.inputSchema.properties.aspectRatio).toBeDefined();
     expect(imageGenTool.inputSchema.properties.imageSize).toBeDefined();
+    expect(imageGenTool.inputSchema.properties.model.enum).toEqual([
+      'gemini-3-pro-image-preview',
+      'gemini-3.1-flash-image-preview',
+      'gemini-2.5-flash-image',
+    ]);
+    expect(imageGenTool.inputSchema.properties.aspectRatio.enum).toContain('1:4');
+    expect(imageGenTool.inputSchema.properties.aspectRatio.enum).toContain('8:1');
+    expect(imageGenTool.inputSchema.properties.imageSize.enum).toContain('0.5K');
   });
 
   it('routes generate_image call to ImageGenerationHandler', async () => {
