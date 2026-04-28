@@ -3,7 +3,7 @@
 The server provides two file-based audio generation tools:
 
 - `generate_speech`: Gemini TTS text-to-speech output, saved as WAV
-- `generate_music`: Lyria music generation output, saved as MP3 or WAV
+- `generate_music`: Lyria music generation output, saved as MP3; Gemini API/AI Studio mode can request WAV for `lyria-3-pro-preview`
 
 Both tools save generated files to disk and return MCP `audio` content blocks with base64-encoded audio data.
 
@@ -26,6 +26,8 @@ export GEMINI_MUSIC_OUTPUT_DIR="/path/to/music"
 ## generate_speech
 
 Use `generate_speech` for exact text recitation, narration, short dialogue, podcast-style snippets, and audiobook-style audio.
+
+Gemini TTS accepts text-only input, returns audio-only output, has a 32k-token context limit, and does not support streaming in this file-output tool.
 
 ### Models
 
@@ -93,7 +95,7 @@ Use `generate_music` for Lyria music generation.
 | Model | Output | Notes |
 |-------|--------|-------|
 | `lyria-3-clip-preview` | MP3 | Default. Short 30-second clips, loops, and previews |
-| `lyria-3-pro-preview` | MP3 or WAV | Full-length songs with more structure; WAV can be requested with `outputMimeType` |
+| `lyria-3-pro-preview` | MP3; WAV in Gemini API/AI Studio mode | Full-length songs with more structure; Vertex AI mode supports MP3 only |
 
 ### Clip
 
@@ -106,7 +108,7 @@ Use `generate_music` for Lyria music generation.
 }
 ```
 
-### Pro WAV
+### Pro Full Song
 
 ```json
 {
@@ -114,10 +116,13 @@ Use `generate_music` for Lyria music generation.
   "arguments": {
     "prompt": "An atmospheric ambient track with warm pads, slow piano, and subtle field recordings.",
     "model": "lyria-3-pro-preview",
-    "outputMimeType": "audio/wav"
+    "outputMimeType": "audio/mp3",
+    "durationSeconds": 120
   }
 }
 ```
+
+In Gemini API/AI Studio mode, `lyria-3-pro-preview` can also request `"outputMimeType": "audio/wav"`. In Vertex AI mode, Lyria 3 model card support is `audio/mp3` only.
 
 ### Response
 
@@ -143,8 +148,12 @@ Lyria responses can include both audio and text parts. The server iterates over 
 
 - These tools are file-output generation tools. They do not use the Gemini Live API or Lyria RealTime.
 - `generate_speech` is text-only input and audio-only output at the model layer.
-- `generate_music` supports optional `imagePaths` for image-guided Lyria 3 requests, up to 10 images.
-- Lyria 3 preview controls exposed by this tool are prompt-level controls: `lyrics`, `instrumental`, `vocalStyle`, `durationSeconds`, `bpm`, and `intensity`.
+- Gemini TTS returns PCM audio; the server saves and returns it as WAV.
+- `generate_music` supports optional `imagePaths` for image-guided Lyria 3 requests, up to 10 images. Supported file types are PNG (`.png`), JPEG (`.jpg`, `.jpeg`), WEBP (`.webp`), HEIC (`.heic`), and HEIF (`.heif`).
+- Lyria 3 Clip is fixed at 30 seconds. Lyria 3 Pro supports target durations up to 184 seconds; Lyria supports one clip per prompt, 44.1 kHz output, and MP3 at 192 kbps in Vertex AI mode.
+- Supported Lyria 3 language directions are English, German, Spanish, French, Hindi, Japanese, Korean, and Portuguese.
+- Lyria 3 preview controls exposed by this tool are prompt-level controls: `lyrics`, `instrumental`, `vocalStyle`, `language`, `durationSeconds`, `bpm`, and `intensity`.
 - Lyria 3 model-side features such as audio watermarking, input filtering, recitation filtering, vocal-likeness filtering, and prompt rewriting run automatically and are not exposed as toggleable parameters.
-- `generate_music` does not accept audio or video sources; use `query` for audio/video understanding workflows.
+- Lyria 3 negative prompting is not supported.
+- Lyria 3 accepts text prompts and optional image references only. `generate_music` does not accept audio or video source files; use `query` for audio/video understanding workflows, then pass the extracted style or structure as text to `generate_music`.
 - For very large audio outputs, prefer using the saved file path from the text content block.

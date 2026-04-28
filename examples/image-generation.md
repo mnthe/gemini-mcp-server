@@ -58,6 +58,20 @@ const request = {
 };
 ```
 
+## Reference Images
+
+Use `imagePaths` for local reference images, image editing, or style transfer. Supported file types are PNG (`.png`), JPEG (`.jpg`, `.jpeg`), WEBP (`.webp`), HEIC (`.heic`), and HEIF (`.heif`). Audio and video files are not accepted by `generate_image`.
+
+```typescript
+const request = {
+  name: "generate_image",
+  arguments: {
+    prompt: "Create a polished product ad using this package design as the reference.",
+    imagePaths: ["/path/to/package.png"]
+  }
+};
+```
+
 ## Aspect Ratio
 
 Control the image dimensions with the `aspectRatio` parameter. Defaults to `1:1`.

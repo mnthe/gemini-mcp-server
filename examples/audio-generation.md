@@ -51,7 +51,7 @@ const info = JSON.parse(response.content.find(c => c.type === "text").text);
 console.log("Saved music:", info.music[0].filePath);
 ```
 
-## Music: Lyria Pro WAV
+## Music: Lyria Pro Full Song
 
 ```typescript
 const request = {
@@ -59,13 +59,15 @@ const request = {
   arguments: {
     prompt: "A two-minute cinematic orchestral cue with a quiet piano opening, rising strings, and a warm brass finale.",
     model: "lyria-3-pro-preview",
-    outputMimeType: "audio/wav",
+    outputMimeType: "audio/mp3",
     durationSeconds: 120,
     bpm: 96,
     intensity: "high"
   }
 };
 ```
+
+In Gemini API/AI Studio mode, Pro can also request `outputMimeType: "audio/wav"`. Vertex AI mode follows the Lyria 3 model card and accepts `audio/mp3` only.
 
 ## Music: Vocals and Lyrics
 
@@ -76,6 +78,7 @@ const request = {
     prompt: "Create a polished Korean pop chorus with bright synths and a confident vocal hook.",
     model: "lyria-3-pro-preview",
     vocalStyle: "warm Korean pop vocal, clear diction, energetic delivery",
+    language: "Korean",
     lyrics: `[Chorus]
 달빛 아래 we keep moving,
 손을 들어 feel the rhythm`
@@ -99,7 +102,7 @@ const request = {
 };
 ```
 
-`imagePaths` accepts up to 10 local images. Audio and video files are not accepted as `generate_music` sources.
+`imagePaths` accepts up to 10 local images. Supported file types are PNG (`.png`), JPEG (`.jpg`, `.jpeg`), WEBP (`.webp`), HEIC (`.heic`), and HEIF (`.heif`). Audio and video files are not accepted as `generate_music` sources; analyze audio with `query` first, then pass the musical description as text. Lyria 3 supports one clip per prompt, Clip is fixed at 30 seconds, and Pro duration is capped at 184 seconds.
 
 ## Using with MCP Inspector
 

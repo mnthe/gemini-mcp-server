@@ -27,7 +27,7 @@ Customize the AI assistant's behavior and persona:
 
 ### 🎨 Multimodal Input Support
 Send images, audio, video, and code files to Gemini:
-- **Images**: JPEG, PNG, WebP, HEIC
+- **Images**: JPEG, PNG, WebP, HEIC, HEIF
 - **Videos**: MP4, MOV, AVI, WebM, and more
 - **Audio**: MP3, WAV, AAC, FLAC, and more
 - **Documents/Code**: PDF, text files, code files (Python, JavaScript, etc.)
@@ -65,8 +65,9 @@ Generate images directly from text prompts using Gemini image models:
 ### 🎧 Audio Generation
 Generate file-based audio outputs:
 - **generate_speech**: Gemini TTS single-speaker or two-speaker speech, saved as WAV
-- **generate_music**: Lyria 3 music generation, saved as MP3 or WAV depending on model/config
+- **generate_music**: Lyria 3 music generation, saved as MP3; Gemini API/AI Studio mode can request WAV for `lyria-3-pro-preview`
 - Speech defaults to `~/Music/gemini-generated/speech`; music defaults to `~/Music/gemini-generated/music`
+- Generation failures return structured MCP error content with `status`, `tool`, `errorType`, `message`, and validation `issues` when available
 - See [GENERATION.md](GENERATION.md), [AUDIO_GENERATION.md](AUDIO_GENERATION.md), [examples/audio-generation.md](examples/audio-generation.md), and [examples/video-generation.md](examples/video-generation.md)
 
 ### 🔐 Security First
@@ -373,9 +374,9 @@ Generate images from text prompts using Gemini image models.
   - `gemini-2.5-flash-image` — fast 1K image generation and editing
 - `aspectRatio` (string, optional): Image aspect ratio. Default: `1:1`. Options: `1:1`, `1:4`, `1:8`, `2:3`, `3:2`, `3:4`, `4:1`, `4:3`, `4:5`, `5:4`, `8:1`, `9:16`, `16:9`, `21:9` (`1:4`, `1:8`, `4:1`, `8:1` require `gemini-3.1-flash-image-preview`)
 - `imageSize` (string, optional): Output resolution. Default: `1K`. Options: `0.5K`, `1K`, `2K`, `4K` (`0.5K` requires `gemini-3.1-flash-image-preview`; omit for `gemini-2.5-flash-image`)
-- `imagePaths` (array, optional): Local reference images for editing or style transfer (max 14)
+- `imagePaths` (array, optional): Local reference images for editing or style transfer (max 14; `gemini-2.5-flash-image` supports at most 3). Supported file types: PNG (`.png`), JPEG (`.jpg`, `.jpeg`), WEBP (`.webp`), HEIC (`.heic`), HEIF (`.heif`)
 - `systemInstruction` (string, optional): System instruction for Gemini 3 image models
-- `thinkingLevel` (string, optional): Gemini 3 image thinking level: `minimal`, `low`, `medium`, `high`
+- `thinkingLevel` (string, optional): Gemini 3.1 Flash Image thinking level: `minimal` or `high`
 - `mediaResolution` (string, optional): Media resolution for reference image inputs: `low`, `medium`, `high`
 
 **Behavior:**
@@ -408,6 +409,7 @@ Generate speech from text using Gemini TTS models.
 **Behavior:**
 - Generated speech is saved to `GEMINI_SPEECH_OUTPUT_DIR` (defaults to `~/Music/gemini-generated/speech`)
 - Returns MCP `audio` content and saved file paths
+- Gemini TTS is text-only input; audio, image, and video reference files are not supported by `generate_speech`
 
 ### generate_music
 
@@ -416,18 +418,22 @@ Generate music using Lyria 3 models.
 **Parameters:**
 - `prompt` (string, required): Music generation prompt
 - `model` (string, optional): Music model. Options: `lyria-3-clip-preview` (default), `lyria-3-pro-preview`
-- `outputMimeType` (string, optional): `audio/mp3` or `audio/wav` (`audio/wav` requires `lyria-3-pro-preview`)
-- `imagePaths` (array, optional): Local image paths for multimodal music generation inputs (max 10)
+- `outputMimeType` (string, optional): Vertex AI mode supports `audio/mp3` only. Gemini API/AI Studio mode supports `audio/mp3`, or `audio/wav` with `lyria-3-pro-preview`
+- `imagePaths` (array, optional): Local image paths for multimodal music generation inputs (max 10). Supported file types: PNG (`.png`), JPEG (`.jpg`, `.jpeg`), WEBP (`.webp`), HEIC (`.heic`), HEIF (`.heif`)
 - `lyrics` (string, optional): User-provided lyrics
 - `instrumental` (boolean, optional): Request instrumental-only output; cannot be combined with `lyrics` or `vocalStyle`
 - `vocalStyle` (string, optional): Vocal generation direction
-- `durationSeconds` (number, optional): Target duration in seconds; requires `lyria-3-pro-preview`
+- `language` (string, optional): Output language direction. Options: English, German, Spanish, French, Hindi, Japanese, Korean, Portuguese
+- `durationSeconds` (number, optional): Target duration in seconds; requires `lyria-3-pro-preview`; max 184 seconds
 - `bpm` (number, optional): Tempo direction in beats per minute
 - `intensity` (string, optional): `low`, `medium`, or `high`
 
 **Behavior:**
 - Generated music is saved to `GEMINI_MUSIC_OUTPUT_DIR` (defaults to `~/Music/gemini-generated/music`)
 - Returns MCP `audio` content, saved file paths, and any lyrics/song-structure text returned by Lyria
+- Lyria 3 Clip is fixed at 30 seconds; Lyria 3 Pro supports longer structured songs up to 184 seconds
+- Lyria 3 output is 44.1 kHz, one clip per prompt; Vertex AI mode supports 192 kbps MP3 only, while Gemini API/AI Studio Pro can also request WAV
+- Lyria 3 accepts text prompts and optional image references only; audio and video reference files are not supported by `generate_music`; negative prompting is not supported
 
 ### generate_video
 
@@ -448,16 +454,17 @@ Generate videos from text prompts using Veo video generation models.
 - `negativePrompt` (string, optional): Description of what to exclude from the video
 - `seed` (number, optional): Random seed for reproducibility
 - `numberOfVideos` (number, optional): Number of videos to generate. Default: `1`
-- `imagePath` (string, optional): Local file path of input image for image-to-video generation
-- `lastFramePath` (string, optional): Local file path of last frame for interpolation (requires `imagePath`)
-- `referenceImagePaths` (array, optional): Local file paths of reference images for style guidance (max 3, Veo 3.1 only)
-- `videoPath` (string, optional): Local file path of a Veo-generated 720p video to extend
+- `imagePath` (string, optional): Local file path of input image for image-to-video generation. Supported file types: PNG (`.png`), JPEG (`.jpg`, `.jpeg`), WEBP (`.webp`)
+- `lastFramePath` (string, optional): Local file path of last frame for interpolation (requires `imagePath`). Same supported image file types as `imagePath`
+- `referenceImagePaths` (array, optional): Local file paths of reference images for style guidance (max 3, Veo 3.1 only). Same supported image file types as `imagePath`
+- `videoPath` (string, optional): Local file path of a Veo-generated 720p MP4 (`.mp4`) video to extend
 
 **Behavior:**
 - Generated videos are saved to `GEMINI_VIDEO_OUTPUT_DIR` (defaults to `~/Movies/gemini-generated` on macOS, `~/Videos/gemini-generated` on Windows/Linux)
 - `generate_video` returns an operation ID; `check_video` polls the operation and returns saved file paths when complete
 - Supports text-to-video, image-to-video, interpolation, reference image, and Veo video extension modes
 - Veo 3.1 Lite does not support `4k` or reference asset images; model availability can differ between Vertex AI and Google AI Studio
+- Audio file references are not supported by `generate_video`; describe dialogue, sound effects, and ambience in `prompt`
 
 **Examples:**
 ```

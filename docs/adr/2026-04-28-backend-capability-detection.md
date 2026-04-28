@@ -57,6 +57,8 @@ Keep the legacy `VideoGenerationSchema` export as the Vertex default for compati
 
 Build the `generate_video` MCP tool schema dynamically in `tools/list` so clients see the active backend's model enum, default model, and `numberOfVideos` maximum.
 
+Build the `generate_music` MCP tool schema dynamically for output MIME support: Vertex AI lists `audio/mp3` only, while Gemini Developer API / AI Studio lists `audio/mp3` and `audio/wav` with validation that WAV requires `lyria-3-pro-preview`.
+
 ### Non-decisions
 
 Do not add schema rejects for these handoff items based only on local failures:
@@ -79,6 +81,7 @@ Boot-time `models.list()` probing remains useful for future model catalog drift,
 - Gemini Developer API mode no longer sends `generateAudio` or `seed` fields that `@google/genai` rejects for `generateVideos`.
 - Vertex mode keeps existing GA model IDs and multi-video behavior.
 - MCP clients see backend-appropriate video tool metadata.
+- MCP clients see backend-appropriate Lyria output MIME metadata.
 - Image generation validation now matches documented `thinkingLevel` and `gemini-2.5-flash-image` reference-image limits.
 
 ### Tradeoffs
@@ -94,12 +97,15 @@ Boot-time `models.list()` probing remains useful for future model catalog drift,
   - Added `getAllowedVideoModels(useVertexAI)`.
   - Added `getDefaultVideoModel(useVertexAI)`.
   - Added `buildVideoGenerationSchema(useVertexAI)`.
+  - Added `buildMusicGenerationSchema(useVertexAI)` and backend-specific Lyria output MIME validation.
   - Kept `VideoGenerationSchema` as the Vertex default.
   - Tightened image `thinkingLevel` and `gemini-2.5-flash-image` reference-image validation.
 
 - `src/server/GeminiAIMCPServer.ts`
   - Builds `generate_video` tool metadata from the active backend.
+  - Builds `generate_music` output MIME metadata from the active backend.
   - Parses `generate_video` calls with `buildVideoGenerationSchema(this.config.useVertexAI)`.
+  - Parses `generate_music` calls with `buildMusicGenerationSchema(this.config.useVertexAI)`.
 
 - `src/services/GeminiAIService.ts`
   - Selects the backend-specific default Veo model.

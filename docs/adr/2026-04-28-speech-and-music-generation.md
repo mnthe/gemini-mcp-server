@@ -30,9 +30,9 @@ Implement two synchronous file-output MCP tools:
    - Uses Lyria 3 models through `models.generateContent`
    - Default model: `lyria-3-clip-preview`
    - Supports `lyria-3-pro-preview` for longer structured music
-   - Supports `outputMimeType: audio/wav` only with `lyria-3-pro-preview`
+   - Supports `outputMimeType: audio/mp3` in Vertex AI mode, and `audio/wav` only with `lyria-3-pro-preview` in Gemini Developer API / AI Studio mode
    - Supports image-guided music inputs through `imagePaths` with a maximum of 10 images
-   - Supports prompt-level controls for user-provided lyrics, vocal direction, instrumental mode, target duration, BPM, and intensity
+   - Supports prompt-level controls for user-provided lyrics, vocal direction, language, instrumental mode, target duration, BPM, and intensity
    - Preserves any lyrics or song-structure text returned by Lyria
 
 3. Shared generated-file utilities
@@ -77,8 +77,10 @@ Implement two synchronous file-output MCP tools:
 ## Implementation Notes
 
 - `SpeechGenerationSchema` validates supported Gemini TTS models and rejects `voiceName` when multi-speaker config is used.
-- `MusicGenerationSchema` validates Lyria 3 models, limits image inputs to 10, rejects `audio/wav` output unless `lyria-3-pro-preview` is selected, and rejects incompatible prompt-level controls.
-- Lyria 3 watermarking, input filtering, recitation filtering, vocal-likeness filtering, and prompt rewriting are model-side features; the tool documents them but does not expose toggles.
+- `buildMusicGenerationSchema(useVertexAI)` validates Lyria 3 models, limits image inputs to 10, uses backend-specific output MIME rules, and rejects incompatible prompt-level controls.
+- Vertex AI mode accepts `audio/mp3` only per the Lyria 3 model card; Gemini Developer API / AI Studio mode accepts `audio/wav` only with `lyria-3-pro-preview`.
+- Lyria 3 Clip is fixed at 30 seconds. Lyria 3 Pro target duration is capped at 184 seconds. Lyria 3 supports one clip per prompt, 44.1 kHz output, MP3 at 192 kbps in Vertex AI mode, and language directions for English, German, Spanish, French, Hindi, Japanese, Korean, and Portuguese.
+- Lyria 3 watermarking, input filtering, recitation filtering, vocal-likeness filtering, and prompt rewriting are model-side features; negative prompting is unsupported; the tool documents model-side features but does not expose toggles.
 - Lyria response parsing iterates over all parts and does not assume text or audio ordering.
 - `GEMINI_SPEECH_OUTPUT_DIR` and `GEMINI_MUSIC_OUTPUT_DIR` override the default output directories.
 
@@ -87,4 +89,5 @@ Implement two synchronous file-output MCP tools:
 Verification run:
 
 - `npm run build`: PASS
-- `npm exec vitest -- --run src/schemas/index.test.ts src/utils/generatedFileSaver.test.ts src/server/GeminiAIMCPServer.test.ts src/handlers/VideoGenerationHandler.test.ts src/services/GeminiAIService.test.ts`: PASS, 5 files, 37 tests
+- `node --input-type=module -e "<schema smoke test>"`: PASS for Vertex/Gemini API music output MIME rules and Veo source file type rules
+- `npm ls vitest`: no local `vitest` install in this workspace, so unit tests were not run in the current checkout

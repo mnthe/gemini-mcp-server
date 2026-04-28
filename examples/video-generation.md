@@ -2,6 +2,8 @@
 
 This example demonstrates the `generate_video` and `check_video` tools.
 
+Image source fields (`imagePath`, `lastFramePath`, `referenceImagePaths`) accept PNG (`.png`), JPEG (`.jpg`, `.jpeg`), and WEBP (`.webp`). `videoPath` is for Veo-generated 720p MP4 (`.mp4`) extension sources. Audio files are not accepted as references; describe dialogue, sound effects, and ambience in the prompt.
+
 ## Text to Video
 
 ```typescript
