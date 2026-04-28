@@ -144,3 +144,6 @@ build/
 .claude/settings.local.json
 # Git worktrees
 .worktrees/
+
+# Local MCP server registration (Claude Code project scope)
+.mcp.json
