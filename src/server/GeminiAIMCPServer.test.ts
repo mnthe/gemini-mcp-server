@@ -209,6 +209,10 @@ describe('GeminiAIMCPServer generate_image wiring', () => {
     expect(imageGenTool.inputSchema.properties.aspectRatio.enum).toContain('1:4');
     expect(imageGenTool.inputSchema.properties.aspectRatio.enum).toContain('8:1');
     expect(imageGenTool.inputSchema.properties.imageSize.enum).toContain('0.5K');
+    expect(imageGenTool.inputSchema.properties.imagePaths.maxItems).toBe(14);
+    expect(imageGenTool.inputSchema.properties.systemInstruction).toBeDefined();
+    expect(imageGenTool.inputSchema.properties.thinkingLevel.enum).toContain('high');
+    expect(imageGenTool.inputSchema.properties.mediaResolution.enum).toContain('medium');
   });
 
   it('routes generate_image call to ImageGenerationHandler', async () => {
@@ -265,6 +269,12 @@ describe('GeminiAIMCPServer generate_image wiring', () => {
       'audio/mp3',
       'audio/wav',
     ]);
+    expect(musicTool.inputSchema.properties.imagePaths.maxItems).toBe(10);
+    expect(musicTool.inputSchema.properties.lyrics).toBeDefined();
+    expect(musicTool.inputSchema.properties.instrumental).toBeDefined();
+    expect(musicTool.inputSchema.properties.durationSeconds.maximum).toBe(184);
+    expect(musicTool.inputSchema.properties.bpm).toBeDefined();
+    expect(musicTool.inputSchema.properties.intensity.enum).toContain('medium');
 
     await callHandler({
       params: {

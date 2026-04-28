@@ -16,18 +16,20 @@ Implement a `generate_video` MCP tool following the established image generation
 2. **Image-to-video** animation from input images
 3. **Interpolation** between start and end frames (image + lastFrame)
 4. **Reference images** for style/asset guidance (max 3, Veo 3.1 only)
-5. **Default model**: `veo-3.1-fast-generate-001` (speed-optimized)
-6. **Audio generation**: Enabled by default (`generateAudio: true`)
-7. **Platform-aware storage**: macOS → `~/Movies/gemini-generated`, Windows/Linux → `~/Videos/gemini-generated`
-8. **Async request/check split**: `generate_video` returns an operation ID; `check_video` polls and saves completed videos
-9. **File path return**: Only file paths (not base64) due to large video sizes (tens of MB)
+5. **Veo video extension** from a local `videoPath` pointing at a Veo-generated video
+6. **Default model**: `veo-3.1-fast-generate-001` (speed-optimized)
+7. **Audio generation**: Enabled by default (`generateAudio: true`)
+8. **Prompt and person controls**: Expose `enhancePrompt` and `personGeneration`
+9. **Platform-aware storage**: macOS → `~/Movies/gemini-generated`, Windows/Linux → `~/Videos/gemini-generated`
+10. **Async request/check split**: `generate_video` returns an operation ID; `check_video` polls and saves completed videos
+11. **File path return**: Only file paths (not base64) due to large video sizes (tens of MB)
 
 ### Rationale
 
 - **Consistency**: Reuses image generation patterns (Schema→Service→Handler→Utility→Server) to minimize learning curve and maintain code cohesion
 - **Scalability**: Splitting request and status check avoids blocking MCP calls for extended generation times
 - **Practicality**: File path returns are appropriate for large video files; base64 inline would be infeasible
-- **Base64 input**: Image inputs (imagePath, lastFramePath, referenceImagePaths) are read locally and encoded as base64 to match `imagePaths` pattern from image generation
+- **Base64 input**: Image and video inputs (`imagePath`, `lastFramePath`, `referenceImagePaths`, `videoPath`) are read locally and encoded as base64 to match generation input patterns
 - **Audio**: Veo 3.1 supports audio generation, so enabling by default enhances output value
 - **Storage**: Platform-aware paths (`~/Movies` on macOS, `~/Videos` elsewhere) follow OS conventions
 
@@ -77,6 +79,10 @@ export const VideoGenerationSchema = z.object({
     .describe("Video resolution (1080p/4k requires 8s duration, default: 720p)"),
   generateAudio: z.boolean().optional()
     .describe("Generate audio for the video (default: true)"),
+  enhancePrompt: z.boolean().optional()
+    .describe("Whether to use Veo prompt rewriting/enhancement"),
+  personGeneration: z.enum(['allow_adult', 'dont_allow']).optional()
+    .describe("Optional person generation control"),
   negativePrompt: z.string().optional()
     .describe("Text describing what to exclude from the video"),
   seed: z.number().optional()
@@ -89,6 +95,8 @@ export const VideoGenerationSchema = z.object({
     .describe("Local file path of last frame image for interpolation (requires imagePath)"),
   referenceImagePaths: z.array(z.string()).optional()
     .describe("Local file paths of reference images for style/asset guidance (max 3, Veo 3.1 only)"),
+  videoPath: z.string().optional()
+    .describe("Local file path of a Veo-generated 720p video to extend"),
 }).refine(
   (data) => {
     if ((data.resolution === '1080p' || data.resolution === '4k')) {
@@ -116,12 +124,14 @@ Three validation refines enforce:
 - **Resolution/duration constraint**: 1080p and 4K require exactly 8 seconds
 - **Interpolation dependency**: `lastFramePath` without `imagePath` is rejected
 - **Reference image limit**: Maximum 3 reference images (Veo 3.1 limit)
+- **Source mode separation**: `videoPath`, `referenceImagePaths`, and image/interpolation inputs cannot be mixed
+- **Extension constraints**: `videoPath` requires 720p and returns one video
 
 #### 2. Service Implementation (`src/services/GeminiAIService.ts`)
 
 The `generateVideo()` method:
 1. Builds API request parameters from options
-2. Reads image files (imagePath, lastFramePath, referenceImagePaths) and encodes as base64
+2. Reads image/video source files (imagePath, lastFramePath, referenceImagePaths, videoPath) and encodes as base64
 3. Calls `client.models.generateVideos()` to initiate async operation
 4. Caches the operation object by operation ID
 5. `checkVideoOperation()` polls `client.operations.getVideosOperation()`

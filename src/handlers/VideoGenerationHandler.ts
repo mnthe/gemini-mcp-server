@@ -23,12 +23,15 @@ export class VideoGenerationHandler {
       durationSeconds: input.durationSeconds,
       resolution: input.resolution,
       generateAudio: input.generateAudio,
+      enhancePrompt: input.enhancePrompt,
+      personGeneration: input.personGeneration,
       negativePrompt: input.negativePrompt,
       seed: input.seed,
       numberOfVideos: input.numberOfVideos,
       imagePath: input.imagePath,
       lastFramePath: input.lastFramePath,
       referenceImagePaths: input.referenceImagePaths,
+      videoPath: input.videoPath,
     });
 
     return {

@@ -179,12 +179,16 @@ describe('GeminiAIMCPServer generate_video wiring', () => {
     expect(videoGenTool.inputSchema.properties.durationSeconds).toBeDefined();
     expect(videoGenTool.inputSchema.properties.resolution).toBeDefined();
     expect(videoGenTool.inputSchema.properties.generateAudio).toBeDefined();
+    expect(videoGenTool.inputSchema.properties.enhancePrompt).toBeDefined();
+    expect(videoGenTool.inputSchema.properties.personGeneration.enum).toEqual(['allow_adult', 'dont_allow']);
     expect(videoGenTool.inputSchema.properties.negativePrompt).toBeDefined();
     expect(videoGenTool.inputSchema.properties.seed).toBeDefined();
     expect(videoGenTool.inputSchema.properties.numberOfVideos).toBeDefined();
     expect(videoGenTool.inputSchema.properties.imagePath).toBeDefined();
     expect(videoGenTool.inputSchema.properties.lastFramePath).toBeDefined();
     expect(videoGenTool.inputSchema.properties.referenceImagePaths).toBeDefined();
+    expect(videoGenTool.inputSchema.properties.referenceImagePaths.maxItems).toBe(3);
+    expect(videoGenTool.inputSchema.properties.videoPath).toBeDefined();
     expect(videoGenTool.inputSchema.properties.model.enum).toEqual([
       'veo-3.1-fast-generate-001',
       'veo-3.1-generate-001',

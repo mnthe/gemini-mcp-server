@@ -492,8 +492,8 @@ function pcmToWav(pcmData: Buffer, options?: WavOptions): Buffer
 2. VideoGenerationSchema.parse(input) → validated VideoGenerationInput
    ↓
 3. VideoGenerationHandler.handle(input)
-   ├─ GeminiAIService.generateVideo(prompt, { model, imagePath, lastFramePath, referenceImagePaths, ... })
-   │  ├─ Read image files and encode as base64 (imagePath, lastFramePath, referenceImagePaths)
+   ├─ GeminiAIService.generateVideo(prompt, { model, imagePath, lastFramePath, referenceImagePaths, videoPath, ... })
+   │  ├─ Read source files and encode as base64 (imagePath, lastFramePath, referenceImagePaths, videoPath)
    │  ├─ Calls client.models.generateVideos() → async operation
    │  └─ Caches operation object by operationId
    │
@@ -611,6 +611,10 @@ z.object({
   model: z.enum(['gemini-3-pro-image-preview', 'gemini-3.1-flash-image-preview', 'gemini-2.5-flash-image']).optional(),
   aspectRatio: z.enum(['1:1','1:4','1:8','2:3','3:2','3:4','4:1','4:3','4:5','5:4','8:1','9:16','16:9','21:9']).optional(),
   imageSize: z.enum(['0.5K', '1K', '2K', '4K']).optional(),
+  imagePaths: z.array(z.string()).max(14).optional(),
+  systemInstruction: z.string().optional(),
+  thinkingLevel: z.enum(['minimal','low','medium','high']).optional(),
+  mediaResolution: z.enum(['low','medium','high']).optional(),
 })
 ```
 
@@ -626,12 +630,15 @@ z.object({
   durationSeconds: z.enum(['4', '6', '8']).optional(),
   resolution: z.enum(['720p', '1080p', '4k']).optional(),
   generateAudio: z.boolean().optional(),  // default: true
+  enhancePrompt: z.boolean().optional(),
+  personGeneration: z.enum(['allow_adult', 'dont_allow']).optional(),
   negativePrompt: z.string().optional(),
   seed: z.number().optional(),
   numberOfVideos: z.number().optional(),
   imagePath: z.string().optional(),         // image-to-video
   lastFramePath: z.string().optional(),     // interpolation (requires imagePath)
   referenceImagePaths: z.array(z.string()).optional(),  // max 3, Veo 3.1 only
+  videoPath: z.string().optional(),         // Veo video extension
 })
 ```
 
@@ -639,6 +646,9 @@ z.object({
 - 1080p/4k resolution requires durationSeconds to be '8'
 - `lastFramePath` requires `imagePath` (interpolation mode constraint)
 - Maximum 3 reference images allowed
+- `videoPath` cannot be combined with image or reference-image source modes
+- `videoPath` requires 720p and returns one extended video
+- Veo 3.1 Lite rejects `4k` and `referenceImagePaths`
 
 ### SpeechGenerationSchema
 
@@ -669,12 +679,20 @@ z.object({
   prompt: z.string(),
   model: z.enum(['lyria-3-clip-preview', 'lyria-3-pro-preview']).optional(),
   outputMimeType: z.enum(['audio/mp3', 'audio/wav']).optional(),
-  imagePaths: z.array(z.string()).optional(),
+  imagePaths: z.array(z.string()).max(10).optional(),
+  lyrics: z.string().optional(),
+  instrumental: z.boolean().optional(),
+  vocalStyle: z.string().optional(),
+  durationSeconds: z.number().optional(),
+  bpm: z.number().optional(),
+  intensity: z.enum(['low','medium','high']).optional(),
 })
 ```
 
 **Validation Refines**:
 - `outputMimeType: 'audio/wav'` requires `model: 'lyria-3-pro-preview'`
+- `durationSeconds` requires `model: 'lyria-3-pro-preview'`
+- `instrumental` cannot be combined with `lyrics` or `vocalStyle`
 
 ### SearchSchema / FetchSchema
 

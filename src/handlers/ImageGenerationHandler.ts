@@ -22,6 +22,9 @@ export class ImageGenerationHandler {
       aspectRatio: input.aspectRatio,
       imageSize: input.imageSize,
       imagePaths: input.imagePaths,
+      systemInstruction: input.systemInstruction,
+      thinkingLevel: input.thinkingLevel,
+      mediaResolution: input.mediaResolution,
     });
 
     const content: Array<{ type: string; text?: string; data?: string; mimeType?: string }> = [];

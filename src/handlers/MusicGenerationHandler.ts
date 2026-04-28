@@ -25,6 +25,12 @@ export class MusicGenerationHandler {
       model: input.model,
       outputMimeType: input.outputMimeType,
       imagePaths: input.imagePaths,
+      lyrics: input.lyrics,
+      instrumental: input.instrumental,
+      vocalStyle: input.vocalStyle,
+      durationSeconds: input.durationSeconds,
+      bpm: input.bpm,
+      intensity: input.intensity,
     });
 
     if (result.audios.length === 0) {

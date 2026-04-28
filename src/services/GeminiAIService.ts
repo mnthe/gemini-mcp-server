@@ -5,13 +5,14 @@
 
 import { GenerateContentConfig, GoogleGenAI, MediaResolution, Part, ThinkingLevel } from "@google/genai";
 import { readFileSync } from "node:fs";
-import { extname } from "node:path";
+import { extname, resolve as resolvePath, sep as pathSep } from "node:path";
 
 // Re-export ThinkingLevel for consumers
 export { ThinkingLevel } from "@google/genai";
 import { GeminiAIConfig, MultimodalPart, isSupportedMimeType } from '../types/index.js';
 import { validateSecureUrl } from '../utils/urlSecurity.js';
 import { validateMultimodalFile } from '../utils/fileSecurity.js';
+import { resolveOutputDirs } from '../utils/generatedFileSaver.js';
 import { SecurityError } from '../errors/index.js';
 
 export interface ImageGenerationOptions {
@@ -19,6 +20,9 @@ export interface ImageGenerationOptions {
   aspectRatio?: string;
   imageSize?: string;
   imagePaths?: string[];
+  systemInstruction?: string;
+  thinkingLevel?: ThinkingLevel | string;
+  mediaResolution?: string;
 }
 
 export interface GeneratedImage {
@@ -32,12 +36,15 @@ export interface VideoGenerationOptions {
   durationSeconds?: string;
   resolution?: string;
   generateAudio?: boolean;
+  enhancePrompt?: boolean;
+  personGeneration?: string;
   negativePrompt?: string;
   seed?: number;
   numberOfVideos?: number;
   imagePath?: string;
   lastFramePath?: string;
   referenceImagePaths?: string[];
+  videoPath?: string;
 }
 
 export interface GeneratedVideo {
@@ -61,6 +68,12 @@ export interface MusicGenerationOptions {
   model?: string;
   outputMimeType?: string;
   imagePaths?: string[];
+  lyrics?: string;
+  instrumental?: boolean;
+  vocalStyle?: string;
+  durationSeconds?: number;
+  bpm?: number;
+  intensity?: string;
 }
 
 export interface GeneratedAudio {
@@ -95,6 +108,7 @@ export class GeminiAIService {
   private client: GoogleGenAI;
   private config: GeminiAIConfig;
   private pendingVideoOps = new Map<string, any>();
+  private extraSafeDirectories: string[];
 
   constructor(config: GeminiAIConfig) {
     this.config = config;
@@ -107,6 +121,18 @@ export class GeminiAIService {
       : new GoogleGenAI({
           apiKey: config.apiKey,
         });
+
+    // Auto-allow this server's own generated-output directories so users can
+    // round-trip generated files (e.g. feed a generated image back into query).
+    const outputs = resolveOutputDirs(config);
+    this.extraSafeDirectories = [outputs.image, outputs.video, outputs.speech, outputs.music]
+      .map(d => resolvePath(d));
+  }
+
+  private isInSelfManagedDir(absolutePath: string): boolean {
+    return this.extraSafeDirectories.some(dir =>
+      absolutePath === dir || absolutePath.startsWith(dir + pathSep)
+    );
   }
 
   /**
@@ -277,8 +303,9 @@ export class GeminiAIService {
           const validated = validateMultimodalFile(
             part.fileData.mimeType,
             part.fileData.fileUri,
-            { 
-              allowAllDirectories: this.config.allowFileUris // Allow file:// only if explicitly enabled
+            {
+              allowAllDirectories: this.config.allowFileUris, // Allow file:// only if explicitly enabled
+              additionalSafeDirectories: this.extraSafeDirectories,
             }
           );
           
@@ -287,11 +314,18 @@ export class GeminiAIService {
             await validateSecureUrl(validated.fileUri);
           }
           
-          // file:// URIs are converted to absolute paths by validateMultimodalFile
-          // Only allowed if allowFileUris is true (CLI environments)
-          if (part.fileData.fileUri.startsWith('file://') && !this.config.allowFileUris) {
+          // file:// URIs are converted to absolute paths by validateMultimodalFile.
+          // Gate: only allowed when allowFileUris=true (CLI environments) OR when
+          // the resolved path is inside this server's own generated-output dirs
+          // (round-trip case — the server wrote the file itself).
+          if (
+            part.fileData.fileUri.startsWith('file://') &&
+            !this.config.allowFileUris &&
+            !this.isInSelfManagedDir(validated.fileUri)
+          ) {
             throw new SecurityError(
-              'file:// URIs are not allowed. Set GEMINI_ALLOW_FILE_URIS=true to enable (only for CLI environments, not desktop apps)'
+              'file:// URIs are not allowed. Set GEMINI_ALLOW_FILE_URIS=true to enable (only for CLI environments, not desktop apps), ' +
+              'or use a path under the gemini-generated output directories.'
             );
           }
           
@@ -364,17 +398,32 @@ export class GeminiAIService {
   ): Promise<{ images: GeneratedImage[]; text?: string }> {
     const model = options.model || 'gemini-3-pro-image-preview';
     const contents = this.buildContentsWithInlineFiles(prompt, options.imagePaths);
+    const config: GenerateContentConfig = {
+      responseModalities: ['TEXT', 'IMAGE'],
+      imageConfig: {
+        aspectRatio: options.aspectRatio || '1:1',
+        imageSize: options.imageSize,
+      },
+    };
+
+    if (options.systemInstruction) {
+      config.systemInstruction = options.systemInstruction;
+    }
+
+    const thinkingLevel = this.resolveThinkingLevel(options.thinkingLevel);
+    if (thinkingLevel) {
+      config.thinkingConfig = { thinkingLevel };
+    }
+
+    const mediaResolution = this.resolveMediaResolution(options.mediaResolution);
+    if (mediaResolution) {
+      config.mediaResolution = mediaResolution;
+    }
 
     const response = await this.client.models.generateContent({
       model,
       contents,
-      config: {
-        responseModalities: ['TEXT', 'IMAGE'],
-        imageConfig: {
-          aspectRatio: options.aspectRatio || '1:1',
-          imageSize: options.imageSize,
-        },
-      },
+      config,
     });
     return this.extractImages(response);
   }
@@ -442,11 +491,43 @@ export class GeminiAIService {
 
     const response = await this.client.models.generateContent({
       model,
-      contents: this.buildContentsWithInlineFiles(prompt, options.imagePaths),
+      contents: this.buildContentsWithInlineFiles(
+        this.buildMusicPrompt(prompt, options),
+        options.imagePaths
+      ),
       config,
     });
 
     return this.extractAudioParts(response, options.outputMimeType || 'audio/mp3');
+  }
+
+  private buildMusicPrompt(prompt: string, options: MusicGenerationOptions): string {
+    const controls: string[] = [];
+
+    if (options.durationSeconds !== undefined) {
+      controls.push(`Target duration: ${options.durationSeconds} seconds.`);
+    }
+    if (options.bpm !== undefined) {
+      controls.push(`Tempo: ${options.bpm} BPM.`);
+    }
+    if (options.intensity) {
+      controls.push(`Intensity: ${String(options.intensity).toLowerCase()}.`);
+    }
+    if (options.instrumental) {
+      controls.push('Instrumental only, no vocals.');
+    }
+    if (options.vocalStyle) {
+      controls.push(`Vocal direction: ${options.vocalStyle}`);
+    }
+    if (options.lyrics) {
+      controls.push(`Use these user-provided lyrics:\n${options.lyrics}`);
+    }
+
+    if (controls.length === 0) {
+      return prompt;
+    }
+
+    return `${prompt}\n\nLyria generation controls:\n${controls.join('\n')}`;
   }
 
   private getMimeTypeFromExtension(ext: string): string {
@@ -458,8 +539,14 @@ export class GeminiAIService {
       '.webp': 'image/webp',
       '.bmp': 'image/bmp',
       '.mp4': 'video/mp4',
+      '.mpeg': 'video/mpeg',
+      '.mpg': 'video/mpg',
+      '.avi': 'video/avi',
+      '.wmv': 'video/wmv',
+      '.flv': 'video/flv',
+      '.mpegps': 'video/mpegps',
       '.webm': 'video/webm',
-      '.mov': 'video/quicktime',
+      '.mov': 'video/mov',
     };
     return map[ext.toLowerCase()] || 'image/png';
   }
@@ -570,37 +657,39 @@ export class GeminiAIService {
       prompt,
       config: {
         aspectRatio: options.aspectRatio || '16:9',
-        durationSeconds: parseInt(options.durationSeconds || '8'),
-        resolution: options.resolution,
+        durationSeconds: options.videoPath ? undefined : parseInt(options.durationSeconds || '8'),
+        resolution: options.videoPath ? (options.resolution || '720p') : options.resolution,
         generateAudio: options.generateAudio ?? true,
+        enhancePrompt: options.enhancePrompt,
+        personGeneration: options.personGeneration,
         negativePrompt: options.negativePrompt,
         seed: options.seed,
-        numberOfVideos: options.numberOfVideos || 1,
+        numberOfVideos: options.videoPath ? 1 : (options.numberOfVideos || 1),
       },
     };
 
+    // Video extension: attach a Veo-generated input video.
+    if (options.videoPath) {
+      const data = readFileSync(options.videoPath).toString('base64');
+      const mimeType = this.getMimeTypeFromExtension(extname(options.videoPath));
+      params.video = { videoBytes: data, mimeType };
+    }
+
     // Image-to-video: attach input image
     if (options.imagePath) {
-      const data = readFileSync(options.imagePath).toString('base64');
-      const mimeType = this.getMimeTypeFromExtension(extname(options.imagePath));
-      params.image = { bytesBase64: data, mimeType };
+      params.image = this.buildVideoImageFromPath(options.imagePath);
     }
 
     // Interpolation: attach last frame
     if (options.lastFramePath) {
-      const data = readFileSync(options.lastFramePath).toString('base64');
-      const mimeType = this.getMimeTypeFromExtension(extname(options.lastFramePath));
-      params.config.lastFrame = { bytesBase64: data, mimeType };
+      params.config.lastFrame = this.buildVideoImageFromPath(options.lastFramePath);
     }
 
     // Reference images (max 3)
     if (options.referenceImagePaths && options.referenceImagePaths.length > 0) {
       params.config.referenceImages = options.referenceImagePaths.map((filePath: string) => ({
         referenceType: 'asset',
-        image: {
-          bytesBase64: readFileSync(filePath).toString('base64'),
-          mimeType: this.getMimeTypeFromExtension(extname(filePath)),
-        },
+        image: this.buildVideoImageFromPath(filePath),
       }));
     }
 
@@ -616,6 +705,13 @@ export class GeminiAIService {
     this.pendingVideoOps.set(operationId, operation);
 
     return { operationId };
+  }
+
+  private buildVideoImageFromPath(filePath: string): { imageBytes: string; mimeType: string } {
+    return {
+      imageBytes: readFileSync(filePath).toString('base64'),
+      mimeType: this.getMimeTypeFromExtension(extname(filePath)),
+    };
   }
 
   /**

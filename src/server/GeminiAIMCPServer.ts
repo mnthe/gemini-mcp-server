@@ -34,6 +34,8 @@ import { ImageGenerationHandler } from '../handlers/ImageGenerationHandler.js';
 import { SpeechGenerationHandler } from '../handlers/SpeechGenerationHandler.js';
 import { MusicGenerationHandler } from '../handlers/MusicGenerationHandler.js';
 import { VideoGenerationHandler } from '../handlers/VideoGenerationHandler.js';
+import { getEffectiveSafeDirectories } from '../utils/fileSecurity.js';
+import { resolveOutputDirs } from '../utils/generatedFileSaver.js';
 
 export class GeminiAIMCPServer {
   private server: Server;
@@ -273,7 +275,22 @@ export class GeminiAIMCPServer {
               imagePaths: {
                 type: "array",
                 items: { type: "string" },
-                description: "Local file paths of reference images to include as input (e.g., for image editing or style transfer)",
+                maxItems: 14,
+                description: "Local file paths of reference images to include as input (max 14; e.g., for image editing or style transfer)",
+              },
+              systemInstruction: {
+                type: "string",
+                description: "Optional system instruction for Gemini 3 image models",
+              },
+              thinkingLevel: {
+                type: "string",
+                enum: ["minimal", "low", "medium", "high", "MINIMAL", "LOW", "MEDIUM", "HIGH"],
+                description: "Optional Gemini 3 image thinking level",
+              },
+              mediaResolution: {
+                type: "string",
+                enum: ["low", "medium", "high", "LOW", "MEDIUM", "HIGH"],
+                description: "Optional media resolution for reference image inputs",
               },
             },
             required: ["prompt"],
@@ -355,7 +372,37 @@ export class GeminiAIMCPServer {
               imagePaths: {
                 type: "array",
                 items: { type: "string" },
-                description: "Optional local image paths to use as multimodal music generation inputs",
+                maxItems: 10,
+                description: "Optional local image paths to use as multimodal music generation inputs (max 10)",
+              },
+              lyrics: {
+                type: "string",
+                description: "Optional user-provided lyrics to include in the Lyria prompt",
+              },
+              instrumental: {
+                type: "boolean",
+                description: "Explicitly request instrumental-only output",
+              },
+              vocalStyle: {
+                type: "string",
+                description: "Optional vocal generation direction, such as vocal tone, language, or delivery style",
+              },
+              durationSeconds: {
+                type: "number",
+                minimum: 1,
+                maximum: 184,
+                description: "Optional target duration in seconds; requires lyria-3-pro-preview",
+              },
+              bpm: {
+                type: "number",
+                minimum: 40,
+                maximum: 240,
+                description: "Optional tempo direction in beats per minute",
+              },
+              intensity: {
+                type: "string",
+                enum: ["low", "medium", "high", "LOW", "MEDIUM", "HIGH"],
+                description: "Optional musical intensity direction",
               },
             },
             required: ["prompt"],
@@ -369,7 +416,7 @@ export class GeminiAIMCPServer {
             "Use check_video with the operationId to poll for completion and download results. " +
             "Recommended polling interval: 30 seconds. " +
             "Supports text-to-video, image-to-video (with imagePath), interpolation (imagePath + lastFramePath), " +
-            "and reference images (referenceImagePaths, max 3, Veo 3.1 only).",
+            "reference images (referenceImagePaths, max 3, Veo 3.1 only), and Veo video extension (videoPath).",
           inputSchema: {
             type: "object",
             properties: {
@@ -401,6 +448,15 @@ export class GeminiAIMCPServer {
                 type: "boolean",
                 description: "Generate audio for the video (default: true)",
               },
+              enhancePrompt: {
+                type: "boolean",
+                description: "Use Veo prompt rewriting/enhancement",
+              },
+              personGeneration: {
+                type: "string",
+                enum: ["allow_adult", "dont_allow"],
+                description: "Optional person generation control",
+              },
               negativePrompt: {
                 type: "string",
                 description: "Text describing what to exclude from the video",
@@ -424,7 +480,12 @@ export class GeminiAIMCPServer {
               referenceImagePaths: {
                 type: "array",
                 items: { type: "string" },
+                maxItems: 3,
                 description: "Local file paths of reference images for style/asset guidance (max 3, Veo 3.1 only)",
+              },
+              videoPath: {
+                type: "string",
+                description: "Local file path of a Veo-generated 720p input video to extend",
               },
             },
             required: ["prompt"],
@@ -510,6 +571,7 @@ export class GeminiAIMCPServer {
    */
   async run(): Promise<void> {
     this.logger.info('Initializing Gemini AI MCP Server');
+    this.logBootDiagnostics();
 
     // Initialize MCP servers from config
     await this.initializeMCPServers();
@@ -522,6 +584,24 @@ export class GeminiAIMCPServer {
     await this.server.connect(transport);
 
     this.logger.info("Gemini AI MCP Server running on stdio");
+  }
+
+  /**
+   * Log effective filesystem policy at boot so users can see exactly which
+   * directories multimodal fileData inputs (file://, absolute paths) are
+   * allowed to read from in the running process.
+   */
+  private logBootDiagnostics(): void {
+    const outputs = resolveOutputDirs(this.config);
+    const safeDirs = getEffectiveSafeDirectories({
+      additionalSafeDirectories: [outputs.image, outputs.video, outputs.speech, outputs.music],
+    });
+    this.logger.info(`cwd: ${process.cwd()}`);
+    this.logger.info(`Allowed multimodal directories: ${safeDirs.join(', ')}`);
+    this.logger.info(
+      `file:// URIs ${this.config.allowFileUris ? 'enabled' : 'disabled'}` +
+      (this.config.allowFileUris ? '' : ' (set GEMINI_ALLOW_FILE_URIS=true to enable in CLI environments)')
+    );
   }
 
   /**

@@ -143,5 +143,8 @@ Lyria responses can include both audio and text parts. The server iterates over 
 
 - These tools are file-output generation tools. They do not use the Gemini Live API or Lyria RealTime.
 - `generate_speech` is text-only input and audio-only output at the model layer.
-- `generate_music` supports optional `imagePaths` for image-guided Lyria 3 requests.
+- `generate_music` supports optional `imagePaths` for image-guided Lyria 3 requests, up to 10 images.
+- Lyria 3 preview controls exposed by this tool are prompt-level controls: `lyrics`, `instrumental`, `vocalStyle`, `durationSeconds`, `bpm`, and `intensity`.
+- Lyria 3 model-side features such as audio watermarking, input filtering, recitation filtering, vocal-likeness filtering, and prompt rewriting run automatically and are not exposed as toggleable parameters.
+- `generate_music` does not accept audio or video sources; use `query` for audio/video understanding workflows.
 - For very large audio outputs, prefer using the saved file path from the text content block.

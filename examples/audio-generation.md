@@ -59,10 +59,47 @@ const request = {
   arguments: {
     prompt: "A two-minute cinematic orchestral cue with a quiet piano opening, rising strings, and a warm brass finale.",
     model: "lyria-3-pro-preview",
-    outputMimeType: "audio/wav"
+    outputMimeType: "audio/wav",
+    durationSeconds: 120,
+    bpm: 96,
+    intensity: "high"
   }
 };
 ```
+
+## Music: Vocals and Lyrics
+
+```typescript
+const request = {
+  name: "generate_music",
+  arguments: {
+    prompt: "Create a polished Korean pop chorus with bright synths and a confident vocal hook.",
+    model: "lyria-3-pro-preview",
+    vocalStyle: "warm Korean pop vocal, clear diction, energetic delivery",
+    lyrics: `[Chorus]
+달빛 아래 we keep moving,
+손을 들어 feel the rhythm`
+  }
+};
+```
+
+## Music from Images
+
+```typescript
+const request = {
+  name: "generate_music",
+  arguments: {
+    prompt: "Create an atmospheric track inspired by the mood and colors in these images.",
+    model: "lyria-3-pro-preview",
+    imagePaths: [
+      "/path/to/desert-sunset.jpg",
+      "/path/to/night-sky.jpg"
+    ]
+  }
+};
+```
+
+`imagePaths` accepts up to 10 local images. Audio and video files are not accepted as `generate_music` sources.
 
 ## Using with MCP Inspector
 

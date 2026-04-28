@@ -31,6 +31,8 @@ Implement two synchronous file-output MCP tools:
    - Default model: `lyria-3-clip-preview`
    - Supports `lyria-3-pro-preview` for longer structured music
    - Supports `outputMimeType: audio/wav` only with `lyria-3-pro-preview`
+   - Supports image-guided music inputs through `imagePaths` with a maximum of 10 images
+   - Supports prompt-level controls for user-provided lyrics, vocal direction, instrumental mode, target duration, BPM, and intensity
    - Preserves any lyrics or song-structure text returned by Lyria
 
 3. Shared generated-file utilities
@@ -69,12 +71,14 @@ Implement two synchronous file-output MCP tools:
 
 - Large Lyria Pro outputs are returned as MCP audio content as well as saved files, which can increase response size.
 - TTS output is normalized to WAV, so the saved MIME type differs from raw PCM returned by the model.
+- Audio and video source files are intentionally not accepted by `generate_speech` or `generate_music`; use `query` for audio/video understanding.
 - Lyria RealTime and Gemini Live API remain unsupported by these tools.
 
 ## Implementation Notes
 
 - `SpeechGenerationSchema` validates supported Gemini TTS models and rejects `voiceName` when multi-speaker config is used.
-- `MusicGenerationSchema` validates Lyria 3 models and rejects `audio/wav` output unless `lyria-3-pro-preview` is selected.
+- `MusicGenerationSchema` validates Lyria 3 models, limits image inputs to 10, rejects `audio/wav` output unless `lyria-3-pro-preview` is selected, and rejects incompatible prompt-level controls.
+- Lyria 3 watermarking, input filtering, recitation filtering, vocal-likeness filtering, and prompt rewriting are model-side features; the tool documents them but does not expose toggles.
 - Lyria response parsing iterates over all parts and does not assume text or audio ordering.
 - `GEMINI_SPEECH_OUTPUT_DIR` and `GEMINI_MUSIC_OUTPUT_DIR` override the default output directories.
 

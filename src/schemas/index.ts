@@ -62,8 +62,14 @@ export const ImageGenerationSchema = z.object({
     .describe("Aspect ratio (default: 1:1; 1:4, 1:8, 4:1, and 8:1 require gemini-3.1-flash-image-preview)"),
   imageSize: z.enum(['0.5K', '1K', '2K', '4K']).optional()
     .describe("Resolution (0.5K requires gemini-3.1-flash-image-preview, default: 1K)"),
-  imagePaths: z.array(z.string()).optional()
-    .describe("Local file paths of reference images to include as input (e.g., for image editing or style transfer)"),
+  imagePaths: z.array(z.string()).max(14).optional()
+    .describe("Local file paths of reference images to include as input (max 14; e.g., for image editing or style transfer)"),
+  systemInstruction: z.string().optional()
+    .describe("Optional system instruction for Gemini 3 image models"),
+  thinkingLevel: z.enum(['minimal', 'low', 'medium', 'high', 'MINIMAL', 'LOW', 'MEDIUM', 'HIGH']).optional()
+    .describe("Optional Gemini 3 image thinking level"),
+  mediaResolution: z.enum(['low', 'medium', 'high', 'LOW', 'MEDIUM', 'HIGH']).optional()
+    .describe("Optional media resolution for reference image inputs"),
 }).refine(
   (data) => {
     if (!data.aspectRatio) {
@@ -83,6 +89,11 @@ export const ImageGenerationSchema = z.object({
     return data.model !== 'gemini-2.5-flash-image' || data.imageSize === undefined;
   },
   { message: "imageSize is not supported by model='gemini-2.5-flash-image'; omit imageSize for its 1K output" }
+).refine(
+  (data) => {
+    return !data.thinkingLevel || data.model !== 'gemini-2.5-flash-image';
+  },
+  { message: "thinkingLevel is only supported by Gemini 3 image models; omit it for model='gemini-2.5-flash-image'" }
 );
 
 const ALLOWED_VIDEO_MODELS = [
@@ -128,11 +139,29 @@ export const MusicGenerationSchema = z.object({
     .describe("Music model (default: lyria-3-clip-preview)"),
   outputMimeType: z.enum(['audio/mp3', 'audio/wav']).optional()
     .describe("Optional output MIME type; audio/wav requires lyria-3-pro-preview"),
-  imagePaths: z.array(z.string()).optional()
-    .describe("Optional local image paths to use as multimodal music generation inputs"),
+  imagePaths: z.array(z.string()).max(10).optional()
+    .describe("Optional local image paths to use as multimodal music generation inputs (max 10)"),
+  lyrics: z.string().optional()
+    .describe("Optional user-provided lyrics to include in the Lyria prompt"),
+  instrumental: z.boolean().optional()
+    .describe("Whether to explicitly request instrumental-only output"),
+  vocalStyle: z.string().optional()
+    .describe("Optional vocal generation direction, such as vocal tone, language, or delivery style"),
+  durationSeconds: z.number().int().min(1).max(184).optional()
+    .describe("Optional target duration in seconds; requires lyria-3-pro-preview"),
+  bpm: z.number().int().min(40).max(240).optional()
+    .describe("Optional tempo direction in beats per minute"),
+  intensity: z.enum(['low', 'medium', 'high', 'LOW', 'MEDIUM', 'HIGH']).optional()
+    .describe("Optional musical intensity direction"),
 }).refine(
   (data) => data.outputMimeType !== 'audio/wav' || data.model === 'lyria-3-pro-preview',
   { message: "outputMimeType 'audio/wav' requires model='lyria-3-pro-preview'" }
+).refine(
+  (data) => data.durationSeconds === undefined || data.model === 'lyria-3-pro-preview',
+  { message: "durationSeconds requires model='lyria-3-pro-preview'" }
+).refine(
+  (data) => !data.instrumental || (!data.lyrics && !data.vocalStyle),
+  { message: "instrumental cannot be combined with lyrics or vocalStyle" }
 );
 
 export const VideoGenerationSchema = z.object({
@@ -147,6 +176,10 @@ export const VideoGenerationSchema = z.object({
     .describe("Video resolution (1080p/4k requires durationSeconds='8')"),
   generateAudio: z.boolean().optional()
     .describe("Whether to generate audio"),
+  enhancePrompt: z.boolean().optional()
+    .describe("Whether to use Veo prompt rewriting/enhancement"),
+  personGeneration: z.enum(['allow_adult', 'dont_allow']).optional()
+    .describe("Optional person generation control"),
   negativePrompt: z.string().optional()
     .describe("Negative prompt for generation"),
   seed: z.number().int().min(0).max(4294967295).optional()
@@ -159,6 +192,8 @@ export const VideoGenerationSchema = z.object({
     .describe("Local file path of reference image (last frame, requires imagePath)"),
   referenceImagePaths: z.array(z.string()).optional()
     .describe("Local file paths of reference images (max 3)"),
+  videoPath: z.string().optional()
+    .describe("Local file path of a Veo-generated 720p video to extend"),
 }).refine(
   (data) => {
     if (data.resolution === '1080p' || data.resolution === '4k') {
@@ -183,6 +218,47 @@ export const VideoGenerationSchema = z.object({
     return true;
   },
   { message: "referenceImagePaths must have at most 3 items" }
+).refine(
+  (data) => {
+    if (!data.referenceImagePaths?.length) {
+      return true;
+    }
+    return data.model !== 'veo-3.1-lite-generate-001';
+  },
+  { message: "referenceImagePaths are not supported by model='veo-3.1-lite-generate-001'" }
+).refine(
+  (data) => {
+    if (!data.videoPath) {
+      return true;
+    }
+    return !data.imagePath && !data.lastFramePath && !data.referenceImagePaths?.length;
+  },
+  { message: "videoPath cannot be used with imagePath, lastFramePath, or referenceImagePaths" }
+).refine(
+  (data) => {
+    if (!data.referenceImagePaths?.length) {
+      return true;
+    }
+    return !data.imagePath && !data.lastFramePath && !data.videoPath;
+  },
+  { message: "referenceImagePaths cannot be used with imagePath, lastFramePath, or videoPath" }
+).refine(
+  (data) => {
+    if (!data.videoPath || !data.resolution) {
+      return true;
+    }
+    return data.resolution === '720p';
+  },
+  { message: "videoPath extension only supports resolution='720p'" }
+).refine(
+  (data) => !data.videoPath || !data.durationSeconds,
+  { message: "durationSeconds cannot be used with videoPath; Veo extension adds 7 seconds" }
+).refine(
+  (data) => !data.videoPath || data.numberOfVideos === undefined || data.numberOfVideos === 1,
+  { message: "videoPath extension returns a single video; omit numberOfVideos or set it to 1" }
+).refine(
+  (data) => data.model !== 'veo-3.1-lite-generate-001' || data.resolution !== '4k',
+  { message: "resolution '4k' is not supported by model='veo-3.1-lite-generate-001'" }
 );
 
 export type QueryInput = z.infer<typeof QuerySchema>;

@@ -46,7 +46,10 @@ export GEMINI_MUSIC_OUTPUT_DIR="/path/to/music"
 | `model` | enum | `gemini-3-pro-image-preview`, `gemini-3.1-flash-image-preview`, `gemini-2.5-flash-image` |
 | `aspectRatio` | enum | Includes standard ratios and 3.1 Flash-only wide/tall ratios |
 | `imageSize` | enum | `0.5K`, `1K`, `2K`, `4K`; omit for `gemini-2.5-flash-image` |
-| `imagePaths` | string[] | Optional local reference images |
+| `imagePaths` | string[] | Optional local reference images, max 14 |
+| `systemInstruction` | string | Optional Gemini 3 image system instruction |
+| `thinkingLevel` | enum | Optional Gemini 3 image thinking level |
+| `mediaResolution` | enum | Optional media resolution for reference image inputs |
 
 Example:
 
@@ -99,7 +102,13 @@ Detailed guide: [AUDIO_GENERATION.md](AUDIO_GENERATION.md)
 | `prompt` | string | Required |
 | `model` | enum | `lyria-3-clip-preview`, `lyria-3-pro-preview` |
 | `outputMimeType` | enum | `audio/mp3` or `audio/wav`; WAV requires `lyria-3-pro-preview` |
-| `imagePaths` | string[] | Optional image-guided Lyria inputs |
+| `imagePaths` | string[] | Optional image-guided Lyria inputs, max 10 |
+| `lyrics` | string | Optional user-provided lyrics |
+| `instrumental` | boolean | Requests instrumental-only output; cannot be combined with lyrics/vocals |
+| `vocalStyle` | string | Optional vocal direction |
+| `durationSeconds` | number | Optional target duration; requires `lyria-3-pro-preview` |
+| `bpm` | number | Optional tempo direction |
+| `intensity` | enum | `low`, `medium`, `high` |
 
 Example:
 
@@ -108,10 +117,14 @@ Example:
   "name": "generate_music",
   "arguments": {
     "prompt": "A 30-second lo-fi instrumental loop with soft keys and vinyl texture.",
-    "model": "lyria-3-clip-preview"
+    "model": "lyria-3-clip-preview",
+    "bpm": 82,
+    "intensity": "low"
   }
 }
 ```
+
+For Lyria 3, watermarking, input filtering, output recitation filtering, vocal-likeness filtering, and prompt rewriting are model-side features. The tool exposes controllable prompt-level inputs for lyrics, vocals, instrumental mode, duration, BPM, and intensity.
 
 Detailed guide: [AUDIO_GENERATION.md](AUDIO_GENERATION.md)
 
@@ -127,12 +140,24 @@ Detailed guide: [AUDIO_GENERATION.md](AUDIO_GENERATION.md)
 | `durationSeconds` | enum | `4`, `6`, `8` |
 | `resolution` | enum | `720p`, `1080p`, `4k`; 1080p/4k require 8 seconds |
 | `generateAudio` | boolean | Defaults to true |
+| `enhancePrompt` | boolean | Optional Veo prompt rewriting/enhancement |
+| `personGeneration` | enum | `allow_adult`, `dont_allow` |
 | `negativePrompt` | string | Optional exclusions |
 | `seed` | number | 0-4294967295 |
 | `numberOfVideos` | number | 1-4 |
 | `imagePath` | string | Optional first frame for image-to-video |
 | `lastFramePath` | string | Optional last frame, requires `imagePath` |
 | `referenceImagePaths` | string[] | Optional references, max 3 |
+| `videoPath` | string | Optional Veo-generated 720p video to extend |
+
+Source modes are mutually exclusive:
+
+- Text-only: omit source path fields.
+- Image-to-video/interpolation: use `imagePath`, optionally with `lastFramePath`.
+- Reference-image generation: use `referenceImagePaths` only.
+- Video extension: use `videoPath` only. Veo extension requires a Veo-generated 720p input video and returns one extended video.
+
+Veo 3.1 standard and fast support reference asset images; Lite does not. Lite also does not support `4k` output.
 
 Example:
 
@@ -148,6 +173,20 @@ Example:
 }
 ```
 
+Video extension:
+
+```json
+{
+  "name": "generate_video",
+  "arguments": {
+    "prompt": "Track the subject as the camera follows them into the next room.",
+    "model": "veo-3.1-generate-001",
+    "videoPath": "/path/to/previous-veo-output.mp4",
+    "resolution": "720p"
+  }
+}
+```
+
 Poll:
 
 ```json
@@ -158,6 +197,8 @@ Poll:
   }
 }
 ```
+
+More examples: [examples/video-generation.md](examples/video-generation.md)
 
 ## Authentication Mode Notes
 

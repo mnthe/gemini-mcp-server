@@ -135,12 +135,13 @@ The Gemini AI MCP Server is a production-grade intelligent agent that enables AI
 - Calls `GeminiAIService.generateMusic` with prompt and Lyria options
 - Saves generated music to disk via `audioSaver`
 - Returns structured content with file paths, MCP audio content, and Lyria text parts
-- Supports Lyria 3 Clip and Lyria 3 Pro
+- Supports Lyria 3 Clip and Lyria 3 Pro, including image-guided inputs up to 10 images
 
 **VideoGenerationHandler.ts** - Video generation entrypoint
 - Starts Veo video generation and returns an operation ID
 - Checks video operation status with `check_video`
 - Saves completed videos to disk via `videoSaver`
+- Supports text-to-video, image-to-video, interpolation, reference-image, and Veo extension source modes
 
 #### 6. Business Logic (`src/managers/`)
 
@@ -197,18 +198,23 @@ User Input → Turn 1..10 Loop:
 ### 8. Image Generation (`generate_image` tool)
 - Generates images via Gemini image models
 - Configurable aspect ratio, image size, and model
+- Supports Gemini 3 image controls for system instructions, thinking level, media resolution, and up to 14 reference images
 - Automatically saves output to disk with timestamped filenames
 - Returns both base64 image data and local file paths
 
 ### 9. Audio Generation (`generate_speech`, `generate_music` tools)
 - Generates TTS speech through Gemini TTS models
 - Generates music through Lyria 3 models
+- Supports image-guided Lyria inputs; audio/video sources remain out of scope for file-output audio generation
+- Supports Lyria 3 prompt-level controls for user lyrics, vocal direction, instrumental mode, target duration, BPM, and intensity
 - Saves speech and music to platform-aware audio directories
 - Returns MCP audio content blocks and local file paths
 - Keeps real-time Live API and Lyria RealTime out of scope
 
 ### 10. Video Generation (`generate_video`, `check_video` tools)
 - Starts Veo generation asynchronously and returns an operation ID
+- Accepts local Veo-generated videos as `videoPath` for extension
+- Supports Veo prompt enhancement and person-generation controls
 - Polls completed operations through `check_video`
 - Saves completed videos to platform-aware video directories
 - Returns saved file paths
