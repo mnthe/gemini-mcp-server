@@ -37,17 +37,15 @@ export class QueryHandler {
    */
   async handle(input: QueryInput): Promise<{ content: Array<{ type: string; text: string }> }> {
     try {
-      let sessionId = input.sessionId;
+      let sessionId: string | undefined;
       let conversationHistory: Message[] = [];
 
       // Handle conversation context
       if (this.enableConversations) {
-        if (!sessionId) {
-          sessionId = this.conversationManager.createSession();
-        }
-
+        sessionId = this.conversationManager.getOrCreateSession(input.sessionId);
         conversationHistory = this.conversationManager.getHistory(sessionId);
       }
+      const previousHistoryLength = conversationHistory.length;
 
       // Run agentic loop with multimodal parts if provided
       const result = await this.agenticLoop.run(
@@ -68,7 +66,8 @@ export class QueryHandler {
 
       // Update conversation history with all messages from result
       if (this.enableConversations && sessionId) {
-        for (const msg of result.messages) {
+        const newMessages = result.messages.slice(previousHistoryLength);
+        for (const msg of newMessages) {
           this.conversationManager.addMessage(sessionId, msg);
         }
       }

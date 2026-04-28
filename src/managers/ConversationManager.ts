@@ -16,7 +16,8 @@ export class ConversationManager {
     this.maxHistory = maxHistory;
 
     // Clean up expired sessions periodically
-    setInterval(() => this.cleanupExpiredSessions(), 60000); // Every minute
+    const cleanupInterval = setInterval(() => this.cleanupExpiredSessions(), 60000); // Every minute
+    cleanupInterval.unref?.();
   }
 
   /**
@@ -24,6 +25,29 @@ export class ConversationManager {
    */
   createSession(): string {
     const sessionId = randomBytes(16).toString("hex");
+    this.createSessionWithId(sessionId);
+    return sessionId;
+  }
+
+  /**
+   * Get an existing session or create one with the provided ID
+   */
+  getOrCreateSession(sessionId?: string): string {
+    if (!sessionId) {
+      return this.createSession();
+    }
+
+    const session = this.sessions.get(sessionId);
+    if (session) {
+      session.lastAccessed = new Date();
+      return sessionId;
+    }
+
+    this.createSessionWithId(sessionId);
+    return sessionId;
+  }
+
+  private createSessionWithId(sessionId: string): void {
     const session: ConversationSession = {
       id: sessionId,
       history: [],
@@ -31,7 +55,6 @@ export class ConversationManager {
       lastAccessed: new Date(),
     };
     this.sessions.set(sessionId, session);
-    return sessionId;
   }
 
   /**
