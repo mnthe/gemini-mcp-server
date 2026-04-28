@@ -3,8 +3,10 @@
  */
 
 export interface GeminiAIConfig {
-  projectId: string;
-  location: string;
+  projectId?: string;
+  location?: string;
+  apiKey?: string;
+  useVertexAI: boolean;
   model: string;
   temperature: number;
   maxTokens: number;
@@ -23,4 +25,6 @@ export interface GeminiAIConfig {
   mediaResolution?: string;
   imageOutputDir?: string;
   videoOutputDir?: string;
+  speechOutputDir?: string;
+  musicOutputDir?: string;
 }

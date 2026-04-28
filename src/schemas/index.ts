@@ -91,6 +91,50 @@ const ALLOWED_VIDEO_MODELS = [
   'veo-3.1-lite-generate-001',
 ] as const;
 
+const ALLOWED_SPEECH_MODELS = [
+  'gemini-3.1-flash-tts-preview',
+  'gemini-2.5-flash-preview-tts',
+  'gemini-2.5-pro-preview-tts',
+] as const;
+
+const SpeechSpeakerSchema = z.object({
+  speaker: z.string().min(1).describe("Speaker name exactly as it appears in the prompt"),
+  voiceName: z.string().min(1).describe("Prebuilt voice name for this speaker"),
+});
+
+export const SpeechGenerationSchema = z.object({
+  prompt: z.string().describe("Text or transcript to synthesize as speech"),
+  model: z.enum(ALLOWED_SPEECH_MODELS).optional()
+    .describe("Speech model (default: gemini-3.1-flash-tts-preview)"),
+  voiceName: z.string().min(1).optional()
+    .describe("Prebuilt voice name for single-speaker TTS (default: Kore)"),
+  languageCode: z.string().min(2).optional()
+    .describe("Optional BCP-47 language code for speech synthesis"),
+  speakers: z.array(SpeechSpeakerSchema).length(2).optional()
+    .describe("Exactly two speaker voice configs for multi-speaker TTS"),
+}).refine(
+  (data) => !data.voiceName || !data.speakers,
+  { message: "voiceName cannot be used with speakers; set voiceName per speaker instead" }
+);
+
+const ALLOWED_MUSIC_MODELS = [
+  'lyria-3-clip-preview',
+  'lyria-3-pro-preview',
+] as const;
+
+export const MusicGenerationSchema = z.object({
+  prompt: z.string().describe("Music generation prompt"),
+  model: z.enum(ALLOWED_MUSIC_MODELS).optional()
+    .describe("Music model (default: lyria-3-clip-preview)"),
+  outputMimeType: z.enum(['audio/mp3', 'audio/wav']).optional()
+    .describe("Optional output MIME type; audio/wav requires lyria-3-pro-preview"),
+  imagePaths: z.array(z.string()).optional()
+    .describe("Optional local image paths to use as multimodal music generation inputs"),
+}).refine(
+  (data) => data.outputMimeType !== 'audio/wav' || data.model === 'lyria-3-pro-preview',
+  { message: "outputMimeType 'audio/wav' requires model='lyria-3-pro-preview'" }
+);
+
 export const VideoGenerationSchema = z.object({
   prompt: z.string().describe("Video generation prompt"),
   model: z.enum(ALLOWED_VIDEO_MODELS).optional()
@@ -145,6 +189,8 @@ export type QueryInput = z.infer<typeof QuerySchema>;
 export type SearchInput = z.infer<typeof SearchSchema>;
 export type FetchInput = z.infer<typeof FetchSchema>;
 export type ImageGenerationInput = z.infer<typeof ImageGenerationSchema>;
+export type SpeechGenerationInput = z.infer<typeof SpeechGenerationSchema>;
+export type MusicGenerationInput = z.infer<typeof MusicGenerationSchema>;
 export type VideoGenerationInput = z.infer<typeof VideoGenerationSchema>;
 
 export const CheckVideoSchema = z.object({

@@ -1,15 +1,12 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
+import {
+  getDefaultGeneratedDir,
+  getExtensionForMimeType,
+  saveBase64File,
+  generateTimestampedFilename,
+} from './generatedFileSaver.js';
 
 export function getDefaultImageDir(): string {
-  const home = os.homedir();
-  switch (process.platform) {
-    case 'darwin':  return path.join(home, 'Pictures', 'gemini-generated');
-    case 'win32':   return path.join(home, 'Pictures', 'gemini-generated');
-    case 'linux':   return path.join(home, 'Pictures', 'gemini-generated');
-    default:        return path.join(home, 'gemini-generated');
-  }
+  return getDefaultGeneratedDir('image');
 }
 
 export function saveImage(
@@ -17,16 +14,13 @@ export function saveImage(
   outputDir: string,
   filename: string
 ): string {
-  fs.mkdirSync(outputDir, { recursive: true });
-  const filePath = path.join(outputDir, filename);
-  const buffer = Buffer.from(base64Data, 'base64');
-  fs.writeFileSync(filePath, buffer);
-  return filePath;
+  return saveBase64File(base64Data, outputDir, filename);
 }
 
 export function generateImageFilename(index: number, mimeType: string): string {
-  const now = new Date();
-  const timestamp = now.toISOString().replace(/[-:T]/g, '').slice(0, 14);
-  const ext = mimeType === 'image/jpeg' ? 'jpg' : 'png';
-  return `img-${timestamp}-${String(index).padStart(3, '0')}.${ext}`;
+  return generateTimestampedFilename(
+    'img',
+    index,
+    getExtensionForMimeType(mimeType, 'png')
+  );
 }

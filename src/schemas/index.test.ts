@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { ImageGenerationSchema, QuerySchema, VideoGenerationSchema } from './index.js';
+import {
+  ImageGenerationSchema,
+  MusicGenerationSchema,
+  QuerySchema,
+  SpeechGenerationSchema,
+  VideoGenerationSchema,
+} from './index.js';
 
 describe('QuerySchema model controls', () => {
   it('accepts Gemini 3.1 Flash-Lite and request-level controls', () => {
@@ -61,5 +67,50 @@ describe('VideoGenerationSchema current Veo models', () => {
       prompt: 'old model',
       model: 'veo-3.1-generate-preview',
     })).toThrow();
+  });
+});
+
+describe('SpeechGenerationSchema TTS models', () => {
+  it('accepts Gemini TTS model and two-speaker voice config', () => {
+    const parsed = SpeechGenerationSchema.parse({
+      prompt: 'Alice: 안녕하세요\nBob: 반갑습니다',
+      model: 'gemini-3.1-flash-tts-preview',
+      speakers: [
+        { speaker: 'Alice', voiceName: 'Kore' },
+        { speaker: 'Bob', voiceName: 'Puck' },
+      ],
+    });
+
+    expect(parsed.speakers).toHaveLength(2);
+  });
+
+  it('rejects top-level voiceName with multi-speaker config', () => {
+    expect(() => SpeechGenerationSchema.parse({
+      prompt: 'Alice: hi\nBob: hello',
+      voiceName: 'Kore',
+      speakers: [
+        { speaker: 'Alice', voiceName: 'Kore' },
+        { speaker: 'Bob', voiceName: 'Puck' },
+      ],
+    })).toThrow(/voiceName cannot be used with speakers/);
+  });
+});
+
+describe('MusicGenerationSchema Lyria models', () => {
+  it('accepts Lyria 3 Pro WAV output', () => {
+    const parsed = MusicGenerationSchema.parse({
+      prompt: 'A cinematic orchestral track',
+      model: 'lyria-3-pro-preview',
+      outputMimeType: 'audio/wav',
+    });
+
+    expect(parsed.outputMimeType).toBe('audio/wav');
+  });
+
+  it('rejects WAV output on Lyria 3 Clip default model', () => {
+    expect(() => MusicGenerationSchema.parse({
+      prompt: 'A short acoustic loop',
+      outputMimeType: 'audio/wav',
+    })).toThrow(/lyria-3-pro-preview/);
   });
 });

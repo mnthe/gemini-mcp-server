@@ -1,6 +1,6 @@
 /**
  * GeminiAIService - Handles communication with Google AI (Gemini models)
- * Uses @google/genai unified SDK supporting both Vertex AI and Google AI Studio
+ * Uses @google/genai SDK with Vertex AI or Gemini Developer API mode
  */
 
 import { GenerateContentConfig, GoogleGenAI, MediaResolution, Part, ThinkingLevel } from "@google/genai";
@@ -45,6 +45,29 @@ export interface GeneratedVideo {
   mimeType: string;
 }
 
+export interface SpeechSpeakerOptions {
+  speaker: string;
+  voiceName: string;
+}
+
+export interface SpeechGenerationOptions {
+  model?: string;
+  voiceName?: string;
+  languageCode?: string;
+  speakers?: SpeechSpeakerOptions[];
+}
+
+export interface MusicGenerationOptions {
+  model?: string;
+  outputMimeType?: string;
+  imagePaths?: string[];
+}
+
+export interface GeneratedAudio {
+  data: Buffer;
+  mimeType: string;
+}
+
 export interface QueryOptions {
   enableThinking?: boolean;
   /**
@@ -75,11 +98,15 @@ export class GeminiAIService {
 
   constructor(config: GeminiAIConfig) {
     this.config = config;
-    this.client = new GoogleGenAI({
-      vertexai: true,
-      project: config.projectId,
-      location: config.location,
-    });
+    this.client = config.useVertexAI
+      ? new GoogleGenAI({
+          vertexai: true,
+          project: config.projectId,
+          location: config.location,
+        })
+      : new GoogleGenAI({
+          apiKey: config.apiKey,
+        });
   }
 
   /**
@@ -92,7 +119,7 @@ export class GeminiAIService {
   }
 
   /**
-   * Query Vertex AI with a prompt and optional multimodal content
+   * Query Gemini with a prompt and optional multimodal content
    */
   async query(
     prompt: string, 
@@ -336,20 +363,7 @@ export class GeminiAIService {
     options: ImageGenerationOptions = {}
   ): Promise<{ images: GeneratedImage[]; text?: string }> {
     const model = options.model || 'gemini-3-pro-image-preview';
-
-    // Build contents: text prompt + optional reference images
-    let contents: any;
-    if (options.imagePaths && options.imagePaths.length > 0) {
-      const parts: Part[] = [{ text: prompt }];
-      for (const filePath of options.imagePaths) {
-        const data = readFileSync(filePath).toString('base64');
-        const mimeType = this.getMimeTypeFromExtension(extname(filePath));
-        parts.push({ inlineData: { data, mimeType } });
-      }
-      contents = [{ role: 'user', parts }];
-    } else {
-      contents = prompt;
-    }
+    const contents = this.buildContentsWithInlineFiles(prompt, options.imagePaths);
 
     const response = await this.client.models.generateContent({
       model,
@@ -363,6 +377,76 @@ export class GeminiAIService {
       },
     });
     return this.extractImages(response);
+  }
+
+  /**
+   * Generate speech audio using Gemini TTS models
+   */
+  async generateSpeech(
+    prompt: string,
+    options: SpeechGenerationOptions = {}
+  ): Promise<{ audios: GeneratedAudio[]; text?: string }> {
+    const model = options.model || 'gemini-3.1-flash-tts-preview';
+
+    const speechConfig: any = {};
+    if (options.languageCode) {
+      speechConfig.languageCode = options.languageCode;
+    }
+
+    if (options.speakers && options.speakers.length > 0) {
+      speechConfig.multiSpeakerVoiceConfig = {
+        speakerVoiceConfigs: options.speakers.map((speaker) => ({
+          speaker: speaker.speaker,
+          voiceConfig: {
+            prebuiltVoiceConfig: {
+              voiceName: speaker.voiceName,
+            },
+          },
+        })),
+      };
+    } else {
+      speechConfig.voiceConfig = {
+        prebuiltVoiceConfig: {
+          voiceName: options.voiceName || 'Kore',
+        },
+      };
+    }
+
+    const response = await this.client.models.generateContent({
+      model,
+      contents: prompt,
+      config: {
+        responseModalities: ['AUDIO'],
+        speechConfig,
+      },
+    });
+
+    return this.extractAudioParts(response, 'audio/pcm');
+  }
+
+  /**
+   * Generate music using Lyria models
+   */
+  async generateMusic(
+    prompt: string,
+    options: MusicGenerationOptions = {}
+  ): Promise<{ audios: GeneratedAudio[]; text?: string }> {
+    const model = options.model || 'lyria-3-clip-preview';
+    const config: GenerateContentConfig = {
+      responseModalities: ['AUDIO', 'TEXT'],
+    };
+
+    if (options.outputMimeType) {
+      config.responseMimeType = options.outputMimeType;
+    }
+
+    const response = await this.client.models.generateContent({
+      model,
+      contents: this.buildContentsWithInlineFiles(prompt, options.imagePaths),
+      config,
+    });
+
+    return this.extractAudioParts(response, options.outputMimeType || 'audio/mp3');
   }
 
   private getMimeTypeFromExtension(ext: string): string {
@@ -380,6 +464,38 @@ export class GeminiAIService {
     return map[ext.toLowerCase()] || 'image/png';
   }
 
+  private buildContentsWithInlineFiles(prompt: string, filePaths?: string[]): any {
+    if (!filePaths || filePaths.length === 0) {
+      return prompt;
+    }
+
+    const parts: Part[] = [{ text: prompt }];
+    for (const filePath of filePaths) {
+      const data = readFileSync(filePath).toString('base64');
+      const mimeType = this.getMimeTypeFromExtension(extname(filePath));
+      parts.push({ inlineData: { data, mimeType } });
+    }
+
+    return [{ role: 'user', parts }];
+  }
+
+  private getResponseParts(response: any): any[] {
+    const parts: any[] = [];
+
+    const candidates = response?.candidates || [];
+    for (const candidate of candidates) {
+      if (Array.isArray(candidate?.content?.parts)) {
+        parts.push(...candidate.content.parts);
+      }
+    }
+
+    if (parts.length === 0 && Array.isArray(response?.parts)) {
+      parts.push(...response.parts);
+    }
+
+    return parts;
+  }
+
   /**
    * Extract images and text from a Gemini response containing inline data
    */
@@ -387,19 +503,15 @@ export class GeminiAIService {
     const images: GeneratedImage[] = [];
     let text: string | undefined;
 
-    const candidates = response?.candidates || [];
-    for (const candidate of candidates) {
-      const parts = candidate?.content?.parts || [];
-      for (const part of parts) {
-        if (part.inlineData) {
-          images.push({
-            data: part.inlineData.data,
-            mimeType: part.inlineData.mimeType || 'image/png',
-          });
-        }
-        if (part.text) {
-          text = text ? text + '\n' + part.text : part.text;
-        }
+    for (const part of this.getResponseParts(response)) {
+      if (part.inlineData) {
+        images.push({
+          data: part.inlineData.data,
+          mimeType: part.inlineData.mimeType || 'image/png',
+        });
+      }
+      if (part.text) {
+        text = text ? text + '\n' + part.text : part.text;
       }
     }
 
@@ -409,6 +521,38 @@ export class GeminiAIService {
     }
 
     return { images, text };
+  }
+
+  /**
+   * Extract audio and text from a Gemini response containing inline data
+   */
+  private extractAudioParts(
+    response: any,
+    defaultMimeType: string
+  ): { audios: GeneratedAudio[]; text?: string } {
+    const audios: GeneratedAudio[] = [];
+    let text: string | undefined;
+
+    for (const part of this.getResponseParts(response)) {
+      if (part.inlineData) {
+        const rawData = part.inlineData.data;
+        audios.push({
+          data: Buffer.isBuffer(rawData)
+            ? rawData
+            : Buffer.from(String(rawData), 'base64'),
+          mimeType: part.inlineData.mimeType || defaultMimeType,
+        });
+      }
+      if (part.text) {
+        text = text ? text + '\n' + part.text : part.text;
+      }
+    }
+
+    if (!text && response?.text) {
+      text = response.text;
+    }
+
+    return { audios, text };
   }
 
   /**

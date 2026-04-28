@@ -11,7 +11,16 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 
 import { GeminiAIConfig, CachedDocument, MCPServerConfig } from '../types/index.js';
-import { QuerySchema, SearchSchema, FetchSchema, ImageGenerationSchema, VideoGenerationSchema, CheckVideoSchema } from '../schemas/index.js';
+import {
+  QuerySchema,
+  SearchSchema,
+  FetchSchema,
+  ImageGenerationSchema,
+  SpeechGenerationSchema,
+  MusicGenerationSchema,
+  VideoGenerationSchema,
+  CheckVideoSchema,
+} from '../schemas/index.js';
 import { ConversationManager } from '../managers/ConversationManager.js';
 import { GeminiAIService } from '../services/GeminiAIService.js';
 import { EnhancedMCPClient } from '../mcp/EnhancedMCPClient.js';
@@ -22,6 +31,8 @@ import { QueryHandler } from '../handlers/QueryHandler.js';
 import { SearchHandler } from '../handlers/SearchHandler.js';
 import { FetchHandler } from '../handlers/FetchHandler.js';
 import { ImageGenerationHandler } from '../handlers/ImageGenerationHandler.js';
+import { SpeechGenerationHandler } from '../handlers/SpeechGenerationHandler.js';
+import { MusicGenerationHandler } from '../handlers/MusicGenerationHandler.js';
 import { VideoGenerationHandler } from '../handlers/VideoGenerationHandler.js';
 
 export class GeminiAIMCPServer {
@@ -41,6 +52,8 @@ export class GeminiAIMCPServer {
   private searchHandler: SearchHandler;
   private fetchHandler: FetchHandler;
   private imageGenerationHandler: ImageGenerationHandler;
+  private speechGenerationHandler: SpeechGenerationHandler;
+  private musicGenerationHandler: MusicGenerationHandler;
   private videoGenerationHandler: VideoGenerationHandler;
 
   // Cache
@@ -100,6 +113,8 @@ export class GeminiAIMCPServer {
     this.searchHandler = new SearchHandler(this.geminiAI, this.searchCache);
     this.fetchHandler = new FetchHandler(this.searchCache);
     this.imageGenerationHandler = new ImageGenerationHandler(this.geminiAI, config);
+    this.speechGenerationHandler = new SpeechGenerationHandler(this.geminiAI, config);
+    this.musicGenerationHandler = new MusicGenerationHandler(this.geminiAI, config);
     this.videoGenerationHandler = new VideoGenerationHandler(this.geminiAI, config);
 
     this.setupHandlers();
@@ -265,6 +280,88 @@ export class GeminiAIMCPServer {
           },
         },
         {
+          name: "generate_speech",
+          description:
+            "Generate speech audio using Gemini TTS models. " +
+            "Supports single-speaker and two-speaker TTS. " +
+            `Audio is saved to ${this.speechGenerationHandler.getSpeechOutputDir()} and returned as MCP audio content.`,
+          inputSchema: {
+            type: "object",
+            properties: {
+              prompt: {
+                type: "string",
+                description: "Text or transcript to synthesize as speech",
+              },
+              model: {
+                type: "string",
+                enum: ["gemini-3.1-flash-tts-preview", "gemini-2.5-flash-preview-tts", "gemini-2.5-pro-preview-tts"],
+                description: "Speech model (default: gemini-3.1-flash-tts-preview)",
+              },
+              voiceName: {
+                type: "string",
+                description: "Prebuilt voice name for single-speaker TTS (default: Kore)",
+              },
+              languageCode: {
+                type: "string",
+                description: "Optional BCP-47 language code for speech synthesis",
+              },
+              speakers: {
+                type: "array",
+                minItems: 2,
+                maxItems: 2,
+                description: "Exactly two speaker voice configs for multi-speaker TTS",
+                items: {
+                  type: "object",
+                  properties: {
+                    speaker: {
+                      type: "string",
+                      description: "Speaker name exactly as it appears in the prompt",
+                    },
+                    voiceName: {
+                      type: "string",
+                      description: "Prebuilt voice name for this speaker",
+                    },
+                  },
+                  required: ["speaker", "voiceName"],
+                },
+              },
+            },
+            required: ["prompt"],
+          },
+        },
+        {
+          name: "generate_music",
+          description:
+            "Generate music using Lyria models. " +
+            "Supports short clips and full-length songs depending on the model. " +
+            `Audio is saved to ${this.musicGenerationHandler.getMusicOutputDir()} and returned as MCP audio content.`,
+          inputSchema: {
+            type: "object",
+            properties: {
+              prompt: {
+                type: "string",
+                description: "Music generation prompt",
+              },
+              model: {
+                type: "string",
+                enum: ["lyria-3-clip-preview", "lyria-3-pro-preview"],
+                description: "Music model (default: lyria-3-clip-preview)",
+              },
+              outputMimeType: {
+                type: "string",
+                enum: ["audio/mp3", "audio/wav"],
+                description: "Optional output MIME type; audio/wav requires lyria-3-pro-preview",
+              },
+              imagePaths: {
+                type: "array",
+                items: { type: "string" },
+                description: "Optional local image paths to use as multimodal music generation inputs",
+              },
+            },
+            required: ["prompt"],
+          },
+        },
+        {
           name: "generate_video",
           description:
             "Start video generation using Google's Veo models. Returns an operationId immediately. " +
@@ -380,6 +477,16 @@ export class GeminiAIMCPServer {
         case "generate_image": {
           const input = ImageGenerationSchema.parse(args);
           return await this.imageGenerationHandler.handle(input);
+        }
+
+        case "generate_speech": {
+          const input = SpeechGenerationSchema.parse(args);
+          return await this.speechGenerationHandler.handle(input);
+        }
+
+        case "generate_music": {
+          const input = MusicGenerationSchema.parse(args);
+          return await this.musicGenerationHandler.handle(input);
         }
 
         case "generate_video": {

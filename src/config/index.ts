@@ -7,12 +7,23 @@
 import { GeminiAIConfig } from '../types/index.js';
 
 export function loadConfig(): GeminiAIConfig {
-  // Get project ID - follows gen-ai SDK standard environment variables
-  const projectId = process.env.GOOGLE_CLOUD_PROJECT || "";
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+  const projectId = process.env.GOOGLE_CLOUD_PROJECT;
+  const explicitVertexMode = process.env.GOOGLE_GENAI_USE_VERTEXAI;
+  const useVertexAI = explicitVertexMode === undefined
+    ? Boolean(projectId) || !apiKey
+    : explicitVertexMode === "true";
 
-  if (!projectId) {
+  if (useVertexAI && !projectId) {
     console.error(
-      "Error: GOOGLE_CLOUD_PROJECT environment variable is required"
+      "Error: GOOGLE_CLOUD_PROJECT environment variable is required when using Vertex AI mode"
+    );
+    process.exit(1);
+  }
+
+  if (!useVertexAI && !apiKey) {
+    console.error(
+      "Error: GEMINI_API_KEY or GOOGLE_API_KEY environment variable is required when using Google AI Studio / Gemini Developer API mode"
     );
     process.exit(1);
   }
@@ -58,9 +69,15 @@ export function loadConfig(): GeminiAIConfig {
   // Video output directory - where generated videos are saved
   const videoOutputDir = process.env.GEMINI_VIDEO_OUTPUT_DIR;
 
+  // Audio output directories - where generated speech and music are saved
+  const speechOutputDir = process.env.GEMINI_SPEECH_OUTPUT_DIR;
+  const musicOutputDir = process.env.GEMINI_MUSIC_OUTPUT_DIR;
+
   return {
     projectId,
     location,
+    apiKey,
+    useVertexAI,
     model,
     temperature,
     maxTokens,
@@ -79,5 +96,7 @@ export function loadConfig(): GeminiAIConfig {
     mediaResolution,
     imageOutputDir,
     videoOutputDir,
+    speechOutputDir,
+    musicOutputDir,
   };
 }

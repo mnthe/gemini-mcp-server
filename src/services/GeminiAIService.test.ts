@@ -61,7 +61,9 @@ describe('default model configuration', () => {
     // Save and clear env
     const savedModel = process.env.GEMINI_MODEL;
     const savedProject = process.env.GOOGLE_CLOUD_PROJECT;
+    const savedUseVertex = process.env.GOOGLE_GENAI_USE_VERTEXAI;
     delete process.env.GEMINI_MODEL;
+    delete process.env.GOOGLE_GENAI_USE_VERTEXAI;
     process.env.GOOGLE_CLOUD_PROJECT = 'test-project';
 
     try {
@@ -69,6 +71,7 @@ describe('default model configuration', () => {
       const { loadConfig } = await import('../config/index.js');
       const config = loadConfig();
       expect(config.model).toBe('gemini-3-flash-preview');
+      expect(config.useVertexAI).toBe(true);
     } finally {
       // Restore env
       if (savedModel !== undefined) {
@@ -79,6 +82,37 @@ describe('default model configuration', () => {
       } else {
         delete process.env.GOOGLE_CLOUD_PROJECT;
       }
+      if (savedUseVertex !== undefined) {
+        process.env.GOOGLE_GENAI_USE_VERTEXAI = savedUseVertex;
+      } else {
+        delete process.env.GOOGLE_GENAI_USE_VERTEXAI;
+      }
+    }
+  });
+});
+
+describe('API mode configuration', () => {
+  it('uses Gemini Developer API mode when explicitly configured with an API key', async () => {
+    const savedProject = process.env.GOOGLE_CLOUD_PROJECT;
+    const savedApiKey = process.env.GEMINI_API_KEY;
+    const savedUseVertex = process.env.GOOGLE_GENAI_USE_VERTEXAI;
+    delete process.env.GOOGLE_CLOUD_PROJECT;
+    process.env.GEMINI_API_KEY = 'test-api-key';
+    process.env.GOOGLE_GENAI_USE_VERTEXAI = 'false';
+
+    try {
+      const { loadConfig } = await import('../config/index.js');
+      const config = loadConfig();
+      expect(config.useVertexAI).toBe(false);
+      expect(config.apiKey).toBe('test-api-key');
+      expect(config.projectId).toBeUndefined();
+    } finally {
+      if (savedProject !== undefined) process.env.GOOGLE_CLOUD_PROJECT = savedProject;
+      else delete process.env.GOOGLE_CLOUD_PROJECT;
+      if (savedApiKey !== undefined) process.env.GEMINI_API_KEY = savedApiKey;
+      else delete process.env.GEMINI_API_KEY;
+      if (savedUseVertex !== undefined) process.env.GOOGLE_GENAI_USE_VERTEXAI = savedUseVertex;
+      else delete process.env.GOOGLE_GENAI_USE_VERTEXAI;
     }
   });
 });
@@ -88,6 +122,8 @@ describe('mediaResolution config', () => {
     const savedModel = process.env.GEMINI_MODEL;
     const savedProject = process.env.GOOGLE_CLOUD_PROJECT;
     const savedMediaRes = process.env.GEMINI_MEDIA_RESOLUTION;
+    const savedUseVertex = process.env.GOOGLE_GENAI_USE_VERTEXAI;
+    delete process.env.GOOGLE_GENAI_USE_VERTEXAI;
     process.env.GOOGLE_CLOUD_PROJECT = 'test-project';
     process.env.GEMINI_MEDIA_RESOLUTION = 'high';
 
@@ -101,12 +137,16 @@ describe('mediaResolution config', () => {
       else delete process.env.GOOGLE_CLOUD_PROJECT;
       if (savedMediaRes !== undefined) process.env.GEMINI_MEDIA_RESOLUTION = savedMediaRes;
       else delete process.env.GEMINI_MEDIA_RESOLUTION;
+      if (savedUseVertex !== undefined) process.env.GOOGLE_GENAI_USE_VERTEXAI = savedUseVertex;
+      else delete process.env.GOOGLE_GENAI_USE_VERTEXAI;
     }
   });
 
   it('is undefined when env var not set', async () => {
     const savedProject = process.env.GOOGLE_CLOUD_PROJECT;
     const savedMediaRes = process.env.GEMINI_MEDIA_RESOLUTION;
+    const savedUseVertex = process.env.GOOGLE_GENAI_USE_VERTEXAI;
+    delete process.env.GOOGLE_GENAI_USE_VERTEXAI;
     process.env.GOOGLE_CLOUD_PROJECT = 'test-project';
     delete process.env.GEMINI_MEDIA_RESOLUTION;
 
@@ -118,6 +158,38 @@ describe('mediaResolution config', () => {
       if (savedProject !== undefined) process.env.GOOGLE_CLOUD_PROJECT = savedProject;
       else delete process.env.GOOGLE_CLOUD_PROJECT;
       if (savedMediaRes !== undefined) process.env.GEMINI_MEDIA_RESOLUTION = savedMediaRes;
+      else delete process.env.GEMINI_MEDIA_RESOLUTION;
+      if (savedUseVertex !== undefined) process.env.GOOGLE_GENAI_USE_VERTEXAI = savedUseVertex;
+      else delete process.env.GOOGLE_GENAI_USE_VERTEXAI;
+    }
+  });
+});
+
+describe('generated audio output config', () => {
+  it('loads speech and music output directories from env', async () => {
+    const savedProject = process.env.GOOGLE_CLOUD_PROJECT;
+    const savedSpeechDir = process.env.GEMINI_SPEECH_OUTPUT_DIR;
+    const savedMusicDir = process.env.GEMINI_MUSIC_OUTPUT_DIR;
+    const savedUseVertex = process.env.GOOGLE_GENAI_USE_VERTEXAI;
+    delete process.env.GOOGLE_GENAI_USE_VERTEXAI;
+    process.env.GOOGLE_CLOUD_PROJECT = 'test-project';
+    process.env.GEMINI_SPEECH_OUTPUT_DIR = '/tmp/speech';
+    process.env.GEMINI_MUSIC_OUTPUT_DIR = '/tmp/music';
+
+    try {
+      const { loadConfig } = await import('../config/index.js');
+      const config = loadConfig();
+      expect(config.speechOutputDir).toBe('/tmp/speech');
+      expect(config.musicOutputDir).toBe('/tmp/music');
+    } finally {
+      if (savedProject !== undefined) process.env.GOOGLE_CLOUD_PROJECT = savedProject;
+      else delete process.env.GOOGLE_CLOUD_PROJECT;
+      if (savedSpeechDir !== undefined) process.env.GEMINI_SPEECH_OUTPUT_DIR = savedSpeechDir;
+      else delete process.env.GEMINI_SPEECH_OUTPUT_DIR;
+      if (savedMusicDir !== undefined) process.env.GEMINI_MUSIC_OUTPUT_DIR = savedMusicDir;
+      else delete process.env.GEMINI_MUSIC_OUTPUT_DIR;
+      if (savedUseVertex !== undefined) process.env.GOOGLE_GENAI_USE_VERTEXAI = savedUseVertex;
+      else delete process.env.GOOGLE_GENAI_USE_VERTEXAI;
     }
   });
 });

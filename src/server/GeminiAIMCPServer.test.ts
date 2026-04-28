@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /**
- * Tests for generate_image tool wiring in GeminiAIMCPServer.
+ * Tests for generation tool wiring in GeminiAIMCPServer.
  *
  * We cannot instantiate the full server (requires API keys, transport, etc.)
  * so we test indirectly: import the module, mock dependencies, and verify
@@ -99,6 +99,24 @@ vi.mock('../handlers/ImageGenerationHandler.js', () => ({
   },
 }));
 
+const mockSpeechGenHandle = vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] });
+vi.mock('../handlers/SpeechGenerationHandler.js', () => ({
+  SpeechGenerationHandler: class {
+    handle = mockSpeechGenHandle;
+    getSpeechOutputDir = vi.fn().mockReturnValue('/tmp/speech');
+    constructor() {}
+  },
+}));
+
+const mockMusicGenHandle = vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] });
+vi.mock('../handlers/MusicGenerationHandler.js', () => ({
+  MusicGenerationHandler: class {
+    handle = mockMusicGenHandle;
+    getMusicOutputDir = vi.fn().mockReturnValue('/tmp/music');
+    constructor() {}
+  },
+}));
+
 vi.mock('../handlers/VideoGenerationHandler.js', () => ({
   VideoGenerationHandler: class {
     handle = vi.fn();
@@ -154,6 +172,8 @@ describe('GeminiAIMCPServer generate_image wiring', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockImageGenHandle.mockClear();
+    mockSpeechGenHandle.mockClear();
+    mockMusicGenHandle.mockClear();
     mcpServer = new GeminiAIMCPServer(createTestConfig());
     // Access the internal Server mock instance via the private field
     const internalServer = (mcpServer as any).server;
@@ -205,6 +225,58 @@ describe('GeminiAIMCPServer generate_image wiring', () => {
 
     // Verify the mock handle function was called with parsed args
     expect(mockImageGenHandle).toHaveBeenCalledWith({ prompt: 'a cat' });
+  });
+
+  it('generate_speech tool is exposed and routed to SpeechGenerationHandler', async () => {
+    const result = await listHandler();
+    const speechTool = result.tools.find((t: any) => t.name === 'generate_speech');
+
+    expect(speechTool).toBeDefined();
+    expect(speechTool.inputSchema.required).toContain('prompt');
+    expect(speechTool.inputSchema.properties.model.enum).toEqual([
+      'gemini-3.1-flash-tts-preview',
+      'gemini-2.5-flash-preview-tts',
+      'gemini-2.5-pro-preview-tts',
+    ]);
+    expect(speechTool.inputSchema.properties.speakers.minItems).toBe(2);
+    expect(speechTool.inputSchema.properties.speakers.maxItems).toBe(2);
+
+    await callHandler({
+      params: {
+        name: 'generate_speech',
+        arguments: { prompt: 'say hello', voiceName: 'Kore' },
+      },
+    });
+
+    expect(mockSpeechGenHandle).toHaveBeenCalledWith({ prompt: 'say hello', voiceName: 'Kore' });
+  });
+
+  it('generate_music tool is exposed and routed to MusicGenerationHandler', async () => {
+    const result = await listHandler();
+    const musicTool = result.tools.find((t: any) => t.name === 'generate_music');
+
+    expect(musicTool).toBeDefined();
+    expect(musicTool.inputSchema.required).toContain('prompt');
+    expect(musicTool.inputSchema.properties.model.enum).toEqual([
+      'lyria-3-clip-preview',
+      'lyria-3-pro-preview',
+    ]);
+    expect(musicTool.inputSchema.properties.outputMimeType.enum).toEqual([
+      'audio/mp3',
+      'audio/wav',
+    ]);
+
+    await callHandler({
+      params: {
+        name: 'generate_music',
+        arguments: { prompt: 'short folk loop', model: 'lyria-3-clip-preview' },
+      },
+    });
+
+    expect(mockMusicGenHandle).toHaveBeenCalledWith({
+      prompt: 'short folk loop',
+      model: 'lyria-3-clip-preview',
+    });
   });
 
   it('throws for unknown tool names', async () => {
