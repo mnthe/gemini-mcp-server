@@ -27,7 +27,10 @@ src/
 │   ├── QueryHandler.ts
 │   ├── SearchHandler.ts
 │   ├── FetchHandler.ts
-│   └── ImageGenerationHandler.ts
+│   ├── ImageGenerationHandler.ts
+│   ├── SpeechGenerationHandler.ts
+│   ├── MusicGenerationHandler.ts
+│   └── VideoGenerationHandler.ts
 │
 ├── managers/          # Business logic managers
 │   └── ConversationManager.ts
@@ -55,7 +58,10 @@ src/
 │   ├── Logger.ts
 │   ├── urlSecurity.ts
 │   ├── fileSecurity.ts
-│   └── imageSaver.ts
+│   ├── generatedFileSaver.ts
+│   ├── imageSaver.ts
+│   ├── videoSaver.ts
+│   └── audioSaver.ts
 │
 ├── server/            # MCP server bootstrap
 │   ├── GeminiAIMCPServer.ts
@@ -79,7 +85,7 @@ Contains the **heart of the agentic system** - the loop, state management, and t
 **External service integrations** - Gemini AI API service for model interactions. Includes integration tests co-located with the service.
 
 ### handlers/
-**MCP request handlers** - process tool call requests from MCP clients (query, search, fetch, image generation).
+**MCP request handlers** - process tool call requests from MCP clients (query, search, fetch, image generation, speech generation, music generation, video generation).
 
 ### managers/
 **Business logic managers** - ConversationManager maintains multi-turn conversation state.
@@ -88,7 +94,7 @@ Contains the **heart of the agentic system** - the loop, state management, and t
 **Shared primitives** - custom errors, TypeScript types, validation schemas, and configuration loading. Pure, reusable code.
 
 ### utils/
-**Utility functions** - Logger for observability, URL/file security validators for SSRF protection, imageSaver for persisting generated images to disk.
+**Utility functions** - Logger for observability, URL/file security validators for SSRF protection, and generated media savers for image, video, speech, and music outputs.
 
 ### server/
 **Application bootstrap** - server initialization and wiring. Single responsibility: start the MCP server. Includes integration tests co-located with the server.

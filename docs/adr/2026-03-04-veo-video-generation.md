@@ -2,11 +2,11 @@
 
 ## Status
 
-Accepted — 2026-03-04
+Accepted — 2026-03-04; amended — 2026-04-28
 
 ## Context
 
-The project provides multimodal content generation capabilities via MCP tools. Image generation (`gemini_generate_image`) was previously implemented following a standard pattern: Schema → Service → Handler → Utility → Server registration. Users need the ability to generate videos from text prompts, images (image-to-video), and interpolation scenarios using Google's Veo models.
+The project provides multimodal content generation capabilities via MCP tools. Image generation (`generate_image`) was previously implemented following a standard pattern: Schema → Service → Handler → Utility → Server registration. Users need the ability to generate videos from text prompts, images (image-to-video), and interpolation scenarios using Google's Veo models.
 
 ## Decision
 
@@ -18,14 +18,14 @@ Implement a `generate_video` MCP tool following the established image generation
 4. **Reference images** for style/asset guidance (max 3, Veo 3.1 only)
 5. **Default model**: `veo-3.1-fast-generate-001` (speed-optimized)
 6. **Audio generation**: Enabled by default (`generateAudio: true`)
-7. **Platform-aware storage**: macOS → `~/Movies/gemini-generated`, others → `~/Videos/gemini-generated`
-8. **Async polling**: 10-second interval polling for long-running operations
+7. **Platform-aware storage**: macOS → `~/Movies/gemini-generated`, Windows/Linux → `~/Videos/gemini-generated`
+8. **Async request/check split**: `generate_video` returns an operation ID; `check_video` polls and saves completed videos
 9. **File path return**: Only file paths (not base64) due to large video sizes (tens of MB)
 
 ### Rationale
 
 - **Consistency**: Reuses image generation patterns (Schema→Service→Handler→Utility→Server) to minimize learning curve and maintain code cohesion
-- **Scalability**: Async polling with 10s intervals avoids blocking and handles extended generation times
+- **Scalability**: Splitting request and status check avoids blocking MCP calls for extended generation times
 - **Practicality**: File path returns are appropriate for large video files; base64 inline would be infeasible
 - **Base64 input**: Image inputs (imagePath, lastFramePath, referenceImagePaths) are read locally and encoded as base64 to match `imagePaths` pattern from image generation
 - **Audio**: Veo 3.1 supports audio generation, so enabling by default enhances output value
@@ -39,7 +39,7 @@ Implement a `generate_video` MCP tool following the established image generation
 ### Files Changed
 
 - `src/schemas/index.ts` (modified) — Added `VideoGenerationSchema` with validation refines
-- `src/services/GeminiAIService.ts` (modified) — Added `generateVideo()` method with async operation polling
+- `src/services/GeminiAIService.ts` (modified) — Added `generateVideo()` and `checkVideoOperation()` methods
 - `src/utils/videoSaver.ts` (created) — Video save utilities matching imageSaver pattern
 - `src/handlers/VideoGenerationHandler.ts` (created) — Handler for video generation requests
 - `src/server/GeminiAIMCPServer.ts` (modified) — Registered `generate_video` tool in ListTools and CallTool
@@ -123,14 +123,14 @@ The `generateVideo()` method:
 1. Builds API request parameters from options
 2. Reads image files (imagePath, lastFramePath, referenceImagePaths) and encodes as base64
 3. Calls `client.models.generateVideos()` to initiate async operation
-4. Polls `client.operations.getVideosOperation()` every 10 seconds until `operation.done === true`
-5. Extracts video data from response (handles both inline base64 and downloadable URIs)
-6. Returns array of `GeneratedVideo` objects with buffer data and MIME type
+4. Caches the operation object by operation ID
+5. `checkVideoOperation()` polls `client.operations.getVideosOperation()`
+6. Extracts video data from response when complete (handles both inline base64 and downloadable URIs)
 
 #### 3. Video Saver (`src/utils/videoSaver.ts`)
 
 Utility functions matching imageSaver pattern:
-- `getDefaultVideoDir()`: Platform-aware paths (macOS: `~/Movies/gemini-generated`, others: `~/Videos/gemini-generated`)
+- `getDefaultVideoDir()`: Platform-aware paths (macOS: `~/Movies/gemini-generated`, Windows/Linux: `~/Videos/gemini-generated`)
 - `saveVideo(data: Buffer, outputDir: string, filename: string)`: Writes video to disk
 - `generateVideoFilename(index: number)`: Creates timestamped filenames (`vid-YYYYMMDDHHMMSS-NNN.mp4`)
 
@@ -145,8 +145,8 @@ Orchestrates the video generation flow:
 #### 5. Server Registration (`src/server/GeminiAIMCPServer.ts`)
 
 - Imported VideoGenerationHandler and VideoGenerationSchema
-- Added `generate_video` tool definition to ListTools (with all 11 parameters)
-- Added `generate_video` case to CallTool switch statement
+- Added `generate_video` and `check_video` tool definitions to ListTools
+- Added `generate_video` and `check_video` cases to CallTool switch statement
 
 #### 6. Configuration (`src/types/config.ts`, `src/config/index.ts`)
 
@@ -158,14 +158,14 @@ Orchestrates the video generation flow:
 | ID | Task | Status | Key Evidence |
 |----|------|--------|--------------|
 | 1  | Schema + Config + VideoSaver | resolved | videoSaver utility created; schema with 3 refines; config integration |
-| 2  | GeminiAIService.generateVideo() | resolved | Async operation polling (10s interval); image base64 reading; response extraction |
+| 2  | GeminiAIService.generateVideo() / checkVideoOperation() | resolved | Operation ID creation; cached polling; image base64 reading; response extraction |
 | 3  | VideoGenerationHandler + Server registration | resolved | Handler orchestration; ListTools + CallTool registration; test file created |
 | verify | Full build + integration | resolved | TypeScript build pass; vitest 4/4; no compilation errors |
 
 ## Delta from Plan
 
 **Implementation matched plan**. No deviations:
-- All 6 design decisions upheld (existing pattern, async polling, file path return, base64 input, audio default, platform paths)
+- All design decisions upheld after amendment (existing pattern, async request/check split, file path return, base64 input, audio default, platform paths)
 - All 11 schema parameters implemented with correct validation
 - All 7 files modified/created as specified
 - All test scenarios covered (schema, service, handler, build verification)

@@ -4,7 +4,7 @@
 
 The Gemini AI MCP Server is a production-grade intelligent agent that enables AI assistants to query Google AI (Gemini models) via Vertex AI or Google AI Studio with full agentic capabilities - turn-based execution, automatic tool orchestration, and MCP-to-MCP integration.
 
-**Last Updated**: 2026-02-21
+**Last Updated**: 2026-04-28
 **Status**: Production-ready
 
 ## What Was Built
@@ -79,11 +79,15 @@ The Gemini AI MCP Server is a production-grade intelligent agent that enables AI
 
 **GeminiAIService.ts** (`src/services/`)
 - Gemini API integration via gen-ai SDK
+- API mode selection for Vertex AI or Google AI Studio / Gemini Developer API
 - ThinkingConfig support for reasoning mode
 - Dynamic generation config per query
 - Response text extraction
-- Supports both Vertex AI and Google AI Studio modes
+- Supports Vertex AI and Google AI Studio / Gemini Developer API modes via the `@google/genai` SDK
 - Image generation via Gemini image models (`generateImage`)
+- Speech generation via Gemini TTS models (`generateSpeech`)
+- Music generation via Lyria models (`generateMusic`)
+- Video generation via Veo models (`generateVideo`, `checkVideoOperation`)
 - Supports Gemini 3 models (`gemini-3-flash-preview`, `gemini-3.1-pro-preview`, and later)
 
 **Logger.ts** (`src/utils/`)
@@ -92,10 +96,14 @@ The Gemini AI MCP Server is a production-grade intelligent agent that enables AI
 - Structured log entries
 - Automatic directory creation
 
-**imageSaver.ts** (`src/utils/`)
-- Platform-aware default output directory (~/Pictures/gemini-generated on macOS/Windows/Linux)
-- Base64-to-file decoding and persistence
-- Timestamped filename generation with zero-padded index
+**generatedFileSaver.ts / imageSaver.ts / videoSaver.ts / audioSaver.ts** (`src/utils/`)
+- Shared platform-aware generated file directories
+- Images: `~/Pictures/gemini-generated`
+- Videos: `~/Movies/gemini-generated` on macOS, `~/Videos/gemini-generated` on Windows/Linux
+- Speech: `~/Music/gemini-generated/speech`
+- Music: `~/Music/gemini-generated/music`
+- Buffer/base64 persistence and timestamped filenames with zero-padded indexes
+- PCM-to-WAV wrapping for Gemini TTS output
 
 **Error Types** (`src/errors/`)
 - `SecurityError`: Security violations
@@ -116,6 +124,23 @@ The Gemini AI MCP Server is a production-grade intelligent agent that enables AI
 - Saves generated images to disk via `imageSaver`
 - Returns structured content with file paths and base64 image data
 - Supports aspect ratio, image size, and model selection
+
+**SpeechGenerationHandler.ts** - Speech generation entrypoint
+- Calls `GeminiAIService.generateSpeech` with prompt and voice options
+- Saves generated speech to disk via `audioSaver`
+- Returns structured content with file paths and MCP audio content
+- Supports single-speaker and two-speaker Gemini TTS
+
+**MusicGenerationHandler.ts** - Music generation entrypoint
+- Calls `GeminiAIService.generateMusic` with prompt and Lyria options
+- Saves generated music to disk via `audioSaver`
+- Returns structured content with file paths, MCP audio content, and Lyria text parts
+- Supports Lyria 3 Clip and Lyria 3 Pro
+
+**VideoGenerationHandler.ts** - Video generation entrypoint
+- Starts Veo video generation and returns an operation ID
+- Checks video operation status with `check_video`
+- Saves completed videos to disk via `videoSaver`
 
 #### 6. Business Logic (`src/managers/`)
 
@@ -175,7 +200,20 @@ User Input → Turn 1..10 Loop:
 - Automatically saves output to disk with timestamped filenames
 - Returns both base64 image data and local file paths
 
-### 9. Gemini 3 Model Support
+### 9. Audio Generation (`generate_speech`, `generate_music` tools)
+- Generates TTS speech through Gemini TTS models
+- Generates music through Lyria 3 models
+- Saves speech and music to platform-aware audio directories
+- Returns MCP audio content blocks and local file paths
+- Keeps real-time Live API and Lyria RealTime out of scope
+
+### 10. Video Generation (`generate_video`, `check_video` tools)
+- Starts Veo generation asynchronously and returns an operation ID
+- Polls completed operations through `check_video`
+- Saves completed videos to platform-aware video directories
+- Returns saved file paths
+
+### 11. Gemini 3 Model Support
 - Full support for `gemini-3-flash-preview`, `gemini-3.1-pro-preview`, and subsequent Gemini 3 models
 - Automatic model detection for thinking level configuration
 - `mediaResolution` parameter support for multimodal inputs
@@ -185,7 +223,7 @@ User Input → Turn 1..10 Loop:
 ### Dependencies
 ```json
 {
-  "@google/genai": "^1.43.0",                 // Google Gen AI SDK (Vertex AI & Google AI Studio)
+  "@google/genai": "^1.43.0",                 // Google Gen AI SDK
   "@modelcontextprotocol/sdk": "^1.26.0",     // MCP protocol
   "zod": "^4.3.6",                            // Schema validation (migrated to Zod v4)
   "dotenv": "^17.3.1"                         // Environment variable loading
@@ -216,23 +254,15 @@ npm run build
 ✅ No type errors
 ```
 
-### Security Audit
-```bash
-npm audit
-✅ 0 vulnerabilities
-✅ All dependencies verified
-```
+## Current Verification Scope
 
-## Implementation Statistics
+The maintained automated checks cover:
 
-| Metric | Value |
-|--------|-------|
-| Total Implementation Phases | 8 |
-| Commits | 10 |
-| Source Files | ~30 |
-| Total Lines of Code | ~3800 |
-| Test Coverage | Manual verification |
-| Documentation Files | 6 |
+- TypeScript build: `npm run build`
+- Schema validation for current model/tool inputs
+- Server tool-list and call routing for generation tools
+- Generated-file directory and filename helpers
+- Config loading for Vertex AI and Google AI Studio modes
 
 ## Architecture Highlights
 

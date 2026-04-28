@@ -6,9 +6,10 @@ An intelligent MCP (Model Context Protocol) server that enables AI assistants to
 
 This server provides:
 - **Agentic Loop**: Turn-based execution with automatic tool selection and reasoning
-- **Query Gemini**: Access Gemini models via Vertex AI or Google AI Studio for cross-validation
+- **Query Gemini**: Access Gemini models via Vertex AI or Google AI Studio
 - **Multimodal Support**: Send images, audio, video, and code files alongside text prompts
 - **Image Generation**: Generate images using Gemini image models (gemini-3-pro-image-preview, gemini-3.1-flash-image-preview, gemini-2.5-flash-image)
+- **Speech & Music Generation**: Generate TTS audio with Gemini TTS and music with Lyria
 - **Tool Execution**: Built-in WebFetch + integration with external MCP servers
 - **Multi-turn Conversations**: Maintain context across queries with session management
 - **Reasoning Traces**: File-based logging of AI thinking processes
@@ -61,6 +62,13 @@ Generate images directly from text prompts using Gemini image models:
 - Configurable aspect ratios: 1:1, 16:9, 9:16, 4:3, and more
 - Images automatically saved to configurable output directory
 
+### 🎧 Audio Generation
+Generate file-based audio outputs:
+- **generate_speech**: Gemini TTS single-speaker or two-speaker speech, saved as WAV
+- **generate_music**: Lyria 3 music generation, saved as MP3 or WAV depending on model/config
+- Speech defaults to `~/Music/gemini-generated/speech`; music defaults to `~/Music/gemini-generated/music`
+- See [GENERATION.md](GENERATION.md), [AUDIO_GENERATION.md](AUDIO_GENERATION.md), and [examples/audio-generation.md](examples/audio-generation.md)
+
 ### 🔐 Security First
 
 **Multi-Layer Defense**:
@@ -83,8 +91,8 @@ See [SECURITY.md](SECURITY.md) for detailed security documentation and best prac
 ## Prerequisites
 
 - Node.js 18 or higher
-- Google Cloud Platform account (for Vertex AI) OR Google AI Studio account
-- Google Cloud credentials configured (for Vertex AI mode)
+- Google Cloud Platform account with Vertex AI enabled, or a Google AI Studio API key
+- Google Cloud credentials configured for Vertex AI mode
 
 ## Quick Start
 
@@ -105,7 +113,9 @@ npm run build
 
 ### Authentication
 
-The gen-ai SDK supports multiple authentication methods. For Vertex AI mode:
+The server supports both Vertex AI and Google AI Studio / Gemini Developer API mode.
+
+**Vertex AI mode:**
 
 **Application Default Credentials (Recommended):**
 ```bash
@@ -117,14 +127,23 @@ gcloud auth application-default login
 export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account-key.json"
 ```
 
-For Google AI Studio mode, see the [gen-ai SDK documentation](https://googleapis.github.io/js-genai/release_docs/index.html).
+**Google AI Studio mode:**
+```bash
+export GEMINI_API_KEY="your-ai-studio-api-key"
+export GOOGLE_GENAI_USE_VERTEXAI="false"
+```
 
 ### Configuration
 
 **Required Environment Variables:**
 ```bash
+# Vertex AI mode
 export GOOGLE_CLOUD_PROJECT="your-gcp-project-id"
 export GOOGLE_CLOUD_LOCATION="us-central1"
+
+# Or Google AI Studio mode
+export GEMINI_API_KEY="your-ai-studio-api-key"
+export GOOGLE_GENAI_USE_VERTEXAI="false"
 ```
 
 **Optional Model Settings:**
@@ -164,7 +183,10 @@ export GEMINI_ALLOW_FILE_URIS="true"       # Set to 'true' to allow file:// URIs
 export GEMINI_MEDIA_RESOLUTION="medium"    # Options: low, medium, high (default: not set)
 
 # Image generation output directory
-export GEMINI_IMAGE_OUTPUT_DIR="/path/to/images"  # Default: ~/Pictures on macOS, ~/images on Linux
+export GEMINI_IMAGE_OUTPUT_DIR="/path/to/images"  # Default: ~/Pictures/gemini-generated
+export GEMINI_VIDEO_OUTPUT_DIR="/path/to/videos"  # Default: ~/Movies/gemini-generated on macOS, ~/Videos/gemini-generated on Windows/Linux
+export GEMINI_SPEECH_OUTPUT_DIR="/path/to/speech" # Default: ~/Music/gemini-generated/speech
+export GEMINI_MUSIC_OUTPUT_DIR="/path/to/music"   # Default: ~/Music/gemini-generated/music
 
 # External MCP servers (for tool delegation)
 export GEMINI_MCP_SERVERS='[
@@ -263,7 +285,7 @@ See [PROMPT_CUSTOMIZATION.md](PROMPT_CUSTOMIZATION.md) for comprehensive guide a
 
 ## Available Tools
 
-The server exposes six MCP tools: `query`, `search`, `fetch`, `generate_image`, `generate_video`, and `check_video`.
+The server exposes eight MCP tools: `query`, `search`, `fetch`, `generate_image`, `generate_speech`, `generate_music`, `generate_video`, and `check_video`.
 
 ### query
 
@@ -353,7 +375,7 @@ Generate images from text prompts using Gemini image models.
 - `imageSize` (string, optional): Output resolution. Default: `1K`. Options: `0.5K`, `1K`, `2K`, `4K` (`0.5K` requires `gemini-3.1-flash-image-preview`; omit for `gemini-2.5-flash-image`)
 
 **Behavior:**
-- Generated images are saved to `GEMINI_IMAGE_OUTPUT_DIR` (defaults to `~/Pictures` on macOS, `~/images` on Linux)
+- Generated images are saved to `GEMINI_IMAGE_OUTPUT_DIR` (defaults to `~/Pictures/gemini-generated` on macOS, Windows, and Linux)
 - Returns image data (base64) along with file paths of saved images
 
 **Examples:**
@@ -367,6 +389,35 @@ model: "gemini-3.1-flash-image-preview"
 aspectRatio: "16:9"
 imageSize: "4K"
 ```
+
+### generate_speech
+
+Generate speech from text using Gemini TTS models.
+
+**Parameters:**
+- `prompt` (string, required): Text or transcript to synthesize
+- `model` (string, optional): Speech model. Options: `gemini-3.1-flash-tts-preview` (default), `gemini-2.5-flash-preview-tts`, `gemini-2.5-pro-preview-tts`
+- `voiceName` (string, optional): Prebuilt voice for single-speaker TTS. Default: `Kore`
+- `languageCode` (string, optional): BCP-47 language code
+- `speakers` (array, optional): Exactly two `{ speaker, voiceName }` entries for multi-speaker TTS
+
+**Behavior:**
+- Generated speech is saved to `GEMINI_SPEECH_OUTPUT_DIR` (defaults to `~/Music/gemini-generated/speech`)
+- Returns MCP `audio` content and saved file paths
+
+### generate_music
+
+Generate music using Lyria 3 models.
+
+**Parameters:**
+- `prompt` (string, required): Music generation prompt
+- `model` (string, optional): Music model. Options: `lyria-3-clip-preview` (default), `lyria-3-pro-preview`
+- `outputMimeType` (string, optional): `audio/mp3` or `audio/wav` (`audio/wav` requires `lyria-3-pro-preview`)
+- `imagePaths` (array, optional): Local image paths for multimodal music generation inputs
+
+**Behavior:**
+- Generated music is saved to `GEMINI_MUSIC_OUTPUT_DIR` (defaults to `~/Music/gemini-generated/music`)
+- Returns MCP `audio` content, saved file paths, and any lyrics/song-structure text returned by Lyria
 
 ### generate_video
 
@@ -390,7 +441,7 @@ Generate videos from text prompts using Veo video generation models.
 - `referenceImagePaths` (array, optional): Local file paths of reference images for style guidance (max 3, Veo 3.1 only)
 
 **Behavior:**
-- Generated videos are saved to `GEMINI_VIDEO_OUTPUT_DIR` (defaults to `~/Movies/gemini-generated` on macOS, `~/Videos/gemini-generated` elsewhere)
+- Generated videos are saved to `GEMINI_VIDEO_OUTPUT_DIR` (defaults to `~/Movies/gemini-generated` on macOS, `~/Videos/gemini-generated` on Windows/Linux)
 - Returns file paths of saved videos
 - Supports text-to-video, image-to-video, interpolation, and style reference modes
 

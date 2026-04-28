@@ -157,6 +157,7 @@ If testing via the MCP Inspector:
 Generated images are automatically saved to disk. The default output directory is:
 
 - Linux/macOS: `~/Pictures/gemini-generated`
+- Windows: `%USERPROFILE%\Pictures\gemini-generated`
 - Configurable via `GEMINI_IMAGE_OUTPUT_DIR` environment variable
 
 ```bash

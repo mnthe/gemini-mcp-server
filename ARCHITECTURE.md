@@ -4,7 +4,7 @@
 
 The Gemini AI MCP Server implements an **intelligent agentic loop** inspired by the OpenAI Agents SDK. The architecture supports turn-based execution, automatic tool selection, parallel tool execution, and robust error handling.
 
-**Last Updated**: 2026-02-21
+**Last Updated**: 2026-04-28
 
 ## Core Architecture
 
@@ -172,7 +172,10 @@ ARGUMENTS: {"url": "https://example.com", "extract": true}
 - Gemini API communication via `@google/genai` SDK
 - ThinkingConfig support for reasoning mode (Gemini 2.5 and 3 series)
 - Image generation via native image models
-- Response text and image extraction
+- Speech generation via Gemini TTS models
+- Music generation via Lyria models
+- Video generation via Veo models
+- Response text, image, and audio extraction
 
 **Key Methods**:
 ```typescript
@@ -186,6 +189,25 @@ async generateImage(
   prompt: string,
   options: ImageGenerationOptions
 ): Promise<{ images: GeneratedImage[]; text?: string }>
+
+async generateSpeech(
+  prompt: string,
+  options: SpeechGenerationOptions
+): Promise<{ audios: GeneratedAudio[]; text?: string }>
+
+async generateMusic(
+  prompt: string,
+  options: MusicGenerationOptions
+): Promise<{ audios: GeneratedAudio[]; text?: string }>
+
+async generateVideo(
+  prompt: string,
+  options: VideoGenerationOptions
+): Promise<{ operationId: string }>
+
+async checkVideoOperation(
+  operationId: string
+): Promise<{ done: boolean; videos?: GeneratedVideo[]; error?: string }>
 ```
 
 **QueryOptions**:
@@ -207,6 +229,25 @@ interface ImageGenerationOptions {
 }
 ```
 
+**SpeechGenerationOptions**:
+```typescript
+interface SpeechGenerationOptions {
+  model?: string;        // Default: 'gemini-3.1-flash-tts-preview'
+  voiceName?: string;    // Default: 'Kore' for single-speaker TTS
+  languageCode?: string;
+  speakers?: Array<{ speaker: string; voiceName: string }>; // exactly 2
+}
+```
+
+**MusicGenerationOptions**:
+```typescript
+interface MusicGenerationOptions {
+  model?: string;          // Default: 'lyria-3-clip-preview'
+  outputMimeType?: string; // 'audio/mp3' | 'audio/wav'
+  imagePaths?: string[];
+}
+```
+
 **Gemini 3 Model Detection**:
 - Models matching `/gemini[-_]?3/` pattern use `thinkingLevel` (not `thinkingBudget`)
 - `ThinkingLevel.HIGH` is the default for Gemini 3 models
@@ -216,8 +257,15 @@ interface ImageGenerationOptions {
 - Dynamic generation config per query
 - Model-aware thinking config (Gemini 2.5 vs Gemini 3 API differences)
 - Image generation with base64 inline data extraction
+- Speech/music generation with audio inline data extraction
+- Video generation through async operation IDs
 - Response parsing with error handling
-- Vertex AI mode via `@google/genai` SDK
+- Vertex AI and Google AI Studio / Gemini Developer API modes via `@google/genai` SDK
+
+**API Mode Selection**:
+- `GOOGLE_GENAI_USE_VERTEXAI=true`: force Vertex AI mode
+- `GOOGLE_GENAI_USE_VERTEXAI=false`: force Google AI Studio / Gemini Developer API mode
+- Without an explicit mode, `GOOGLE_CLOUD_PROJECT` selects Vertex AI; otherwise `GEMINI_API_KEY` or `GOOGLE_API_KEY` selects Gemini Developer API
 
 ### 8. ImageGenerationHandler (Image Requests)
 
@@ -253,10 +301,14 @@ Returns an array of MCP content blocks:
 - Save generated videos to local filesystem via videoSaver
 - Return file paths and MIME types as MCP content blocks
 
-**Key Method**:
+**Key Methods**:
 ```typescript
 async handle(
   input: VideoGenerationInput
+): Promise<{ content: Array<{ type: string; text: string }> }>
+
+async handleCheck(
+  input: CheckVideoInput
 ): Promise<{ content: Array<{ type: string; text: string }> }>
 ```
 
@@ -269,11 +321,37 @@ async handle(
 - Audio generation enabled by default
 
 **Response Format**:
-Returns an array with text block containing JSON: `{ videos: [{ filePath, mimeType }] }`
+`generate_video` returns a text block containing JSON: `{ operationId }`.
+`check_video` returns `{ status: 'running' }`, `{ status: 'failed', error }`, or `{ status: 'completed', videos: [{ filePath, mimeType }] }`.
 
 **Configuration**: Uses `config.videoOutputDir` (defaults to `getDefaultVideoDir()` from videoSaver)
 
-### 10. Logger (File-based Logging)
+### 10. SpeechGenerationHandler (Speech Requests)
+
+**Location**: `src/handlers/SpeechGenerationHandler.ts`
+
+**Responsibilities**:
+- Validate and route Gemini TTS requests
+- Coordinate with GeminiAIService to generate speech
+- Wrap PCM output in a WAV container
+- Save generated speech to local filesystem via audioSaver
+- Return file paths and MCP audio content blocks
+
+**Configuration**: Uses `config.speechOutputDir` (defaults to `getDefaultSpeechDir()` from audioSaver)
+
+### 11. MusicGenerationHandler (Music Requests)
+
+**Location**: `src/handlers/MusicGenerationHandler.ts`
+
+**Responsibilities**:
+- Validate and route Lyria music requests
+- Coordinate with GeminiAIService to generate music
+- Save generated music to local filesystem via audioSaver
+- Return file paths, MCP audio content blocks, and Lyria text parts
+
+**Configuration**: Uses `config.musicOutputDir` (defaults to `getDefaultMusicDir()` from audioSaver)
+
+### 12. Logger (File-based Logging)
 
 **Location**: `src/utils/Logger.ts`
 
@@ -287,14 +365,16 @@ Returns an array with text block containing JSON: `{ videos: [{ filePath, mimeTy
 - `logs/general.log`: All logs (info, error, tool calls)
 - `logs/reasoning.log`: Thinking traces only
 
-### 11. imageSaver & videoSaver (Media File Utilities)
+### 13. Generated File Utilities
 
-**Locations**: `src/utils/imageSaver.ts`, `src/utils/videoSaver.ts`
+**Locations**: `src/utils/generatedFileSaver.ts`, `src/utils/imageSaver.ts`, `src/utils/videoSaver.ts`, `src/utils/audioSaver.ts`
 
 **Responsibilities**:
 - Determine platform-appropriate default output directories
-- Save media data (images or videos) to disk
+- Save media data to disk
 - Generate timestamped, indexed filenames
+- Map MIME types to file extensions
+- Wrap Gemini TTS PCM output in WAV containers
 
 **imageSaver Exported Functions**:
 ```typescript
@@ -311,7 +391,7 @@ function generateImageFilename(index: number, mimeType: string): string
 
 **videoSaver Exported Functions**:
 ```typescript
-// Returns ~/Movies/gemini-generated on macOS, ~/Videos/gemini-generated elsewhere
+// Returns ~/Movies/gemini-generated on macOS, ~/Videos/gemini-generated on Windows/Linux
 function getDefaultVideoDir(): string
 
 // Writes buffer data to outputDir/filename
@@ -321,9 +401,32 @@ function saveVideo(data: Buffer, outputDir: string, filename: string): string
 function generateVideoFilename(index: number): string
 ```
 
+**audioSaver Exported Functions**:
+```typescript
+// Returns ~/Music/gemini-generated/speech on macOS, Windows, Linux
+function getDefaultSpeechDir(): string
+
+// Returns ~/Music/gemini-generated/music on macOS, Windows, Linux
+function getDefaultMusicDir(): string
+
+// Writes buffer data to outputDir/filename
+function saveAudio(data: Buffer, outputDir: string, filename: string): string
+
+// Returns e.g. "speech-20260428143000-001.wav"
+function generateSpeechFilename(index: number, mimeType: string): string
+
+// Returns e.g. "music-20260428143000-001.mp3"
+function generateMusicFilename(index: number, mimeType: string): string
+
+// Wraps raw PCM in a WAV header
+function pcmToWav(pcmData: Buffer, options?: WavOptions): Buffer
+```
+
 **Filename Formats**:
 - Images: `img-{YYYYMMDDHHmmss}-{NNN}.{ext}` (jpg for image/jpeg, png otherwise)
 - Videos: `vid-{YYYYMMDDHHmmss}-{NNN}.mp4`
+- Speech: `speech-{YYYYMMDDHHmmss}-{NNN}.wav`
+- Music: `music-{YYYYMMDDHHmmss}-{NNN}.{ext}`
 
 ## Data Flow
 
@@ -361,7 +464,7 @@ function generateVideoFilename(index: number): string
 ### Image Generation Flow
 
 ```
-1. MCP Client → GeminiAIMCPServer (gemini_generate_image tool call)
+1. MCP Client → GeminiAIMCPServer (generate_image tool call)
    ↓
 2. ImageGenerationSchema.parse(input) → validated ImageGenerationInput
    ↓
@@ -392,17 +495,69 @@ function generateVideoFilename(index: number): string
    ├─ GeminiAIService.generateVideo(prompt, { model, imagePath, lastFramePath, referenceImagePaths, ... })
    │  ├─ Read image files and encode as base64 (imagePath, lastFramePath, referenceImagePaths)
    │  ├─ Calls client.models.generateVideos() → async operation
-   │  ├─ Polling: client.operations.getVideosOperation() every 10 seconds until done
-   │  └─ extractVideos() → { videos: GeneratedVideo[], data: Buffer, mimeType }
+   │  └─ Caches operation object by operationId
    │
-   ├─ For each video:
+   └─ Build MCP content block:
+      └─ text block: JSON { operationId }
+   ↓
+4. Return content array to MCP client
+   ↓
+5. MCP Client → GeminiAIMCPServer (check_video tool call)
+   ↓
+6. VideoGenerationHandler.handleCheck(input)
+   ├─ GeminiAIService.checkVideoOperation(operationId)
+   │  ├─ Calls client.operations.getVideosOperation()
+   │  ├─ Returns running/failed when operation is not complete
+   │  └─ Extracts completed video bytes or downloads URI result
+   │
+   ├─ For each completed video:
    │  ├─ generateVideoFilename(index) → "vid-{timestamp}-{NNN}.mp4"
    │  └─ saveVideo(data, videoOutputDir, filename) → saved file path
    │
-   └─ Build MCP content block:
-      └─ text block: JSON { videos: [{ filePath, mimeType }] }
+   └─ text block: JSON { status: "completed", videos: [{ filePath, mimeType }] }
+```
+
+### Speech Generation Flow
+
+```
+1. MCP Client → GeminiAIMCPServer (generate_speech tool call)
    ↓
-4. Return content array to MCP client
+2. SpeechGenerationSchema.parse(input) → validated SpeechGenerationInput
+   ↓
+3. SpeechGenerationHandler.handle(input)
+   ├─ GeminiAIService.generateSpeech(prompt, { model, voiceName, languageCode, speakers })
+   │  ├─ Calls client.models.generateContent() with responseModalities: ['AUDIO']
+   │  └─ extractAudioParts() → { audios: GeneratedAudio[], text? }
+   │
+   ├─ For each audio:
+   │  ├─ pcmToWav(rawPcm) when the source is not already WAV
+   │  ├─ generateSpeechFilename(index, 'audio/wav')
+   │  └─ saveAudio(data, speechOutputDir, filename) → saved file path
+   │
+   └─ Build MCP content blocks:
+      ├─ text block: JSON { speech: [{ filePath, mimeType, sourceMimeType }], text? }
+      └─ audio block(s): { type: 'audio', data: base64, mimeType: 'audio/wav' }
+```
+
+### Music Generation Flow
+
+```
+1. MCP Client → GeminiAIMCPServer (generate_music tool call)
+   ↓
+2. MusicGenerationSchema.parse(input) → validated MusicGenerationInput
+   ↓
+3. MusicGenerationHandler.handle(input)
+   ├─ GeminiAIService.generateMusic(prompt, { model, outputMimeType, imagePaths })
+   │  ├─ Calls client.models.generateContent() with responseModalities: ['AUDIO', 'TEXT']
+   │  └─ extractAudioParts() → { audios: GeneratedAudio[], text? }
+   │
+   ├─ For each audio:
+   │  ├─ generateMusicFilename(index, mimeType)
+   │  └─ saveAudio(data, musicOutputDir, filename) → saved file path
+   │
+   └─ Build MCP content blocks:
+      ├─ text block: JSON { music: [{ filePath, mimeType }], text? }
+      └─ audio block(s): { type: 'audio', data: base64, mimeType }
 ```
 
 ### Tool Execution Flow
@@ -433,7 +588,7 @@ All tool inputs are validated via Zod schemas defined in `src/schemas/index.ts`.
 
 ### QuerySchema
 
-Validates the `gemini_query` tool input:
+Validates the `query` tool input:
 
 ```typescript
 z.object({
@@ -448,7 +603,7 @@ z.object({
 
 ### ImageGenerationSchema
 
-Validates the `gemini_generate_image` tool input:
+Validates the `generate_image` tool input:
 
 ```typescript
 z.object({
@@ -485,9 +640,45 @@ z.object({
 - `lastFramePath` requires `imagePath` (interpolation mode constraint)
 - Maximum 3 reference images allowed
 
+### SpeechGenerationSchema
+
+Validates the `generate_speech` tool input:
+
+```typescript
+z.object({
+  prompt: z.string(),
+  model: z.enum(['gemini-3.1-flash-tts-preview', 'gemini-2.5-flash-preview-tts', 'gemini-2.5-pro-preview-tts']).optional(),
+  voiceName: z.string().optional(),
+  languageCode: z.string().optional(),
+  speakers: z.array(z.object({
+    speaker: z.string(),
+    voiceName: z.string(),
+  })).length(2).optional(),
+})
+```
+
+**Validation Refines**:
+- `voiceName` cannot be used with `speakers`; set a voice per speaker instead
+
+### MusicGenerationSchema
+
+Validates the `generate_music` tool input:
+
+```typescript
+z.object({
+  prompt: z.string(),
+  model: z.enum(['lyria-3-clip-preview', 'lyria-3-pro-preview']).optional(),
+  outputMimeType: z.enum(['audio/mp3', 'audio/wav']).optional(),
+  imagePaths: z.array(z.string()).optional(),
+})
+```
+
+**Validation Refines**:
+- `outputMimeType: 'audio/wav'` requires `model: 'lyria-3-pro-preview'`
+
 ### SearchSchema / FetchSchema
 
-Validate `gemini_search` and `gemini_fetch` tool inputs (simple string wrappers).
+Validate `search` and `fetch` tool inputs (simple string wrappers).
 
 ## Design Principles
 
@@ -635,10 +826,10 @@ Each runs as separate process with independent:
 - `mcp/` folder (EnhancedMCPClient, Stdio/HTTP connections)
 - `tools/` folder (WebFetchTool, ToolRegistry)
 - `errors/` folder (SecurityError, ModelBehaviorError)
-- `utils/` folder (Logger, imageSaver)
-- `handlers/` folder (QueryHandler, SearchHandler, FetchHandler, ImageGenerationHandler)
+- `utils/` folder (Logger, generated file savers, security validators)
+- `handlers/` folder (QueryHandler, SearchHandler, FetchHandler, generation handlers)
 - Gemini 3 model support (`gemini-3-flash-preview` default, `thinkingLevel` API)
-- Image generation tool (`gemini_generate_image`) with filesystem persistence
+- File-output generation tools (`generate_image`, `generate_video`, `check_video`, `generate_speech`, `generate_music`)
 
 **Benefits**:
 - Keyword-based → LLM-driven decisions
