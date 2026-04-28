@@ -94,6 +94,20 @@ export function validateFileExtension(filePath: string): void {
 }
 
 /**
+ * Compute the effective safe directory whitelist.
+ * Merges defaults with caller-supplied extras and normalizes to absolute paths.
+ * Exposed so callers (e.g. boot diagnostics) can introspect the active list.
+ */
+export function getEffectiveSafeDirectories(
+  config: FileSecurityConfig = {}
+): string[] {
+  return [
+    ...getDefaultSafeDirectories(),
+    ...(config.additionalSafeDirectories || []),
+  ].map(dir => path.resolve(dir));
+}
+
+/**
  * Resolve and validate a file path for security
  * - Prevents path traversal attacks
  * - Converts to absolute path
@@ -106,20 +120,16 @@ export function validateFilePath(
 ): string {
   // Convert to absolute path to prevent path traversal
   const absolutePath = path.resolve(filePath);
-  
+
   // Check for executable extensions
   validateFileExtension(absolutePath);
-  
+
   // If allowAllDirectories is true (testing only), skip directory check
   if (config.allowAllDirectories) {
     return absolutePath;
   }
-  
-  // Build list of safe directories
-  const safeDirectories = [
-    ...getDefaultSafeDirectories(),
-    ...(config.additionalSafeDirectories || []),
-  ].map(dir => path.resolve(dir)); // Normalize all to absolute paths
+
+  const safeDirectories = getEffectiveSafeDirectories(config);
   
   // Check if the file is within any safe directory
   const isInSafeDirectory = safeDirectories.some(safeDir => {

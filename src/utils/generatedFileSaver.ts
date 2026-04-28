@@ -13,6 +13,25 @@ function getPathModule(platform: NodeJS.Platform): path.PlatformPath {
   return platform === 'win32' ? path.win32 : path.posix;
 }
 
+export interface OutputDirsConfig {
+  imageOutputDir?: string;
+  videoOutputDir?: string;
+  speechOutputDir?: string;
+  musicOutputDir?: string;
+}
+
+export function resolveOutputDirs(
+  config: OutputDirsConfig = {},
+  options: DefaultDirOptions = {}
+): { image: string; video: string; speech: string; music: string } {
+  return {
+    image: config.imageOutputDir || getDefaultGeneratedDir('image', options),
+    video: config.videoOutputDir || getDefaultGeneratedDir('video', options),
+    speech: config.speechOutputDir || getDefaultGeneratedDir('speech', options),
+    music: config.musicOutputDir || getDefaultGeneratedDir('music', options),
+  };
+}
+
 export function getDefaultGeneratedDir(
   kind: GeneratedFileKind,
   options: DefaultDirOptions = {}

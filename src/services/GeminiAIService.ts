@@ -318,8 +318,9 @@ export class GeminiAIService {
           // Gate: only allowed when allowFileUris=true (CLI environments) OR when
           // the resolved path is inside this server's own generated-output dirs
           // (round-trip case — the server wrote the file itself).
+          const isFileUri = part.fileData.fileUri.startsWith('file://');
           if (
-            part.fileData.fileUri.startsWith('file://') &&
+            isFileUri &&
             !this.config.allowFileUris &&
             !this.isInSelfManagedDir(validated.fileUri)
           ) {
@@ -328,11 +329,23 @@ export class GeminiAIService {
               'or use a path under the gemini-generated output directories.'
             );
           }
-          
-          contentPart.fileData = {
-            mimeType: validated.mimeType,
-            fileUri: validated.fileUri,
-          };
+
+          if (isFileUri) {
+            // Gemini's fileData.fileUri only accepts gs:// or https://; local
+            // paths get rejected upstream. Once the path has cleared the same
+            // guardrails (validateMultimodalFile + file:// gate), transparently
+            // inline the file as base64 so users can round-trip generated files.
+            const data = readFileSync(validated.fileUri).toString('base64');
+            contentPart.inlineData = {
+              mimeType: validated.mimeType,
+              data,
+            };
+          } else {
+            contentPart.fileData = {
+              mimeType: validated.mimeType,
+              fileUri: validated.fileUri,
+            };
+          }
         } catch (error) {
           if (error instanceof SecurityError) {
             throw error;
