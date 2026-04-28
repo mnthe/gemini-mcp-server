@@ -72,6 +72,7 @@ export interface MusicGenerationOptions {
   lyrics?: string;
   instrumental?: boolean;
   vocalStyle?: string;
+  language?: string;
   durationSeconds?: number;
   bpm?: number;
   intensity?: string;
@@ -533,6 +534,9 @@ export class GeminiAIService {
     if (options.vocalStyle) {
       controls.push(`Vocal direction: ${options.vocalStyle}`);
     }
+    if (options.language) {
+      controls.push(`Language: ${options.language}.`);
+    }
     if (options.lyrics) {
       controls.push(`Use these user-provided lyrics:\n${options.lyrics}`);
     }
@@ -551,6 +555,8 @@ export class GeminiAIService {
       '.jpeg': 'image/jpeg',
       '.gif': 'image/gif',
       '.webp': 'image/webp',
+      '.heic': 'image/heic',
+      '.heif': 'image/heif',
       '.bmp': 'image/bmp',
       '.mp4': 'video/mp4',
       '.mpeg': 'video/mpeg',
@@ -560,7 +566,8 @@ export class GeminiAIService {
       '.flv': 'video/flv',
       '.mpegps': 'video/mpegps',
       '.webm': 'video/webm',
-      '.mov': 'video/mov',
+      '.mov': 'video/quicktime',
+      '.3gp': 'video/3gpp',
     };
     return map[ext.toLowerCase()] || 'image/png';
   }

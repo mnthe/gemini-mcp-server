@@ -4,6 +4,34 @@
 
 import { z } from "zod";
 
+export const GEMINI_IMAGE_INPUT_FILE_TYPES = 'PNG (.png), JPEG (.jpg/.jpeg), WEBP (.webp), HEIC (.heic), HEIF (.heif)';
+export const VEO_IMAGE_INPUT_FILE_TYPES = 'PNG (.png), JPEG (.jpg/.jpeg), WEBP (.webp)';
+export const VEO_EXTENSION_VIDEO_FILE_TYPES = 'MP4 (.mp4) from a previous Veo 720p generation';
+
+const GEMINI_IMAGE_INPUT_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp', '.heic', '.heif'] as const;
+const VEO_IMAGE_INPUT_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp'] as const;
+const VEO_EXTENSION_VIDEO_EXTENSIONS = ['.mp4'] as const;
+
+function hasSupportedExtension(filePath: string, extensions: readonly string[]): boolean {
+  const normalized = filePath.toLowerCase();
+  return extensions.some((extension) => normalized.endsWith(extension));
+}
+
+const GeminiImageInputPathSchema = z.string().refine(
+  (filePath) => hasSupportedExtension(filePath, GEMINI_IMAGE_INPUT_EXTENSIONS),
+  { message: `Unsupported image source file type. Supported file types: ${GEMINI_IMAGE_INPUT_FILE_TYPES}` }
+);
+
+const VeoImageInputPathSchema = z.string().refine(
+  (filePath) => hasSupportedExtension(filePath, VEO_IMAGE_INPUT_EXTENSIONS),
+  { message: `Unsupported Veo image source file type. Supported file types: ${VEO_IMAGE_INPUT_FILE_TYPES}` }
+);
+
+const VeoExtensionVideoPathSchema = z.string().refine(
+  (filePath) => hasSupportedExtension(filePath, VEO_EXTENSION_VIDEO_EXTENSIONS),
+  { message: `Unsupported video extension source file type. Supported file types: ${VEO_EXTENSION_VIDEO_FILE_TYPES}` }
+);
+
 // Schema for inline data (base64 encoded files)
 const InlineDataSchema = z.object({
   mimeType: z.string().describe("MIME type of the file (e.g., 'image/jpeg', 'audio/mp3', 'video/mp4')"),
@@ -62,15 +90,15 @@ export const ImageGenerationSchema = z.object({
     .describe("Aspect ratio (default: 1:1; 1:4, 1:8, 4:1, and 8:1 require gemini-3.1-flash-image-preview)"),
   imageSize: z.enum(['0.5K', '1K', '2K', '4K']).optional()
     .describe("Resolution (0.5K requires gemini-3.1-flash-image-preview, default: 1K)"),
-  imagePaths: z.array(z.string()).max(14).optional()
-    .describe("Local file paths of reference images to include as input (max 14; e.g., for image editing or style transfer)"),
+  imagePaths: z.array(GeminiImageInputPathSchema).max(14).optional()
+    .describe(`Local file paths of reference images to include as input (max 14; e.g., for image editing or style transfer). Supported file types: ${GEMINI_IMAGE_INPUT_FILE_TYPES}. Audio/video files are not accepted.`),
   systemInstruction: z.string().optional()
     .describe("Optional system instruction for Gemini 3 image models"),
   thinkingLevel: z.enum(['minimal', 'high', 'MINIMAL', 'HIGH']).optional()
     .describe("Optional thinking level; only supported by gemini-3.1-flash-image-preview"),
   mediaResolution: z.enum(['low', 'medium', 'high', 'LOW', 'MEDIUM', 'HIGH']).optional()
     .describe("Optional media resolution for reference image inputs"),
-}).refine(
+}).strict().refine(
   (data) => {
     if (!data.aspectRatio) {
       return true;
@@ -130,10 +158,10 @@ const ALLOWED_SPEECH_MODELS = [
 const SpeechSpeakerSchema = z.object({
   speaker: z.string().min(1).describe("Speaker name exactly as it appears in the prompt"),
   voiceName: z.string().min(1).describe("Prebuilt voice name for this speaker"),
-});
+}).strict();
 
 export const SpeechGenerationSchema = z.object({
-  prompt: z.string().describe("Text or transcript to synthesize as speech"),
+  prompt: z.string().describe("Text or transcript to synthesize as speech. Gemini TTS is text-only input; audio/image/video reference files are not accepted."),
   model: z.enum(ALLOWED_SPEECH_MODELS).optional()
     .describe("Speech model (default: gemini-3.1-flash-tts-preview)"),
   voiceName: z.string().min(1).optional()
@@ -142,7 +170,7 @@ export const SpeechGenerationSchema = z.object({
     .describe("Optional BCP-47 language code for speech synthesis"),
   speakers: z.array(SpeechSpeakerSchema).length(2).optional()
     .describe("Exactly two speaker voice configs for multi-speaker TTS"),
-}).refine(
+}).strict().refine(
   (data) => !data.voiceName || !data.speakers,
   { message: "voiceName cannot be used with speakers; set voiceName per speaker instead" }
 );
@@ -152,36 +180,62 @@ const ALLOWED_MUSIC_MODELS = [
   'lyria-3-pro-preview',
 ] as const;
 
-export const MusicGenerationSchema = z.object({
-  prompt: z.string().describe("Music generation prompt"),
-  model: z.enum(ALLOWED_MUSIC_MODELS).optional()
-    .describe("Music model (default: lyria-3-clip-preview)"),
-  outputMimeType: z.enum(['audio/mp3', 'audio/wav']).optional()
-    .describe("Optional output MIME type; audio/wav requires lyria-3-pro-preview"),
-  imagePaths: z.array(z.string()).max(10).optional()
-    .describe("Optional local image paths to use as multimodal music generation inputs (max 10)"),
-  lyrics: z.string().optional()
-    .describe("Optional user-provided lyrics to include in the Lyria prompt"),
-  instrumental: z.boolean().optional()
-    .describe("Whether to explicitly request instrumental-only output"),
-  vocalStyle: z.string().optional()
-    .describe("Optional vocal generation direction, such as vocal tone, language, or delivery style"),
-  durationSeconds: z.number().int().min(1).max(184).optional()
-    .describe("Optional target duration in seconds; requires lyria-3-pro-preview"),
-  bpm: z.number().int().min(40).max(240).optional()
-    .describe("Optional tempo direction in beats per minute"),
-  intensity: z.enum(['low', 'medium', 'high', 'LOW', 'MEDIUM', 'HIGH']).optional()
-    .describe("Optional musical intensity direction"),
-}).refine(
-  (data) => data.outputMimeType !== 'audio/wav' || data.model === 'lyria-3-pro-preview',
-  { message: "outputMimeType 'audio/wav' requires model='lyria-3-pro-preview'" }
-).refine(
-  (data) => data.durationSeconds === undefined || data.model === 'lyria-3-pro-preview',
-  { message: "durationSeconds requires model='lyria-3-pro-preview'" }
-).refine(
-  (data) => !data.instrumental || (!data.lyrics && !data.vocalStyle),
-  { message: "instrumental cannot be combined with lyrics or vocalStyle" }
-);
+export const ALLOWED_LYRIA_LANGUAGES = [
+  'English',
+  'German',
+  'Spanish',
+  'French',
+  'Hindi',
+  'Japanese',
+  'Korean',
+  'Portuguese',
+] as const;
+
+export function getAllowedMusicOutputMimeTypes(useVertexAI: boolean = true): readonly string[] {
+  return useVertexAI ? ['audio/mp3'] : ['audio/mp3', 'audio/wav'];
+}
+
+export function buildMusicGenerationSchema(useVertexAI: boolean = true) {
+  return z.object({
+    prompt: z.string().describe("Music generation prompt"),
+    model: z.enum(ALLOWED_MUSIC_MODELS).optional()
+      .describe("Music model (default: lyria-3-clip-preview)"),
+    outputMimeType: z.enum(['audio/mp3', 'audio/wav']).optional()
+      .describe(useVertexAI
+        ? "Optional output MIME type; Vertex AI Lyria 3 model card supports audio/mp3 only"
+        : "Optional output MIME type; Gemini API defaults to audio/mp3 and supports audio/wav only with lyria-3-pro-preview"),
+    imagePaths: z.array(GeminiImageInputPathSchema).max(10).optional()
+      .describe(`Optional local image paths to use as multimodal Lyria music generation inputs (max 10). Supported Gemini image input file types: ${GEMINI_IMAGE_INPUT_FILE_TYPES}. Audio/video reference files are not accepted by Lyria 3.`),
+    lyrics: z.string().optional()
+      .describe("Optional user-provided lyrics to include in the Lyria prompt"),
+    instrumental: z.boolean().optional()
+      .describe("Whether to explicitly request instrumental-only output"),
+    vocalStyle: z.string().optional()
+      .describe("Optional vocal generation direction, such as vocal tone, language, or delivery style"),
+    language: z.enum(ALLOWED_LYRIA_LANGUAGES).optional()
+      .describe("Optional output language direction. Vertex AI model card languages: English, German, Spanish, French, Hindi, Japanese, Korean, Portuguese"),
+    durationSeconds: z.number().int().min(1).max(184).optional()
+      .describe("Optional target duration in seconds; requires lyria-3-pro-preview; maximum 184 seconds per Vertex AI model card. lyria-3-clip-preview is fixed at 30 seconds and does not support duration controls"),
+    bpm: z.number().int().min(40).max(240).optional()
+      .describe("Optional tempo direction in beats per minute"),
+    intensity: z.enum(['low', 'medium', 'high', 'LOW', 'MEDIUM', 'HIGH']).optional()
+      .describe("Optional musical intensity direction"),
+  }).strict().refine(
+    (data) => data.durationSeconds === undefined || data.model === 'lyria-3-pro-preview',
+    { message: "durationSeconds requires model='lyria-3-pro-preview'" }
+  ).refine(
+    (data) => !data.instrumental || (!data.lyrics && !data.vocalStyle),
+    { message: "instrumental cannot be combined with lyrics or vocalStyle" }
+  ).refine(
+    (data) => !useVertexAI || data.outputMimeType === undefined || data.outputMimeType === 'audio/mp3',
+    { message: "Vertex AI Lyria 3 supports outputMimeType='audio/mp3' only" }
+  ).refine(
+    (data) => useVertexAI || data.outputMimeType !== 'audio/wav' || data.model === 'lyria-3-pro-preview',
+    { message: "outputMimeType='audio/wav' requires model='lyria-3-pro-preview' in Gemini API mode" }
+  );
+}
+
+export const MusicGenerationSchema = buildMusicGenerationSchema(true);
 
 export function buildVideoGenerationSchema(useVertexAI: boolean = true) {
   const allowedVideoModels = useVertexAI ? ALLOWED_VERTEX_VIDEO_MODELS : ALLOWED_GEMINI_API_VIDEO_MODELS;
@@ -209,15 +263,15 @@ export function buildVideoGenerationSchema(useVertexAI: boolean = true) {
       .describe("Random seed for reproducibility (0-4294967295)"),
     numberOfVideos: z.number().int().min(1).max(maxVideoCount).optional()
       .describe(`Number of videos to generate (1-${maxVideoCount})`),
-    imagePath: z.string().optional()
-      .describe("Local file path of reference image (first frame)"),
-    lastFramePath: z.string().optional()
-      .describe("Local file path of reference image (last frame, requires imagePath)"),
-    referenceImagePaths: z.array(z.string()).optional()
-      .describe("Local file paths of reference images (max 3)"),
-    videoPath: z.string().optional()
-      .describe("Local file path of a Veo-generated 720p video to extend"),
-  }).refine(
+    imagePath: VeoImageInputPathSchema.optional()
+      .describe(`Local file path of reference image (first frame). Supported file types: ${VEO_IMAGE_INPUT_FILE_TYPES}`),
+    lastFramePath: VeoImageInputPathSchema.optional()
+      .describe(`Local file path of reference image (last frame, requires imagePath). Supported file types: ${VEO_IMAGE_INPUT_FILE_TYPES}`),
+    referenceImagePaths: z.array(VeoImageInputPathSchema).optional()
+      .describe(`Local file paths of reference images (max 3). Supported file types: ${VEO_IMAGE_INPUT_FILE_TYPES}`),
+    videoPath: VeoExtensionVideoPathSchema.optional()
+      .describe(`Local file path of a Veo-generated 720p video to extend. Supported file types: ${VEO_EXTENSION_VIDEO_FILE_TYPES}`),
+  }).strict().refine(
     (data) => {
       if (data.resolution === '1080p' || data.resolution === '4k') {
         return data.durationSeconds === undefined || data.durationSeconds === '8';
@@ -324,7 +378,7 @@ export type SearchInput = z.infer<typeof SearchSchema>;
 export type FetchInput = z.infer<typeof FetchSchema>;
 export type ImageGenerationInput = z.infer<typeof ImageGenerationSchema>;
 export type SpeechGenerationInput = z.infer<typeof SpeechGenerationSchema>;
-export type MusicGenerationInput = z.infer<typeof MusicGenerationSchema>;
+export type MusicGenerationInput = z.infer<ReturnType<typeof buildMusicGenerationSchema>>;
 export type VideoGenerationInput = z.infer<typeof VideoGenerationSchema>;
 
 export const CheckVideoSchema = z.object({

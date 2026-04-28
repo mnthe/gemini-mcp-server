@@ -212,6 +212,8 @@ describe('GeminiAIMCPServer generate_image wiring', () => {
     expect(imageGenTool.inputSchema.properties.aspectRatio.enum).toContain('8:1');
     expect(imageGenTool.inputSchema.properties.imageSize.enum).toContain('0.5K');
     expect(imageGenTool.inputSchema.properties.imagePaths.maxItems).toBe(14);
+    expect(imageGenTool.inputSchema.properties.imagePaths.description).toContain('HEIC');
+    expect(imageGenTool.inputSchema.properties.imagePaths.description).toContain('Audio/video files are not accepted');
     expect(imageGenTool.inputSchema.properties.systemInstruction).toBeDefined();
     expect(imageGenTool.inputSchema.properties.thinkingLevel.enum).toContain('high');
     expect(imageGenTool.inputSchema.properties.thinkingLevel.enum).not.toContain('medium');
@@ -245,6 +247,7 @@ describe('GeminiAIMCPServer generate_image wiring', () => {
       'gemini-2.5-flash-preview-tts',
       'gemini-2.5-pro-preview-tts',
     ]);
+    expect(speechTool.description).toContain('Input is text-only');
     expect(speechTool.inputSchema.properties.speakers.minItems).toBe(2);
     expect(speechTool.inputSchema.properties.speakers.maxItems).toBe(2);
 
@@ -270,11 +273,16 @@ describe('GeminiAIMCPServer generate_image wiring', () => {
     ]);
     expect(musicTool.inputSchema.properties.outputMimeType.enum).toEqual([
       'audio/mp3',
-      'audio/wav',
     ]);
     expect(musicTool.inputSchema.properties.imagePaths.maxItems).toBe(10);
+    expect(musicTool.description).toContain('audio/video reference files are not accepted');
+    expect(musicTool.description).toContain('44.1 kHz');
+    expect(musicTool.description).toContain('one clip per prompt');
+    expect(musicTool.description).toContain('Vertex AI mode supports 44.1 kHz, 192 kbps audio/mp3 output only');
+    expect(musicTool.inputSchema.properties.imagePaths.description).toContain('WEBP');
     expect(musicTool.inputSchema.properties.lyrics).toBeDefined();
     expect(musicTool.inputSchema.properties.instrumental).toBeDefined();
+    expect(musicTool.inputSchema.properties.language.enum).toContain('Korean');
     expect(musicTool.inputSchema.properties.durationSeconds.maximum).toBe(184);
     expect(musicTool.inputSchema.properties.bpm).toBeDefined();
     expect(musicTool.inputSchema.properties.intensity.enum).toContain('medium');
@@ -292,7 +300,95 @@ describe('GeminiAIMCPServer generate_image wiring', () => {
     });
   });
 
-  it('throws for unknown tool names', async () => {
+  it('uses Gemini API music output schema when Vertex mode is disabled', async () => {
+    const aiStudioServer = new GeminiAIMCPServer(createTestConfig({ useVertexAI: false }));
+    const handlers = getHandlers((aiStudioServer as any).server);
+    const result = await handlers.listHandler();
+    const musicTool = result.tools.find((t: any) => t.name === 'generate_music');
+
+    expect(musicTool.inputSchema.properties.outputMimeType.enum).toEqual([
+      'audio/mp3',
+      'audio/wav',
+    ]);
+    expect(musicTool.description).toContain('Gemini API/AI Studio mode supports audio/mp3 output');
+
+    await handlers.callHandler({
+      params: {
+        name: 'generate_music',
+        arguments: {
+          prompt: 'full ambient song',
+          model: 'lyria-3-pro-preview',
+          outputMimeType: 'audio/wav',
+        },
+      },
+    });
+
+    expect(mockMusicGenHandle).toHaveBeenCalledWith({
+      prompt: 'full ambient song',
+      model: 'lyria-3-pro-preview',
+      outputMimeType: 'audio/wav',
+    });
+
+    const invalidResult = await handlers.callHandler({
+      params: {
+        name: 'generate_music',
+        arguments: {
+          prompt: 'short loop',
+          outputMimeType: 'audio/wav',
+        },
+      },
+    });
+    const errorBody = JSON.parse(invalidResult.content[0].text);
+
+    expect(invalidResult.isError).toBe(true);
+    expect(errorBody.tool).toBe('generate_music');
+    expect(errorBody.errorType).toBe('validation_error');
+    expect(errorBody.issues[0].message).toMatch(/lyria-3-pro-preview/);
+  });
+
+  it('returns structured error content for handler failures', async () => {
+    mockImageGenHandle.mockRejectedValueOnce(new Error('Gemini API unavailable'));
+
+    const result = await callHandler({
+      params: {
+        name: 'generate_image',
+        arguments: { prompt: 'a cat' },
+      },
+    });
+
+    const errorBody = JSON.parse(result.content[0].text);
+    expect(result.isError).toBe(true);
+    expect(errorBody).toEqual({
+      status: 'failed',
+      tool: 'generate_image',
+      errorType: 'runtime_error',
+      message: 'Gemini API unavailable',
+    });
+  });
+
+  it('returns structured validation errors for invalid arguments', async () => {
+    const result = await callHandler({
+      params: {
+        name: 'generate_image',
+        arguments: { prompt: 'a cat', imageSize: '0.5K' },
+      },
+    });
+
+    const errorBody = JSON.parse(result.content[0].text);
+    expect(result.isError).toBe(true);
+    expect(errorBody.status).toBe('failed');
+    expect(errorBody.tool).toBe('generate_image');
+    expect(errorBody.errorType).toBe('validation_error');
+    expect(errorBody.issues).toEqual([
+      {
+        path: '(root)',
+        code: 'custom',
+        message: "imageSize '0.5K' requires model='gemini-3.1-flash-image-preview'",
+      },
+    ]);
+  });
+
+  it('returns structured error content for unknown tool names', async () => {
     const request = {
       params: {
         name: 'nonexistent_tool',
@@ -300,6 +396,15 @@ describe('GeminiAIMCPServer generate_image wiring', () => {
       },
     };
 
-    await expect(callHandler(request)).rejects.toThrow('Unknown tool: nonexistent_tool');
+    const result = await callHandler(request);
+    const errorBody = JSON.parse(result.content[0].text);
+
+    expect(result.isError).toBe(true);
+    expect(errorBody).toEqual({
+      status: 'failed',
+      tool: 'nonexistent_tool',
+      errorType: 'runtime_error',
+      message: 'Unknown tool: nonexistent_tool',
+    });
   });
 });

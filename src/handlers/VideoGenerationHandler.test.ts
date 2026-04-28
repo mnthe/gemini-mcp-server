@@ -188,10 +188,14 @@ describe('GeminiAIMCPServer generate_video wiring', () => {
     expect(videoGenTool.inputSchema.properties.numberOfVideos).toBeDefined();
     expect(videoGenTool.inputSchema.properties.numberOfVideos.maximum).toBe(4);
     expect(videoGenTool.inputSchema.properties.imagePath).toBeDefined();
+    expect(videoGenTool.inputSchema.properties.imagePath.description).toContain('WEBP');
+    expect(videoGenTool.inputSchema.properties.imagePath.description).not.toContain('HEIF');
     expect(videoGenTool.inputSchema.properties.lastFramePath).toBeDefined();
     expect(videoGenTool.inputSchema.properties.referenceImagePaths).toBeDefined();
     expect(videoGenTool.inputSchema.properties.referenceImagePaths.maxItems).toBe(3);
     expect(videoGenTool.inputSchema.properties.videoPath).toBeDefined();
+    expect(videoGenTool.inputSchema.properties.videoPath.description).toContain('MP4');
+    expect(videoGenTool.description).toContain('Audio file references are not supported');
     expect(videoGenTool.inputSchema.properties.model.enum).toEqual([
       'veo-3.1-fast-generate-001',
       'veo-3.1-generate-001',
@@ -250,7 +254,7 @@ describe('GeminiAIMCPServer generate_video wiring', () => {
       model: 'veo-3.1-fast-generate-preview',
     });
 
-    await expect(handlers.callHandler({
+    const invalidResult = await handlers.callHandler({
       params: {
         name: 'generate_video',
         arguments: {
@@ -258,6 +262,13 @@ describe('GeminiAIMCPServer generate_video wiring', () => {
           model: 'veo-3.1-fast-generate-001',
         },
       },
-    })).rejects.toThrow();
+    });
+    const errorBody = JSON.parse(invalidResult.content[0].text);
+
+    expect(invalidResult.isError).toBe(true);
+    expect(errorBody.status).toBe('failed');
+    expect(errorBody.tool).toBe('generate_video');
+    expect(errorBody.errorType).toBe('validation_error');
+    expect(errorBody.issues[0].path).toBe('model');
   });
 });

@@ -28,13 +28,18 @@ export class MusicGenerationHandler {
       lyrics: input.lyrics,
       instrumental: input.instrumental,
       vocalStyle: input.vocalStyle,
+      language: input.language,
       durationSeconds: input.durationSeconds,
       bpm: input.bpm,
       intensity: input.intensity,
     });
 
     if (result.audios.length === 0) {
-      throw new Error('Lyria response did not include audio data');
+      throw new Error(
+        result.text
+          ? `Lyria response did not include audio data: ${result.text}`
+          : 'Lyria response did not include audio data'
+      );
     }
 
     const content: Array<{ type: string; text?: string; data?: string; mimeType?: string }> = [];

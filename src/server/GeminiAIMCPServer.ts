@@ -9,6 +9,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import { ZodError } from "zod";
 
 import { GeminiAIConfig, CachedDocument, MCPServerConfig } from '../types/index.js';
 import {
@@ -17,11 +18,16 @@ import {
   FetchSchema,
   ImageGenerationSchema,
   SpeechGenerationSchema,
-  MusicGenerationSchema,
   CheckVideoSchema,
+  buildMusicGenerationSchema,
   buildVideoGenerationSchema,
+  GEMINI_IMAGE_INPUT_FILE_TYPES,
   getAllowedVideoModels,
   getDefaultVideoModel,
+  getAllowedMusicOutputMimeTypes,
+  ALLOWED_LYRIA_LANGUAGES,
+  VEO_IMAGE_INPUT_FILE_TYPES,
+  VEO_EXTENSION_VIDEO_FILE_TYPES,
 } from '../schemas/index.js';
 import { ConversationManager } from '../managers/ConversationManager.js';
 import { GeminiAIService } from '../services/GeminiAIService.js';
@@ -133,6 +139,10 @@ export class GeminiAIMCPServer {
       const videoModelEnum = getAllowedVideoModels(this.config.useVertexAI);
       const defaultVideoModel = getDefaultVideoModel(this.config.useVertexAI);
       const maxVideoCount = this.config.useVertexAI ? 4 : 1;
+      const musicOutputMimeTypes = getAllowedMusicOutputMimeTypes(this.config.useVertexAI);
+      const musicOutputMimeDescription = this.config.useVertexAI
+        ? "Optional output MIME type; Vertex AI Lyria 3 model card supports audio/mp3 only"
+        : "Optional output MIME type; Gemini API/AI Studio defaults to audio/mp3 and supports audio/wav only with lyria-3-pro-preview";
 
       const tools = [
         {
@@ -146,6 +156,7 @@ export class GeminiAIMCPServer {
             "Supports multimodal inputs (images, audio, video, documents) via the optional 'parts' parameter.",
           inputSchema: {
             type: "object",
+            additionalProperties: false,
             properties: {
               prompt: {
                 type: "string",
@@ -225,6 +236,7 @@ export class GeminiAIMCPServer {
             "Follows OpenAI MCP specification for search tools.",
           inputSchema: {
             type: "object",
+            additionalProperties: false,
             properties: {
               query: {
                 type: "string",
@@ -241,6 +253,7 @@ export class GeminiAIMCPServer {
             "Follows OpenAI MCP specification for fetch tools.",
           inputSchema: {
             type: "object",
+            additionalProperties: false,
             properties: {
               id: {
                 type: "string",
@@ -255,9 +268,13 @@ export class GeminiAIMCPServer {
           description:
             "Generate images using Gemini's native image generation (Nano Banana). " +
             "Supports gemini-3-pro-image-preview, gemini-3.1-flash-image-preview, and gemini-2.5-flash-image models. " +
+            "gemini-2.5-flash-image supports at most 3 reference images and does not support imageSize; gemini-3.1-flash-image-preview is required for 0.5K and 1:4/1:8/4:1/8:1 ratios. " +
+            `Reference images use imagePaths and must be ${GEMINI_IMAGE_INPUT_FILE_TYPES}. ` +
+            "Audio and video reference files are not accepted by generate_image. " +
             `Images are saved to ${this.imageGenerationHandler.getImageOutputDir()} and returned as base64.`,
           inputSchema: {
             type: "object",
+            additionalProperties: false,
             properties: {
               prompt: {
                 type: "string",
@@ -266,7 +283,7 @@ export class GeminiAIMCPServer {
               model: {
                 type: "string",
                 enum: ["gemini-3-pro-image-preview", "gemini-3.1-flash-image-preview", "gemini-2.5-flash-image"],
-                description: "Image model (default: gemini-3-pro-image-preview; gemini-2.5-flash-image ignores imageSize)",
+                description: "Image model (default: gemini-3-pro-image-preview; gemini-2.5-flash-image supports at most 3 reference images and does not support imageSize)",
               },
               aspectRatio: {
                 type: "string",
@@ -282,7 +299,7 @@ export class GeminiAIMCPServer {
                 type: "array",
                 items: { type: "string" },
                 maxItems: 14,
-                description: "Local file paths of reference images to include as input (max 14; e.g., for image editing or style transfer)",
+                description: `Local file paths of reference images to include as input (max 14; gemini-2.5-flash-image supports at most 3). Supported file types: ${GEMINI_IMAGE_INPUT_FILE_TYPES}. Audio/video files are not accepted.`,
               },
               systemInstruction: {
                 type: "string",
@@ -291,7 +308,7 @@ export class GeminiAIMCPServer {
               thinkingLevel: {
                 type: "string",
                 enum: ["minimal", "high", "MINIMAL", "HIGH"],
-                description: "Optional Gemini 3 image thinking level",
+                description: "Optional thinking level; only supported by gemini-3.1-flash-image-preview",
               },
               mediaResolution: {
                 type: "string",
@@ -307,13 +324,15 @@ export class GeminiAIMCPServer {
           description:
             "Generate speech audio using Gemini TTS models. " +
             "Supports single-speaker and two-speaker TTS. " +
+            "Input is text-only; audio, image, and video reference files are not accepted. TTS has a 32k-token context limit and does not support streaming. " +
             `Audio is saved to ${this.speechGenerationHandler.getSpeechOutputDir()} and returned as MCP audio content.`,
           inputSchema: {
             type: "object",
+            additionalProperties: false,
             properties: {
               prompt: {
                 type: "string",
-                description: "Text or transcript to synthesize as speech",
+                description: "Text or transcript to synthesize as speech. Gemini TTS is text-only input; audio/image/video reference files are not accepted.",
               },
               model: {
                 type: "string",
@@ -356,10 +375,17 @@ export class GeminiAIMCPServer {
           name: "generate_music",
           description:
             "Generate music using Lyria models. " +
-            "Supports short clips and full-length songs depending on the model. " +
+            "Supports lyria-3-clip-preview fixed 30-second clips and lyria-3-pro-preview full songs up to 184 seconds. " +
+            "Lyria 3 supports one clip per prompt; language directions follow the model-card set: English, German, Spanish, French, Hindi, Japanese, Korean, Portuguese. " +
+            (this.config.useVertexAI
+              ? "Vertex AI mode supports 44.1 kHz, 192 kbps audio/mp3 output only. "
+              : "Gemini API/AI Studio mode supports 44.1 kHz stereo audio/mp3 output, and audio/wav only for lyria-3-pro-preview. ") +
+            "Negative prompting is not supported. " +
+            `Lyria 3 accepts text prompts and optional imagePaths (${GEMINI_IMAGE_INPUT_FILE_TYPES}); audio/video reference files are not accepted. ` +
             `Audio is saved to ${this.musicGenerationHandler.getMusicOutputDir()} and returned as MCP audio content.`,
           inputSchema: {
             type: "object",
+            additionalProperties: false,
             properties: {
               prompt: {
                 type: "string",
@@ -372,14 +398,14 @@ export class GeminiAIMCPServer {
               },
               outputMimeType: {
                 type: "string",
-                enum: ["audio/mp3", "audio/wav"],
-                description: "Optional output MIME type; audio/wav requires lyria-3-pro-preview",
+                enum: musicOutputMimeTypes,
+                description: musicOutputMimeDescription,
               },
               imagePaths: {
                 type: "array",
                 items: { type: "string" },
                 maxItems: 10,
-                description: "Optional local image paths to use as multimodal music generation inputs (max 10)",
+                description: `Optional local image paths to use as multimodal music generation inputs (max 10). Supported Gemini image input file types: ${GEMINI_IMAGE_INPUT_FILE_TYPES}. Audio/video reference files are not accepted by Lyria 3.`,
               },
               lyrics: {
                 type: "string",
@@ -393,11 +419,16 @@ export class GeminiAIMCPServer {
                 type: "string",
                 description: "Optional vocal generation direction, such as vocal tone, language, or delivery style",
               },
+              language: {
+                type: "string",
+                enum: ALLOWED_LYRIA_LANGUAGES,
+                description: "Optional output language direction. Supported Lyria 3 languages: English, German, Spanish, French, Hindi, Japanese, Korean, Portuguese",
+              },
               durationSeconds: {
                 type: "number",
                 minimum: 1,
                 maximum: 184,
-                description: "Optional target duration in seconds; requires lyria-3-pro-preview",
+                description: "Optional target duration in seconds; requires lyria-3-pro-preview; maximum 184 seconds. lyria-3-clip-preview is fixed at 30 seconds",
               },
               bpm: {
                 type: "number",
@@ -422,13 +453,16 @@ export class GeminiAIMCPServer {
             "Use check_video with the operationId to poll for completion and download results. " +
             "Recommended polling interval: 30 seconds. " +
             "Supports text-to-video, image-to-video (with imagePath), interpolation (imagePath + lastFramePath), " +
-            "reference images (referenceImagePaths, max 3, Veo 3.1 only), and Veo video extension (videoPath).",
+            "reference images (referenceImagePaths, max 3, Veo 3.1 only), and Veo video extension (videoPath). " +
+            `Image source file types: ${VEO_IMAGE_INPUT_FILE_TYPES}. videoPath must be ${VEO_EXTENSION_VIDEO_FILE_TYPES}. ` +
+            "Audio file references are not supported; describe dialogue, SFX, and ambience in the prompt instead.",
           inputSchema: {
             type: "object",
+            additionalProperties: false,
             properties: {
               prompt: {
                 type: "string",
-                description: "Video generation prompt",
+                description: "Video generation prompt. Include dialogue, SFX, and ambience as text audio cues; audio reference files are not accepted.",
               },
               model: {
                 type: "string",
@@ -481,21 +515,21 @@ export class GeminiAIMCPServer {
               },
               imagePath: {
                 type: "string",
-                description: "Local file path of input image for image-to-video generation",
+                description: `Local file path of input image for image-to-video generation. Supported file types: ${VEO_IMAGE_INPUT_FILE_TYPES}`,
               },
               lastFramePath: {
                 type: "string",
-                description: "Local file path of last frame image for interpolation (requires imagePath)",
+                description: `Local file path of last frame image for interpolation (requires imagePath). Supported file types: ${VEO_IMAGE_INPUT_FILE_TYPES}`,
               },
               referenceImagePaths: {
                 type: "array",
                 items: { type: "string" },
                 maxItems: 3,
-                description: "Local file paths of reference images for style/asset guidance (max 3, Veo 3.1 only)",
+                description: `Local file paths of reference images for style/asset guidance (max 3, Veo 3.1 only). Supported file types: ${VEO_IMAGE_INPUT_FILE_TYPES}`,
               },
               videoPath: {
                 type: "string",
-                description: "Local file path of a Veo-generated 720p input video to extend",
+                description: `Local file path of a Veo-generated 720p input video to extend. Supported file types: ${VEO_EXTENSION_VIDEO_FILE_TYPES}`,
               },
             },
             required: ["prompt"],
@@ -529,51 +563,167 @@ export class GeminiAIMCPServer {
       const toolName = request.params.name;
       const args = request.params.arguments || {};
 
-      switch (toolName) {
-        case "query": {
-          const input = QuerySchema.parse(args);
-          return await this.queryHandler.handle(input);
-        }
+      try {
+        switch (toolName) {
+          case "query": {
+            const input = QuerySchema.parse(args);
+            return await this.queryHandler.handle(input);
+          }
 
-        case "search": {
-          const input = SearchSchema.parse(args);
-          return await this.searchHandler.handle(input);
-        }
+          case "search": {
+            const input = SearchSchema.parse(args);
+            return await this.searchHandler.handle(input);
+          }
 
-        case "fetch": {
-          const input = FetchSchema.parse(args);
-          return await this.fetchHandler.handle(input);
-        }
+          case "fetch": {
+            const input = FetchSchema.parse(args);
+            return await this.fetchHandler.handle(input);
+          }
 
-        case "generate_image": {
-          const input = ImageGenerationSchema.parse(args);
-          return await this.imageGenerationHandler.handle(input);
-        }
+          case "generate_image": {
+            const input = ImageGenerationSchema.parse(args);
+            return await this.imageGenerationHandler.handle(input);
+          }
 
-        case "generate_speech": {
-          const input = SpeechGenerationSchema.parse(args);
-          return await this.speechGenerationHandler.handle(input);
-        }
+          case "generate_speech": {
+            const input = SpeechGenerationSchema.parse(args);
+            return await this.speechGenerationHandler.handle(input);
+          }
 
-        case "generate_music": {
-          const input = MusicGenerationSchema.parse(args);
-          return await this.musicGenerationHandler.handle(input);
-        }
+          case "generate_music": {
+            const input = buildMusicGenerationSchema(this.config.useVertexAI).parse(args);
+            return await this.musicGenerationHandler.handle(input);
+          }
 
-        case "generate_video": {
-          const input = buildVideoGenerationSchema(this.config.useVertexAI).parse(args);
-          return await this.videoGenerationHandler.handle(input);
-        }
+          case "generate_video": {
+            const input = buildVideoGenerationSchema(this.config.useVertexAI).parse(args);
+            return await this.videoGenerationHandler.handle(input);
+          }
 
-        case "check_video": {
-          const input = CheckVideoSchema.parse(args);
-          return await this.videoGenerationHandler.handleCheck(input);
-        }
+          case "check_video": {
+            const input = CheckVideoSchema.parse(args);
+            return await this.videoGenerationHandler.handleCheck(input);
+          }
 
-        default:
-          throw new Error(`Unknown tool: ${toolName}`);
+          default:
+            throw new Error(`Unknown tool: ${toolName}`);
+        }
+      } catch (error) {
+        return this.formatToolErrorResponse(toolName, error);
       }
     });
+  }
+
+  private formatToolErrorResponse(
+    toolName: string,
+    error: unknown
+  ): { isError: true; content: Array<{ type: string; text: string }> } {
+    const details = this.describeToolError(error);
+
+    if (error instanceof Error) {
+      this.logger.error(`Tool '${toolName}' failed: ${details.message}`, error);
+    } else {
+      this.logger.error(`Tool '${toolName}' failed: ${details.message}`);
+    }
+
+    return {
+      isError: true,
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            status: "failed",
+            tool: toolName,
+            ...details,
+          }),
+        },
+      ],
+    };
+  }
+
+  private describeToolError(error: unknown): {
+    errorType: string;
+    message: string;
+    code?: string;
+    statusCode?: number;
+    issues?: Array<{ path: string; code: string; message: string }>;
+  } {
+    if (error instanceof ZodError) {
+      return {
+        errorType: "validation_error",
+        message: "Tool arguments failed validation",
+        issues: error.issues.map((issue) => ({
+          path: issue.path.length > 0 ? issue.path.join(".") : "(root)",
+          code: issue.code,
+          message: issue.message,
+        })),
+      };
+    }
+
+    const message = this.getErrorMessage(error);
+    const code = this.getStringField(error, "code");
+    const statusCode = this.getNumberField(error, "status") ?? this.getNumberField(error, "statusCode");
+    const errorType = this.getErrorType(error, code, statusCode);
+
+    return {
+      errorType,
+      message,
+      ...(code ? { code } : {}),
+      ...(statusCode !== undefined ? { statusCode } : {}),
+    };
+  }
+
+  private getErrorType(error: unknown, code?: string, statusCode?: number): string {
+    if (error instanceof Error && error.name && error.name !== "Error") {
+      return error.name;
+    }
+
+    if (code === "ENOENT") {
+      return "file_not_found";
+    }
+    if (code === "EACCES" || code === "EPERM") {
+      return "file_access_error";
+    }
+    if (statusCode !== undefined) {
+      return "api_error";
+    }
+
+    return "runtime_error";
+  }
+
+  private getErrorMessage(error: unknown): string {
+    if (error instanceof Error) {
+      return error.message;
+    }
+
+    if (typeof error === "string") {
+      return error;
+    }
+
+    const message = this.getStringField(error, "message");
+    if (message) {
+      return message;
+    }
+
+    return "Unknown error";
+  }
+
+  private getStringField(value: unknown, field: string): string | undefined {
+    if (typeof value !== "object" || value === null || !(field in value)) {
+      return undefined;
+    }
+
+    const fieldValue = (value as Record<string, unknown>)[field];
+    return typeof fieldValue === "string" ? fieldValue : undefined;
+  }
+
+  private getNumberField(value: unknown, field: string): number | undefined {
+    if (typeof value !== "object" || value === null || !(field in value)) {
+      return undefined;
+    }
+
+    const fieldValue = (value as Record<string, unknown>)[field];
+    return typeof fieldValue === "number" ? fieldValue : undefined;
   }
 
   /**

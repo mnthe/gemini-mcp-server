@@ -31,7 +31,11 @@ export class SpeechGenerationHandler {
     });
 
     if (result.audios.length === 0) {
-      throw new Error('Gemini TTS response did not include audio data');
+      throw new Error(
+        result.text
+          ? `Gemini TTS response did not include audio data: ${result.text}`
+          : 'Gemini TTS response did not include audio data'
+      );
     }
 
     const content: Array<{ type: string; text?: string; data?: string; mimeType?: string }> = [];

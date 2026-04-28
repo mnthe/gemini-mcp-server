@@ -5,6 +5,7 @@ import {
   QuerySchema,
   SpeechGenerationSchema,
   VideoGenerationSchema,
+  buildMusicGenerationSchema,
   buildVideoGenerationSchema,
 } from './index.js';
 
@@ -105,6 +106,13 @@ describe('ImageGenerationSchema model compatibility', () => {
       thinkingLevel: 'high',
     }).thinkingLevel).toBe('high');
   });
+
+  it('rejects non-image files as image references', () => {
+    expect(() => ImageGenerationSchema.parse({
+      prompt: 'edit from this reference',
+      imagePaths: ['/tmp/reference.mp3'],
+    })).toThrow(/Unsupported image source file type/);
+  });
 });
 
 describe('VideoGenerationSchema current Veo models', () => {
@@ -184,6 +192,23 @@ describe('VideoGenerationSchema current Veo models', () => {
       videoPath: '/tmp/veo-output.mp4',
       numberOfVideos: 2,
     })).toThrow(/single video/);
+  });
+
+  it('rejects unsupported Veo source file types', () => {
+    expect(() => VideoGenerationSchema.parse({
+      prompt: 'animate this source',
+      imagePath: '/tmp/source.wav',
+    })).toThrow(/Unsupported Veo image source file type/);
+
+    expect(() => VideoGenerationSchema.parse({
+      prompt: 'animate this source',
+      imagePath: '/tmp/source.heic',
+    })).toThrow(/Unsupported Veo image source file type/);
+
+    expect(() => VideoGenerationSchema.parse({
+      prompt: 'extend this shot',
+      videoPath: '/tmp/source.mov',
+    })).toThrow(/Unsupported video extension source file type/);
   });
 });
 
@@ -276,18 +301,36 @@ describe('SpeechGenerationSchema TTS models', () => {
 });
 
 describe('MusicGenerationSchema Lyria models', () => {
-  it('accepts Lyria 3 Pro WAV output', () => {
+  it('accepts Vertex Lyria 3 MP3 output and supported language', () => {
     const parsed = MusicGenerationSchema.parse({
       prompt: 'A cinematic orchestral track',
       model: 'lyria-3-pro-preview',
-      outputMimeType: 'audio/wav',
+      outputMimeType: 'audio/mp3',
+      language: 'Korean',
     });
 
-    expect(parsed.outputMimeType).toBe('audio/wav');
+    expect(parsed.outputMimeType).toBe('audio/mp3');
+    expect(parsed.language).toBe('Korean');
   });
 
-  it('rejects WAV output on Lyria 3 Clip default model', () => {
+  it('rejects WAV output in Vertex Lyria 3 mode', () => {
     expect(() => MusicGenerationSchema.parse({
+      prompt: 'A short acoustic loop',
+      model: 'lyria-3-pro-preview',
+      outputMimeType: 'audio/wav',
+    })).toThrow();
+  });
+
+  it('allows WAV output only for Lyria 3 Pro in Gemini API mode', () => {
+    const GeminiApiMusicSchema = buildMusicGenerationSchema(false);
+
+    expect(GeminiApiMusicSchema.parse({
+      prompt: 'A cinematic orchestral track',
+      model: 'lyria-3-pro-preview',
+      outputMimeType: 'audio/wav',
+    }).outputMimeType).toBe('audio/wav');
+
+    expect(() => GeminiApiMusicSchema.parse({
       prompt: 'A short acoustic loop',
       outputMimeType: 'audio/wav',
     })).toThrow(/lyria-3-pro-preview/);
@@ -299,6 +342,7 @@ describe('MusicGenerationSchema Lyria models', () => {
       model: 'lyria-3-pro-preview',
       lyrics: '[Verse]\nHello from the test suite',
       vocalStyle: 'warm Korean pop vocal',
+      language: 'Korean',
       durationSeconds: 120,
       bpm: 110,
       intensity: 'medium',
@@ -307,6 +351,7 @@ describe('MusicGenerationSchema Lyria models', () => {
     expect(parsed.durationSeconds).toBe(120);
     expect(parsed.bpm).toBe(110);
     expect(parsed.lyrics).toContain('Hello');
+    expect(parsed.language).toBe('Korean');
   });
 
   it('rejects incompatible Lyria preview feature controls', () => {
@@ -320,6 +365,16 @@ describe('MusicGenerationSchema Lyria models', () => {
       instrumental: true,
       lyrics: '[Verse]\nWords',
     })).toThrow(/instrumental cannot be combined/);
+
+    expect(() => MusicGenerationSchema.parse({
+      prompt: 'A short acoustic loop',
+      language: 'Italian',
+    })).toThrow();
+
+    expect(() => MusicGenerationSchema.parse({
+      prompt: 'A short acoustic loop',
+      negativePrompt: 'no drums',
+    })).toThrow(/Unrecognized key/);
   });
 
   it('rejects more than 10 image sources', () => {
@@ -327,5 +382,12 @@ describe('MusicGenerationSchema Lyria models', () => {
       prompt: 'A short acoustic loop inspired by these images',
       imagePaths: Array.from({ length: 11 }, (_, index) => `/tmp/ref-${index}.jpg`),
     })).toThrow();
+  });
+
+  it('rejects audio files as Lyria reference inputs', () => {
+    expect(() => MusicGenerationSchema.parse({
+      prompt: 'A short acoustic loop inspired by this audio',
+      imagePaths: ['/tmp/reference.wav'],
+    })).toThrow(/Unsupported image source file type/);
   });
 });

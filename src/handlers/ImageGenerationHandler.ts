@@ -27,6 +27,14 @@ export class ImageGenerationHandler {
       mediaResolution: input.mediaResolution,
     });
 
+    if (result.images.length === 0) {
+      throw new Error(
+        result.text
+          ? `Gemini image generation response did not include image data: ${result.text}`
+          : 'Gemini image generation response did not include image data'
+      );
+    }
+
     const content: Array<{ type: string; text?: string; data?: string; mimeType?: string }> = [];
     const savedPaths: string[] = [];
 
