@@ -192,8 +192,8 @@ async generateImage(
 ```typescript
 interface QueryOptions {
   enableThinking?: boolean;
-  thinkingLevel?: ThinkingLevel;  // Gemini 3 models: MINIMAL | LOW | MEDIUM | HIGH
-  mediaResolution?: string;       // Gemini 3 models: 'low' | 'medium' | 'high'
+  thinkingLevel?: ThinkingLevel | string;  // Gemini 3 models: minimal | low | medium | high
+  mediaResolution?: string;                // Multimodal inputs: low | medium | high
   model?: string;                 // Per-request model override
 }
 ```
@@ -202,8 +202,8 @@ interface QueryOptions {
 ```typescript
 interface ImageGenerationOptions {
   model?: string;        // Default: 'gemini-3-pro-image-preview'
-  aspectRatio?: string;  // e.g., '1:1', '16:9', '9:16'
-  imageSize?: string;    // '1K' | '2K' | '4K'
+  aspectRatio?: string;  // e.g., '1:1', '16:9', '1:4'
+  imageSize?: string;    // '0.5K' | '1K' | '2K' | '4K'
 }
 ```
 
@@ -439,7 +439,9 @@ Validates the `gemini_query` tool input:
 z.object({
   prompt: z.string(),
   sessionId: z.string().optional(),
-  model: z.string().optional(),  // e.g., 'gemini-3-flash-preview', 'gemini-3.1-pro-preview'
+  model: z.string().optional(),  // e.g., 'gemini-3-flash-preview', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview'
+  thinkingLevel: z.enum(['minimal','low','medium','high']).optional(),
+  mediaResolution: z.enum(['low','medium','high']).optional(),
   parts: z.array(MultimodalPartSchema).optional(),
 })
 ```
@@ -451,9 +453,9 @@ Validates the `gemini_generate_image` tool input:
 ```typescript
 z.object({
   prompt: z.string(),
-  model: z.enum(['gemini-3-pro-image-preview', 'gemini-3.1-flash-image-preview']).optional(),
-  aspectRatio: z.enum(['1:1','2:3','3:2','3:4','4:3','4:5','5:4','9:16','16:9','21:9']).optional(),
-  imageSize: z.enum(['1K', '2K', '4K']).optional(),  // 4K requires gemini-3-pro-image-preview or gemini-3.1-flash-image-preview
+  model: z.enum(['gemini-3-pro-image-preview', 'gemini-3.1-flash-image-preview', 'gemini-2.5-flash-image']).optional(),
+  aspectRatio: z.enum(['1:1','1:4','1:8','2:3','3:2','3:4','4:1','4:3','4:5','5:4','8:1','9:16','16:9','21:9']).optional(),
+  imageSize: z.enum(['0.5K', '1K', '2K', '4K']).optional(),
 })
 ```
 
@@ -464,7 +466,7 @@ Validates the `generate_video` tool input:
 ```typescript
 z.object({
   prompt: z.string(),
-  model: z.enum(['veo-3.1-fast-generate-001', 'veo-3.1-generate-preview']).optional(),
+  model: z.enum(['veo-3.1-fast-generate-001', 'veo-3.1-generate-001', 'veo-3.1-lite-generate-001']).optional(),
   aspectRatio: z.enum(['16:9', '9:16']).optional(),
   durationSeconds: z.enum(['4', '6', '8']).optional(),
   resolution: z.enum(['720p', '1080p', '4k']).optional(),

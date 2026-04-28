@@ -253,11 +253,11 @@ If you're testing with the MCP Inspector, you can send multimodal content like t
 ## Model Recommendations
 
 For best multimodal performance, use:
-- `gemini-2.0-flash-exp` - Latest with best multimodal support
-- `gemini-2.5-pro` - Production-ready with strong multimodal
-- `gemini-1.5-pro` - Stable with good multimodal support
+- `gemini-3-flash-preview` - Default with strong multimodal support
+- `gemini-3.1-pro-preview` - High-capability reasoning with strong multimodal support
+- `gemini-3.1-flash-lite-preview` - Cost-efficient multimodal support
 
 Set in your environment:
 ```bash
-export GEMINI_MODEL="gemini-2.0-flash-exp"
+export GEMINI_MODEL="gemini-3-flash-preview"
 ```

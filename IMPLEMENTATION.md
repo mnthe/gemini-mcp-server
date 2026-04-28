@@ -83,8 +83,8 @@ The Gemini AI MCP Server is a production-grade intelligent agent that enables AI
 - Dynamic generation config per query
 - Response text extraction
 - Supports both Vertex AI and Google AI Studio modes
-- Image generation via Imagen API (`generateImage`)
-- Supports Gemini 3 models (gemini-3.0-pro-preview and later)
+- Image generation via Gemini image models (`generateImage`)
+- Supports Gemini 3 models (`gemini-3-flash-preview`, `gemini-3.1-pro-preview`, and later)
 
 **Logger.ts** (`src/utils/`)
 - File-based logging (`logs/general.log`, `logs/reasoning.log`)
@@ -170,13 +170,13 @@ User Input → Turn 1..10 Loop:
 - Supports multi-persona setups (multiple servers with different roles)
 
 ### 8. Image Generation (`generate_image` tool)
-- Generates images via Google Imagen API
+- Generates images via Gemini image models
 - Configurable aspect ratio, image size, and model
 - Automatically saves output to disk with timestamped filenames
 - Returns both base64 image data and local file paths
 
 ### 9. Gemini 3 Model Support
-- Full support for `gemini-3.0-pro-preview` and subsequent Gemini 3 models
+- Full support for `gemini-3-flash-preview`, `gemini-3.1-pro-preview`, and subsequent Gemini 3 models
 - Automatic model detection for thinking level configuration
 - `mediaResolution` parameter support for multimodal inputs
 
@@ -185,7 +185,7 @@ User Input → Turn 1..10 Loop:
 ### Dependencies
 ```json
 {
-  "@google/genai": "^1.42.0",                 // Google Gen AI SDK (Vertex AI & Google AI Studio)
+  "@google/genai": "^1.43.0",                 // Google Gen AI SDK (Vertex AI & Google AI Studio)
   "@modelcontextprotocol/sdk": "^1.26.0",     // MCP protocol
   "zod": "^4.3.6",                            // Schema validation (migrated to Zod v4)
   "dotenv": "^17.3.1"                         // Environment variable loading

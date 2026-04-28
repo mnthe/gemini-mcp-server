@@ -8,7 +8,7 @@ This server provides:
 - **Agentic Loop**: Turn-based execution with automatic tool selection and reasoning
 - **Query Gemini**: Access Gemini models via Vertex AI or Google AI Studio for cross-validation
 - **Multimodal Support**: Send images, audio, video, and code files alongside text prompts
-- **Image Generation**: Generate images using Gemini image models (gemini-3-pro-image-preview, gemini-3.1-flash-image-preview)
+- **Image Generation**: Generate images using Gemini image models (gemini-3-pro-image-preview, gemini-3.1-flash-image-preview, gemini-2.5-flash-image)
 - **Tool Execution**: Built-in WebFetch + integration with external MCP servers
 - **Multi-turn Conversations**: Maintain context across queries with session management
 - **Reasoning Traces**: File-based logging of AI thinking processes
@@ -44,6 +44,8 @@ Inspired by OpenAI Agents SDK, the server operates as an autonomous agent:
 Full support for Gemini 3 generation models:
 - **gemini-3-flash-preview**: Default model — fast and capable
 - **gemini-3.1-pro-preview**: High-capability reasoning model
+- **gemini-3.1-flash-lite-preview**: Cost-efficient multimodal model for high-volume workloads
+- **gemini-3.1-pro-preview-customtools**: Agentic endpoint optimized for custom tools
 - **thinkingLevel**: Per-query thinking budget control for Gemini 3 models
 - **GEMINI_MEDIA_RESOLUTION**: Control media quality for multimodal inputs
 
@@ -54,7 +56,8 @@ Full support for Gemini 3 generation models:
 ### 🖼️ Image Generation
 Generate images directly from text prompts using Gemini image models:
 - **gemini-3-pro-image-preview**: Professional asset production with 4K resolution support (default)
-- **gemini-3.1-flash-image-preview**: High-efficiency generation with 4K resolution and reference images
+- **gemini-3.1-flash-image-preview**: High-efficiency generation with 0.5K-4K resolution and reference images
+- **gemini-2.5-flash-image**: Fast 1K image generation and editing
 - Configurable aspect ratios: 1:1, 16:9, 9:16, 4:3, and more
 - Images automatically saved to configurable output directory
 
@@ -260,7 +263,7 @@ See [PROMPT_CUSTOMIZATION.md](PROMPT_CUSTOMIZATION.md) for comprehensive guide a
 
 ## Available Tools
 
-The server exposes five MCP tools: `query`, `search`, `fetch`, `generate_image`, and `generate_video`.
+The server exposes six MCP tools: `query`, `search`, `fetch`, `generate_image`, `generate_video`, and `check_video`.
 
 ### query
 
@@ -269,7 +272,9 @@ Main agentic entrypoint that handles multi-turn execution with automatic tool se
 **Parameters:**
 - `prompt` (string, required): The text prompt to send
 - `sessionId` (string, optional): Conversation session ID
-- `model` (string, optional): Model override (e.g., `gemini-3-flash-preview`, `gemini-3.1-pro-preview`)
+- `model` (string, optional): Model override (e.g., `gemini-3-flash-preview`, `gemini-3.1-pro-preview`, `gemini-3.1-flash-lite-preview`, `gemini-3.1-pro-preview-customtools`)
+- `thinkingLevel` (string, optional): Gemini 3 thinking level. Options: `minimal`, `low`, `medium`, `high`
+- `mediaResolution` (string, optional): Global media resolution for multimodal inputs. Options: `low`, `medium`, `high`
 - `parts` (array, optional): Multimodal content parts (images, audio, video, documents)
 
 **How It Works:**
@@ -342,9 +347,10 @@ Generate images from text prompts using Gemini image models.
 - `prompt` (string, required): Image generation prompt describing what to generate
 - `model` (string, optional): Image model to use. Options:
   - `gemini-3-pro-image-preview` (default) — professional quality, supports up to 4K resolution
-  - `gemini-3.1-flash-image-preview` — high-efficiency with 4K and reference image support
-- `aspectRatio` (string, optional): Image aspect ratio. Default: `1:1`. Options: `1:1`, `2:3`, `3:2`, `3:4`, `4:3`, `4:5`, `5:4`, `9:16`, `16:9`, `21:9`
-- `imageSize` (string, optional): Output resolution. Default: `1K`. Options: `1K`, `2K`, `4K` (4K requires `gemini-3-pro-image-preview` or `gemini-3.1-flash-image-preview`)
+  - `gemini-3.1-flash-image-preview` — high-efficiency with 0.5K-4K and reference image support
+  - `gemini-2.5-flash-image` — fast 1K image generation and editing
+- `aspectRatio` (string, optional): Image aspect ratio. Default: `1:1`. Options: `1:1`, `1:4`, `1:8`, `2:3`, `3:2`, `3:4`, `4:1`, `4:3`, `4:5`, `5:4`, `8:1`, `9:16`, `16:9`, `21:9` (`1:4`, `1:8`, `4:1`, `8:1` require `gemini-3.1-flash-image-preview`)
+- `imageSize` (string, optional): Output resolution. Default: `1K`. Options: `0.5K`, `1K`, `2K`, `4K` (`0.5K` requires `gemini-3.1-flash-image-preview`; omit for `gemini-2.5-flash-image`)
 
 **Behavior:**
 - Generated images are saved to `GEMINI_IMAGE_OUTPUT_DIR` (defaults to `~/Pictures` on macOS, `~/images` on Linux)
@@ -370,7 +376,8 @@ Generate videos from text prompts using Veo video generation models.
 - `prompt` (string, required): Video generation prompt describing what to generate
 - `model` (string, optional): Video model to use. Default: `veo-3.1-fast-generate-001`. Options:
   - `veo-3.1-fast-generate-001` (default) — fast video generation
-  - `veo-3.1-generate-preview` — higher quality generation
+  - `veo-3.1-generate-001` — standard quality generation
+  - `veo-3.1-lite-generate-001` — cost-efficient generation
 - `aspectRatio` (string, optional): Video aspect ratio. Default: `16:9`. Options: `16:9`, `9:16`
 - `durationSeconds` (string, optional): Video duration. Default: `8`. Options: `4`, `6`, `8` (1080p/4k require 8)
 - `resolution` (string, optional): Video resolution. Default: `720p`. Options: `720p`, `1080p`, `4k` (1080p/4k require 8 second duration)
@@ -394,7 +401,7 @@ generate_video: "A dancing robot in a cyberpunk city"
 
 # Text-to-video with custom settings
 generate_video: "Ocean waves crashing on a beach"
-model: "veo-3.1-generate-preview"
+model: "veo-3.1-generate-001"
 aspectRatio: "16:9"
 durationSeconds: "8"
 resolution: "1080p"

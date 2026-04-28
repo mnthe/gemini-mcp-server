@@ -40,12 +40,13 @@ The response contains:
 
 ## Model Selection
 
-Two image generation models are available:
+Three image generation models are available:
 
 | Model | Description |
 |-------|-------------|
 | `gemini-3-pro-image-preview` | Default. Professional asset production, supports up to 4K resolution |
-| `gemini-3.1-flash-image-preview` | High-efficiency with 4K, reference images, and new aspect ratios |
+| `gemini-3.1-flash-image-preview` | High-efficiency with 0.5K-4K, reference images, and new aspect ratios |
+| `gemini-2.5-flash-image` | Fast 1K image generation and editing |
 
 ```typescript
 const request = {
@@ -64,12 +65,16 @@ Control the image dimensions with the `aspectRatio` parameter. Defaults to `1:1`
 | Value | Use Case |
 |-------|----------|
 | `1:1` | Square (default), social media posts |
+| `1:4` | Tall banner (requires `gemini-3.1-flash-image-preview`) |
+| `1:8` | Extra-tall strip (requires `gemini-3.1-flash-image-preview`) |
 | `2:3` | Portrait, mobile wallpaper |
 | `3:2` | Landscape, photography standard |
 | `3:4` | Portrait, tablet screen |
+| `4:1` | Wide banner (requires `gemini-3.1-flash-image-preview`) |
 | `4:3` | Landscape, classic photo |
 | `4:5` | Portrait, Instagram |
 | `5:4` | Landscape |
+| `8:1` | Extra-wide strip (requires `gemini-3.1-flash-image-preview`) |
 | `9:16` | Portrait, mobile/story |
 | `16:9` | Widescreen, desktop wallpaper |
 | `21:9` | Ultrawide, cinematic |
@@ -90,8 +95,9 @@ The `imageSize` parameter sets the output resolution. Defaults to `1K`.
 
 | Value | Resolution | Supported Models |
 |-------|------------|-----------------|
-| `1K` | ~1024px (default) | Both models |
-| `2K` | ~2048px | Both models |
+| `0.5K` | ~512px | `gemini-3.1-flash-image-preview` |
+| `1K` | ~1024px (default) | `gemini-3-pro-image-preview`, `gemini-3.1-flash-image-preview`; omit `imageSize` for `gemini-2.5-flash-image` |
+| `2K` | ~2048px | `gemini-3-pro-image-preview`, `gemini-3.1-flash-image-preview` |
 | `4K` | ~4096px | `gemini-3-pro-image-preview` or `gemini-3.1-flash-image-preview` |
 
 ```typescript

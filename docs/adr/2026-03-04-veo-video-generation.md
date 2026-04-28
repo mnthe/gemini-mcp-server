@@ -61,7 +61,8 @@ Implement a `generate_video` MCP tool following the established image generation
 ```typescript
 const ALLOWED_VIDEO_MODELS = [
   'veo-3.1-fast-generate-001',
-  'veo-3.1-generate-preview',
+  'veo-3.1-generate-001',
+  'veo-3.1-lite-generate-001',
 ] as const;
 
 export const VideoGenerationSchema = z.object({
