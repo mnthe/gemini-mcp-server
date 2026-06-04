@@ -235,6 +235,20 @@ describe('GeminiAIMCPServer generate_video wiring', () => {
     expect(mockVideoGenHandle).toHaveBeenCalledWith({ prompt: 'a dancing cat' });
   });
 
+  it('strips the backend argument in single-backend deployments', async () => {
+    // createTestConfig is Vertex-only (useVertexAI: true, no availableBackends).
+    // A backend arg is not advertised and must be ignored, so the request still
+    // parses (it is not rejected by the Vertex-only model/backend enum).
+    await callHandler({
+      params: {
+        name: 'generate_video',
+        arguments: { prompt: 'a dancing cat', backend: 'ai-studio' },
+      },
+    });
+
+    expect(mockVideoGenHandle).toHaveBeenCalledWith({ prompt: 'a dancing cat' });
+  });
+
   it('validates generate_video calls against Gemini Developer API mode', async () => {
     const aiStudioServer = new GeminiAIMCPServer(createTestConfig({ useVertexAI: false }));
     const handlers = getHandlers((aiStudioServer as any).server);

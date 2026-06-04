@@ -239,7 +239,7 @@ describe('backend availability detection', () => {
       const config = loadConfig();
       expect(config.defaultBackend).toBe('ai-studio');
       expect(config.availableBackends).toContain('vertex');
-      expect(config.availableBackends[0]).toBe('ai-studio');
+      expect(config.availableBackends?.[0]).toBe('ai-studio');
     } finally {
       if (savedKey !== undefined) process.env.GEMINI_API_KEY = savedKey; else delete process.env.GEMINI_API_KEY;
       if (savedProject !== undefined) process.env.GOOGLE_CLOUD_PROJECT = savedProject; else delete process.env.GOOGLE_CLOUD_PROJECT;
