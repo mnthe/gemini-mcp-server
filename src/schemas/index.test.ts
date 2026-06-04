@@ -247,13 +247,13 @@ describe('VideoGenerationSchema Vertex-only output controls', () => {
     expect(() => GeminiApiVideoSchema.parse({
       prompt: 'compressed video',
       compressionQuality: 'lossless',
-    })).toThrow(/compressionQuality is only supported in Vertex AI mode/);
+    })).toThrow(/compressionQuality is only supported by the Vertex AI backend/);
 
     expect(() => GeminiApiVideoSchema.parse({
       prompt: 'animate this frame',
       imagePath: '/tmp/frame.png',
       resizeMode: 'crop',
-    })).toThrow(/resizeMode is only supported in Vertex AI mode/);
+    })).toThrow(/resizeMode is only supported by the Vertex AI backend/);
   });
 });
 
@@ -316,6 +316,53 @@ describe('VideoGenerationSchema Gemini Developer API compatibility', () => {
       imagePath: '/tmp/frame.png',
       personGeneration: 'allow_all',
     })).toThrow(/allow_adult/);
+  });
+});
+
+describe('buildVideoGenerationSchema dual-backend mode', () => {
+  const DualSchema = buildVideoGenerationSchema(true, ['vertex', 'ai-studio']);
+
+  it('accepts both Vertex (-001) and AI Studio (-preview) models when routed correctly', () => {
+    expect(DualSchema.parse({ prompt: 'x', model: 'veo-3.1-generate-001' }).model)
+      .toBe('veo-3.1-generate-001');
+    expect(DualSchema.parse({ prompt: 'x', backend: 'ai-studio', model: 'veo-3.1-generate-preview' }).model)
+      .toBe('veo-3.1-generate-preview');
+  });
+
+  it('rejects a model that does not match the selected backend', () => {
+    // default backend is vertex; a -preview model belongs to ai-studio
+    expect(() => DualSchema.parse({ prompt: 'x', model: 'veo-3.1-generate-preview' }))
+      .toThrow(/does not match the selected backend/);
+    expect(() => DualSchema.parse({ prompt: 'x', backend: 'vertex', model: 'veo-3.1-generate-preview' }))
+      .toThrow(/does not match the selected backend/);
+  });
+
+  it('gates Vertex-only fields by the selected backend', () => {
+    expect(() => DualSchema.parse({
+      prompt: 'x', backend: 'ai-studio', model: 'veo-3.1-generate-preview', seed: 1,
+    })).toThrow(/seed/);
+    // vertex is the default backend, so seed is allowed without a backend arg
+    expect(DualSchema.parse({ prompt: 'x', seed: 1 }).seed).toBe(1);
+  });
+
+  it('rejects a backend value that is not configured', () => {
+    const VertexOnly = buildVideoGenerationSchema(true, ['vertex']);
+    expect(() => VertexOnly.parse({ prompt: 'x', backend: 'ai-studio' })).toThrow();
+  });
+});
+
+describe('buildMusicGenerationSchema dual-backend mode', () => {
+  const DualMusic = buildMusicGenerationSchema(true, ['vertex', 'ai-studio']);
+
+  it('allows WAV only on the ai-studio backend for lyria-3-pro-preview', () => {
+    expect(DualMusic.parse({
+      prompt: 'song', backend: 'ai-studio', model: 'lyria-3-pro-preview', outputMimeType: 'audio/wav',
+    }).outputMimeType).toBe('audio/wav');
+
+    // vertex backend rejects wav
+    expect(() => DualMusic.parse({
+      prompt: 'song', backend: 'vertex', model: 'lyria-3-pro-preview', outputMimeType: 'audio/wav',
+    })).toThrow(/audio\/mp3/);
   });
 });
 

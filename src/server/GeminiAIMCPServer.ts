@@ -136,13 +136,25 @@ export class GeminiAIMCPServer {
   private setupHandlers(): void {
     // List available tools
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
-      const videoModelEnum = getAllowedVideoModels(this.config.useVertexAI);
+      const availableBackends = this.config.availableBackends ?? [this.config.useVertexAI ? 'vertex' : 'ai-studio'];
+      const defaultBackend = this.config.defaultBackend ?? (this.config.useVertexAI ? 'vertex' : 'ai-studio');
+      const dual = availableBackends.length > 1;
+      const backendProp = {
+        type: "string",
+        enum: availableBackends,
+        description: `Backend for this request (default: ${defaultBackend}; available: ${availableBackends.join(', ')}). Vertex AI uses '-001' video model IDs and Vertex-only controls; Google AI Studio uses '-preview' IDs.`,
+      };
+      const videoModelEnum = dual
+        ? [...getAllowedVideoModels(true), ...getAllowedVideoModels(false)]
+        : getAllowedVideoModels(this.config.useVertexAI);
       const defaultVideoModel = getDefaultVideoModel(this.config.useVertexAI);
-      const maxVideoCount = this.config.useVertexAI ? 4 : 1;
-      const musicOutputMimeTypes = getAllowedMusicOutputMimeTypes(this.config.useVertexAI);
-      const musicOutputMimeDescription = this.config.useVertexAI
-        ? "Optional output MIME type; Vertex AI Lyria 3 model card supports audio/mp3 only"
-        : "Optional output MIME type; Gemini API/AI Studio defaults to audio/mp3 and supports audio/wav only with lyria-3-pro-preview";
+      const maxVideoCount = dual ? 4 : (this.config.useVertexAI ? 4 : 1);
+      const musicOutputMimeTypes = dual ? ['audio/mp3', 'audio/wav'] : getAllowedMusicOutputMimeTypes(this.config.useVertexAI);
+      const musicOutputMimeDescription = dual
+        ? "Optional output MIME type. Vertex AI supports audio/mp3 only; Google AI Studio supports audio/wav for lyria-3-pro-preview."
+        : (this.config.useVertexAI
+          ? "Optional output MIME type; Vertex AI Lyria 3 model card supports audio/mp3 only"
+          : "Optional output MIME type; Gemini API/AI Studio defaults to audio/mp3 and supports audio/wav only with lyria-3-pro-preview");
 
       const tools = [
         {
@@ -565,6 +577,23 @@ export class GeminiAIMCPServer {
         },
       ];
 
+      // When more than one backend is configured, advertise the per-request
+      // `backend` selector on every generation tool so callers can switch.
+      if (dual) {
+        const backendTools = new Set([
+          "query",
+          "generate_image",
+          "generate_speech",
+          "generate_video",
+          "generate_music",
+        ]);
+        for (const tool of tools) {
+          if (backendTools.has(tool.name)) {
+            (tool.inputSchema.properties as Record<string, unknown>).backend = backendProp;
+          }
+        }
+      }
+
       return { tools };
     });
 
@@ -601,12 +630,12 @@ export class GeminiAIMCPServer {
           }
 
           case "generate_music": {
-            const input = buildMusicGenerationSchema(this.config.useVertexAI).parse(args);
+            const input = buildMusicGenerationSchema(this.config.useVertexAI, this.config.availableBackends).parse(args);
             return await this.musicGenerationHandler.handle(input);
           }
 
           case "generate_video": {
-            const input = buildVideoGenerationSchema(this.config.useVertexAI).parse(args);
+            const input = buildVideoGenerationSchema(this.config.useVertexAI, this.config.availableBackends).parse(args);
             return await this.videoGenerationHandler.handle(input);
           }
 

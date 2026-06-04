@@ -4,29 +4,61 @@
  * Reference: https://googleapis.github.io/js-genai/release_docs/index.html
  */
 
-import { GeminiAIConfig } from '../types/index.js';
+import { GeminiAIConfig, Backend } from '../types/index.js';
 
 export function loadConfig(): GeminiAIConfig {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   const projectId = process.env.GOOGLE_CLOUD_PROJECT;
   const explicitVertexMode = process.env.GOOGLE_GENAI_USE_VERTEXAI;
-  const useVertexAI = explicitVertexMode === undefined
-    ? Boolean(projectId) || !apiKey
-    : explicitVertexMode === "true";
 
-  if (useVertexAI && !projectId) {
+  // Detect which backends have credentials. When both are present, the server
+  // can route per request (the `backend` tool argument); otherwise it serves
+  // the single available backend.
+  const vertexAvailable = Boolean(projectId);
+  const aiStudioAvailable = Boolean(apiKey);
+
+  if (!vertexAvailable && !aiStudioAvailable) {
     console.error(
-      "Error: GOOGLE_CLOUD_PROJECT environment variable is required when using Vertex AI mode"
+      "Error: set GOOGLE_CLOUD_PROJECT (Vertex AI) and/or GEMINI_API_KEY/GOOGLE_API_KEY (Google AI Studio)."
     );
     process.exit(1);
   }
 
-  if (!useVertexAI && !apiKey) {
+  // Resolve the default backend: explicit override wins, else infer from creds
+  // (Vertex preferred when a project is set, matching prior behavior).
+  let defaultBackend: Backend;
+  if (explicitVertexMode === "true") {
+    defaultBackend = "vertex";
+  } else if (explicitVertexMode === "false") {
+    defaultBackend = "ai-studio";
+  } else {
+    defaultBackend = vertexAvailable ? "vertex" : "ai-studio";
+  }
+
+  if (defaultBackend === "vertex" && !vertexAvailable) {
     console.error(
-      "Error: GEMINI_API_KEY or GOOGLE_API_KEY environment variable is required when using Google AI Studio / Gemini Developer API mode"
+      "Error: GOOGLE_CLOUD_PROJECT is required when GOOGLE_GENAI_USE_VERTEXAI=true (Vertex AI mode)"
     );
     process.exit(1);
   }
+  if (defaultBackend === "ai-studio" && !aiStudioAvailable) {
+    console.error(
+      "Error: GEMINI_API_KEY or GOOGLE_API_KEY is required when GOOGLE_GENAI_USE_VERTEXAI=false (Google AI Studio mode)"
+    );
+    process.exit(1);
+  }
+
+  // Default backend first so it is the natural primary in any ordered use.
+  const availableBackends: Backend[] = [];
+  if (defaultBackend === "vertex") {
+    availableBackends.push("vertex");
+    if (aiStudioAvailable) availableBackends.push("ai-studio");
+  } else {
+    availableBackends.push("ai-studio");
+    if (vertexAvailable) availableBackends.push("vertex");
+  }
+
+  const useVertexAI = defaultBackend === "vertex";
 
   // Get location - follows gen-ai SDK standards
   // Note: @google/genai with Vertex AI mode requires location for proper authentication
@@ -78,6 +110,8 @@ export function loadConfig(): GeminiAIConfig {
     location,
     apiKey,
     useVertexAI,
+    defaultBackend,
+    availableBackends,
     model,
     temperature,
     maxTokens,

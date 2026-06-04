@@ -60,6 +60,7 @@ export class QueryHandler {
           model: input.model,
           thinkingLevel: input.thinkingLevel,
           mediaResolution: input.mediaResolution,
+          backend: input.backend,
         },
         input.parts // Pass multimodal parts
       );

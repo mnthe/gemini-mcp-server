@@ -77,6 +77,7 @@ export class AgenticLoop {
           model: options.model,
           thinkingLevel: options.thinkingLevel,
           mediaResolution: options.mediaResolution,
+          backend: options.backend,
         },
         isFirstTurn ? multimodalParts : undefined
       );
@@ -128,6 +129,7 @@ export class AgenticLoop {
             model: options.model,
             thinkingLevel: options.thinkingLevel,
             mediaResolution: options.mediaResolution,
+            backend: options.backend,
           });
 
           // Add fallback response as final output

@@ -25,6 +25,7 @@ export class ImageGenerationHandler {
       systemInstruction: input.systemInstruction,
       thinkingLevel: input.thinkingLevel,
       mediaResolution: input.mediaResolution,
+      backend: input.backend,
     });
 
     if (result.images.length === 0) {

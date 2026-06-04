@@ -9,7 +9,7 @@ import { extname, resolve as resolvePath, sep as pathSep } from "node:path";
 
 // Re-export ThinkingLevel for consumers
 export { ThinkingLevel } from "@google/genai";
-import { GeminiAIConfig, MultimodalPart, isSupportedMimeType } from '../types/index.js';
+import { GeminiAIConfig, Backend, MultimodalPart, isSupportedMimeType } from '../types/index.js';
 import { validateSecureUrl } from '../utils/urlSecurity.js';
 import { validateMultimodalFile } from '../utils/fileSecurity.js';
 import { resolveOutputDirs } from '../utils/generatedFileSaver.js';
@@ -24,6 +24,7 @@ export interface ImageGenerationOptions {
   systemInstruction?: string;
   thinkingLevel?: ThinkingLevel | string;
   mediaResolution?: string;
+  backend?: Backend;
 }
 
 export interface GeneratedImage {
@@ -48,6 +49,7 @@ export interface VideoGenerationOptions {
   videoPath?: string;
   compressionQuality?: string;
   resizeMode?: string;
+  backend?: Backend;
 }
 
 export interface GeneratedVideo {
@@ -65,6 +67,7 @@ export interface SpeechGenerationOptions {
   voiceName?: string;
   languageCode?: string;
   speakers?: SpeechSpeakerOptions[];
+  backend?: Backend;
 }
 
 export interface MusicGenerationOptions {
@@ -78,6 +81,7 @@ export interface MusicGenerationOptions {
   durationSeconds?: number;
   bpm?: number;
   intensity?: string;
+  backend?: Backend;
 }
 
 export interface GeneratedAudio {
@@ -106,31 +110,65 @@ export interface QueryOptions {
    * When provided, overrides the ENV-configured model.
    */
   model?: string;
+  /**
+   * Optional backend override ('vertex' | 'ai-studio') for per-request routing.
+   * Defaults to the server's configured default backend.
+   */
+  backend?: Backend;
 }
 
 export class GeminiAIService {
-  private client: GoogleGenAI;
+  private clients = new Map<Backend, GoogleGenAI>();
   private config: GeminiAIConfig;
-  private pendingVideoOps = new Map<string, any>();
+  private pendingVideoOps = new Map<string, { operation: any; backend: Backend }>();
   private extraSafeDirectories: string[];
 
   constructor(config: GeminiAIConfig) {
     this.config = config;
-    this.client = config.useVertexAI
-      ? new GoogleGenAI({
-          vertexai: true,
-          project: config.projectId,
-          location: config.location,
-        })
-      : new GoogleGenAI({
-          apiKey: config.apiKey,
-        });
 
     // Auto-allow this server's own generated-output directories so users can
     // round-trip generated files (e.g. feed a generated image back into query).
     const outputs = resolveOutputDirs(config);
     this.extraSafeDirectories = [outputs.image, outputs.video, outputs.speech, outputs.music]
       .map(d => resolvePath(d));
+  }
+
+  /** Resolve the effective backend for a request (explicit override or default). */
+  private resolveBackend(backend?: Backend): Backend {
+    return backend ?? this.config.defaultBackend ?? (this.config.useVertexAI ? 'vertex' : 'ai-studio');
+  }
+
+  /**
+   * Lazily build and cache a GoogleGenAI client for the given backend.
+   * Throws a clear error when the backend's credentials are not configured.
+   */
+  private clientFor(backend: Backend): GoogleGenAI {
+    const existing = this.clients.get(backend);
+    if (existing) return existing;
+
+    let client: GoogleGenAI;
+    if (backend === 'vertex') {
+      if (!this.config.projectId) {
+        throw new Error(
+          "Vertex AI backend requested but GOOGLE_CLOUD_PROJECT is not configured"
+        );
+      }
+      client = new GoogleGenAI({
+        vertexai: true,
+        project: this.config.projectId,
+        location: this.config.location,
+      });
+    } else {
+      if (!this.config.apiKey) {
+        throw new Error(
+          "Google AI Studio backend requested but GEMINI_API_KEY/GOOGLE_API_KEY is not configured"
+        );
+      }
+      client = new GoogleGenAI({ apiKey: this.config.apiKey });
+    }
+
+    this.clients.set(backend, client);
+    return client;
   }
 
   private isInSelfManagedDir(absolutePath: string): boolean {
@@ -197,7 +235,8 @@ export class GeminiAIService {
       // Build content parts
       const contents = await this.buildContents(prompt, multimodalParts);
 
-      const response = await this.client.models.generateContent({
+      const client = this.clientFor(this.resolveBackend(options.backend));
+      const response = await client.models.generateContent({
         model: effectiveModel,
         contents,
         config,
@@ -437,7 +476,8 @@ export class GeminiAIService {
       config.mediaResolution = mediaResolution;
     }
 
-    const response = await this.client.models.generateContent({
+    const client = this.clientFor(this.resolveBackend(options.backend));
+    const response = await client.models.generateContent({
       model,
       contents,
       config,
@@ -478,7 +518,8 @@ export class GeminiAIService {
       };
     }
 
-    const response = await this.client.models.generateContent({
+    const client = this.clientFor(this.resolveBackend(options.backend));
+    const response = await client.models.generateContent({
       model,
       contents: prompt,
       config: {
@@ -506,7 +547,8 @@ export class GeminiAIService {
       config.responseMimeType = options.outputMimeType;
     }
 
-    const response = await this.client.models.generateContent({
+    const client = this.clientFor(this.resolveBackend(options.backend));
+    const response = await client.models.generateContent({
       model,
       contents: this.buildContentsWithInlineFiles(
         this.buildMusicPrompt(prompt, options),
@@ -672,7 +714,10 @@ export class GeminiAIService {
     prompt: string,
     options: VideoGenerationOptions = {}
   ): Promise<{ operationId: string }> {
-    const model = options.model || getDefaultVideoModel(this.config.useVertexAI);
+    const backend = this.resolveBackend(options.backend);
+    const useVertex = backend === 'vertex';
+    const client = this.clientFor(backend);
+    const model = options.model || getDefaultVideoModel(useVertex);
 
     // Build request parameters
     const params: any = {
@@ -689,7 +734,7 @@ export class GeminiAIService {
       },
     };
 
-    if (this.config.useVertexAI) {
+    if (useVertex) {
       params.config.generateAudio = options.generateAudio ?? true;
       params.config.seed = options.seed;
       if (options.compressionQuality) {
@@ -726,15 +771,15 @@ export class GeminiAIService {
     }
 
     // Start async operation
-    const operation = await this.client.models.generateVideos(params);
+    const operation = await client.models.generateVideos(params);
 
     // Extract UUID from operation name for a cleaner external ID
     // Format: "projects/{project}/locations/{location}/publishers/.../operations/{uuid}"
     const fullName = operation.name || '';
     const operationId = fullName.split('/').pop() || fullName;
 
-    // Cache the full operation object for polling (SDK requires the actual instance)
-    this.pendingVideoOps.set(operationId, operation);
+    // Cache the operation with its backend (polling must use the same client/backend).
+    this.pendingVideoOps.set(operationId, { operation, backend });
 
     return { operationId };
   }
@@ -753,18 +798,20 @@ export class GeminiAIService {
     operationId: string
   ): Promise<{ done: boolean; videos?: GeneratedVideo[]; error?: string }> {
     // Retrieve cached operation object (SDK requires actual operation instance for polling)
-    const cachedOp = this.pendingVideoOps.get(operationId);
-    if (!cachedOp) {
+    const cached = this.pendingVideoOps.get(operationId);
+    if (!cached) {
       return { done: true, error: `Unknown operation: ${operationId}. Operation may have been created in a previous server session.` };
     }
 
-    const operation = await this.client.operations.getVideosOperation({
-      operation: cachedOp,
+    // Poll on the same backend that created the operation.
+    const client = this.clientFor(cached.backend);
+    const operation = await client.operations.getVideosOperation({
+      operation: cached.operation,
     });
 
     if (!operation.done) {
       // Update cached operation with latest state for next poll
-      this.pendingVideoOps.set(operationId, operation);
+      this.pendingVideoOps.set(operationId, { operation, backend: cached.backend });
       return { done: false };
     }
 
