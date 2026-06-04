@@ -13,12 +13,12 @@ describe('QuerySchema model controls', () => {
   it('accepts Gemini 3.1 Flash-Lite and request-level controls', () => {
     const parsed = QuerySchema.parse({
       prompt: 'Summarize this image',
-      model: 'gemini-3.1-flash-lite-preview',
+      model: 'gemini-3.1-flash-lite',
       thinkingLevel: 'medium',
       mediaResolution: 'high',
     });
 
-    expect(parsed.model).toBe('gemini-3.1-flash-lite-preview');
+    expect(parsed.model).toBe('gemini-3.1-flash-lite');
     expect(parsed.thinkingLevel).toBe('medium');
     expect(parsed.mediaResolution).toBe('high');
   });
@@ -28,7 +28,7 @@ describe('ImageGenerationSchema model compatibility', () => {
   it('accepts Nano Banana 2 specific image options', () => {
     const parsed = ImageGenerationSchema.parse({
       prompt: 'wide product banner',
-      model: 'gemini-3.1-flash-image-preview',
+      model: 'gemini-3.1-flash-image',
       aspectRatio: '8:1',
       imageSize: '0.5K',
       thinkingLevel: 'high',
@@ -45,7 +45,7 @@ describe('ImageGenerationSchema model compatibility', () => {
     expect(() => ImageGenerationSchema.parse({
       prompt: 'wide product banner',
       aspectRatio: '8:1',
-    })).toThrow(/gemini-3\.1-flash-image-preview/);
+    })).toThrow(/gemini-3\.1-flash-image/);
   });
 
   it('rejects imageSize for gemini-2.5-flash-image', () => {
@@ -75,7 +75,7 @@ describe('ImageGenerationSchema model compatibility', () => {
 
     expect(() => ImageGenerationSchema.parse({
       prompt: 'flash image',
-      model: 'gemini-3.1-flash-image-preview',
+      model: 'gemini-3.1-flash-image',
       thinkingLevel: 'medium',
     })).toThrow();
 
@@ -84,25 +84,25 @@ describe('ImageGenerationSchema model compatibility', () => {
       prompt: 'fast image',
       model: 'gemini-2.5-flash-image',
       thinkingLevel: 'high',
-    })).toThrow(/gemini-3\.1-flash-image-preview/);
+    })).toThrow(/gemini-3\.1-flash-image/);
 
-    // gemini-3-pro-image-preview (default) also rejects thinkingLevel — Vertex API does not support it
+    // gemini-3-pro-image (default) also rejects thinkingLevel — Vertex API does not support it
     expect(() => ImageGenerationSchema.parse({
       prompt: 'pro image',
-      model: 'gemini-3-pro-image-preview',
+      model: 'gemini-3-pro-image',
       thinkingLevel: 'high',
-    })).toThrow(/gemini-3\.1-flash-image-preview/);
+    })).toThrow(/gemini-3\.1-flash-image/);
 
-    // Default (no model) also rejects thinkingLevel — default resolves to gemini-3-pro-image-preview server-side
+    // Default (no model) also rejects thinkingLevel — default resolves to gemini-3-pro-image server-side
     expect(() => ImageGenerationSchema.parse({
       prompt: 'default image',
       thinkingLevel: 'high',
-    })).toThrow(/gemini-3\.1-flash-image-preview/);
+    })).toThrow(/gemini-3\.1-flash-image/);
 
-    // Only gemini-3.1-flash-image-preview accepts thinkingLevel
+    // Only gemini-3.1-flash-image accepts thinkingLevel
     expect(ImageGenerationSchema.parse({
       prompt: 'flash image',
-      model: 'gemini-3.1-flash-image-preview',
+      model: 'gemini-3.1-flash-image',
       thinkingLevel: 'high',
     }).thinkingLevel).toBe('high');
   });
@@ -209,6 +209,51 @@ describe('VideoGenerationSchema current Veo models', () => {
       prompt: 'extend this shot',
       videoPath: '/tmp/source.mov',
     })).toThrow(/Unsupported video extension source file type/);
+  });
+});
+
+describe('VideoGenerationSchema Vertex-only output controls', () => {
+  it('accepts compressionQuality and resizeMode for image-to-video in Vertex mode', () => {
+    const parsed = VideoGenerationSchema.parse({
+      prompt: 'animate this frame',
+      imagePath: '/tmp/frame.png',
+      compressionQuality: 'lossless',
+      resizeMode: 'crop',
+    });
+
+    expect(parsed.compressionQuality).toBe('lossless');
+    expect(parsed.resizeMode).toBe('crop');
+  });
+
+  it('rejects resizeMode without imagePath', () => {
+    expect(() => VideoGenerationSchema.parse({
+      prompt: 'text to video',
+      resizeMode: 'pad',
+    })).toThrow(/resizeMode requires imagePath/);
+  });
+
+  it('rejects resizeMode combined with referenceImagePaths', () => {
+    expect(() => VideoGenerationSchema.parse({
+      prompt: 'reference guided',
+      imagePath: '/tmp/frame.png',
+      referenceImagePaths: ['/tmp/ref.png'],
+      resizeMode: 'crop',
+    })).toThrow();
+  });
+
+  it('rejects compressionQuality and resizeMode in Gemini Developer API mode', () => {
+    const GeminiApiVideoSchema = buildVideoGenerationSchema(false);
+
+    expect(() => GeminiApiVideoSchema.parse({
+      prompt: 'compressed video',
+      compressionQuality: 'lossless',
+    })).toThrow(/compressionQuality is only supported in Vertex AI mode/);
+
+    expect(() => GeminiApiVideoSchema.parse({
+      prompt: 'animate this frame',
+      imagePath: '/tmp/frame.png',
+      resizeMode: 'crop',
+    })).toThrow(/resizeMode is only supported in Vertex AI mode/);
   });
 });
 

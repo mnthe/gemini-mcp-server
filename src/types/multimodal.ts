@@ -52,6 +52,7 @@ export const SUPPORTED_VIDEO_TYPES = [
   'video/mp4',
   'video/mpeg',
   'video/mov',
+  'video/quicktime',
   'video/avi',
   'video/x-flv',
   'video/mpg',
@@ -80,10 +81,13 @@ export const SUPPORTED_DOCUMENT_TYPES = [
   'application/x-typescript',
   'text/csv',
   'text/markdown',
+  'text/md',
   'text/x-python',
+  'application/x-python',
   'application/x-python-code',
   'application/json',
   'text/xml',
+  'text/rtf',
   'application/rtf',
 ] as const;
 

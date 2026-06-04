@@ -45,7 +45,7 @@ export GEMINI_MUSIC_OUTPUT_DIR="/path/to/music"
 | Parameter | Type | Notes |
 |-----------|------|-------|
 | `prompt` | string | Required |
-| `model` | enum | `gemini-3-pro-image-preview`, `gemini-3.1-flash-image-preview`, `gemini-2.5-flash-image` |
+| `model` | enum | `gemini-3-pro-image`, `gemini-3.1-flash-image`, `gemini-2.5-flash-image` |
 | `aspectRatio` | enum | Includes standard ratios and 3.1 Flash-only wide/tall ratios |
 | `imageSize` | enum | `0.5K`, `1K`, `2K`, `4K`; omit for `gemini-2.5-flash-image` |
 | `imagePaths` | string[] | Optional local reference images, max 14; `gemini-2.5-flash-image` supports at most 3. Supported file types: PNG (`.png`), JPEG (`.jpg`, `.jpeg`), WEBP (`.webp`), HEIC (`.heic`), HEIF (`.heif`) |
@@ -60,7 +60,7 @@ Example:
   "name": "generate_image",
   "arguments": {
     "prompt": "A cinematic product photo of a matte black espresso machine",
-    "model": "gemini-3.1-flash-image-preview",
+    "model": "gemini-3.1-flash-image",
     "aspectRatio": "16:9",
     "imageSize": "2K"
   }

@@ -88,7 +88,7 @@ The Gemini AI MCP Server is a production-grade intelligent agent that enables AI
 - Speech generation via Gemini TTS models (`generateSpeech`)
 - Music generation via Lyria models (`generateMusic`)
 - Video generation via Veo models (`generateVideo`, `checkVideoOperation`)
-- Supports Gemini 3 models (`gemini-3-flash-preview`, `gemini-3.1-pro-preview`, and later)
+- Supports Gemini 3 models (`gemini-3.5-flash`, `gemini-3.1-pro-preview`, and later)
 
 **Logger.ts** (`src/utils/`)
 - File-based logging (`logs/general.log`, `logs/reasoning.log`)
@@ -220,7 +220,7 @@ User Input → Turn 1..10 Loop:
 - Returns saved file paths
 
 ### 11. Gemini 3 Model Support
-- Full support for `gemini-3-flash-preview`, `gemini-3.1-pro-preview`, and subsequent Gemini 3 models
+- Full support for `gemini-3.5-flash`, `gemini-3.1-pro-preview`, and subsequent Gemini 3 models
 - Automatic model detection for thinking level configuration
 - `mediaResolution` parameter support for multimodal inputs
 

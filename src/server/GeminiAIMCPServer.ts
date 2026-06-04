@@ -168,7 +168,7 @@ export class GeminiAIMCPServer {
               },
               model: {
                 type: "string",
-                description: "Optional model override (e.g., gemini-3-flash-preview, gemini-3.1-pro-preview, gemini-3.1-flash-lite-preview, gemini-3.1-pro-preview-customtools)",
+                description: "Optional model override (e.g., gemini-3.5-flash, gemini-3.1-pro-preview, gemini-3.1-flash-lite, gemini-3.1-pro-preview-customtools)",
               },
               thinkingLevel: {
                 type: "string",
@@ -267,8 +267,8 @@ export class GeminiAIMCPServer {
           name: "generate_image",
           description:
             "Generate images using Gemini's native image generation (Nano Banana). " +
-            "Supports gemini-3-pro-image-preview, gemini-3.1-flash-image-preview, and gemini-2.5-flash-image models. " +
-            "gemini-2.5-flash-image supports at most 3 reference images and does not support imageSize; gemini-3.1-flash-image-preview is required for 0.5K and 1:4/1:8/4:1/8:1 ratios. " +
+            "Supports gemini-3-pro-image, gemini-3.1-flash-image, and gemini-2.5-flash-image models. " +
+            "gemini-2.5-flash-image supports at most 3 reference images and does not support imageSize; gemini-3.1-flash-image is required for 0.5K and 1:4/1:8/4:1/8:1 ratios. " +
             `Reference images use imagePaths and must be ${GEMINI_IMAGE_INPUT_FILE_TYPES}. ` +
             "Audio and video reference files are not accepted by generate_image. " +
             `Images are saved to ${this.imageGenerationHandler.getImageOutputDir()} and returned as base64.`,
@@ -282,18 +282,18 @@ export class GeminiAIMCPServer {
               },
               model: {
                 type: "string",
-                enum: ["gemini-3-pro-image-preview", "gemini-3.1-flash-image-preview", "gemini-2.5-flash-image"],
-                description: "Image model (default: gemini-3-pro-image-preview; gemini-2.5-flash-image supports at most 3 reference images and does not support imageSize)",
+                enum: ["gemini-3-pro-image", "gemini-3.1-flash-image", "gemini-2.5-flash-image"],
+                description: "Image model (default: gemini-3-pro-image; gemini-2.5-flash-image supports at most 3 reference images and does not support imageSize, and retires 2026-10-02 — prefer gemini-3.1-flash-image)",
               },
               aspectRatio: {
                 type: "string",
                 enum: ["1:1", "1:4", "1:8", "2:3", "3:2", "3:4", "4:1", "4:3", "4:5", "5:4", "8:1", "9:16", "16:9", "21:9"],
-                description: "Aspect ratio (default: 1:1; 1:4, 1:8, 4:1, and 8:1 require gemini-3.1-flash-image-preview)",
+                description: "Aspect ratio (default: 1:1; 1:4, 1:8, 4:1, and 8:1 require gemini-3.1-flash-image)",
               },
               imageSize: {
                 type: "string",
                 enum: ["0.5K", "1K", "2K", "4K"],
-                description: "Resolution (0.5K requires gemini-3.1-flash-image-preview, default: 1K)",
+                description: "Resolution (0.5K requires gemini-3.1-flash-image, default: 1K)",
               },
               imagePaths: {
                 type: "array",
@@ -308,7 +308,7 @@ export class GeminiAIMCPServer {
               thinkingLevel: {
                 type: "string",
                 enum: ["minimal", "high", "MINIMAL", "HIGH"],
-                description: "Optional thinking level; only supported by gemini-3.1-flash-image-preview",
+                description: "Optional thinking level; only supported by gemini-3.1-flash-image",
               },
               mediaResolution: {
                 type: "string",
@@ -530,6 +530,16 @@ export class GeminiAIMCPServer {
               videoPath: {
                 type: "string",
                 description: `Local file path of a Veo-generated 720p input video to extend. Supported file types: ${VEO_EXTENSION_VIDEO_FILE_TYPES}`,
+              },
+              compressionQuality: {
+                type: "string",
+                enum: ["optimized", "lossless"],
+                description: "Output video compression quality (Vertex AI only): 'optimized' (smaller file, default) or 'lossless' (larger, highest quality)",
+              },
+              resizeMode: {
+                type: "string",
+                enum: ["crop", "pad"],
+                description: "How the input image is fit to the target aspect ratio for image-to-video (Vertex AI only; requires imagePath): 'crop' or 'pad' (default pad)",
               },
             },
             required: ["prompt"],
