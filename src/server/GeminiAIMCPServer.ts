@@ -602,6 +602,14 @@ export class GeminiAIMCPServer {
       const toolName = request.params.name;
       const args = request.params.arguments || {};
 
+      // The `backend` selector is only advertised when multiple backends are
+      // configured. In single-backend deployments, ignore any `backend` arg so
+      // runtime behavior matches the advertised tool contract.
+      const configuredBackends = this.config.availableBackends ?? [this.config.useVertexAI ? 'vertex' : 'ai-studio'];
+      if (configuredBackends.length < 2 && args && typeof args === 'object') {
+        delete (args as Record<string, unknown>).backend;
+      }
+
       try {
         switch (toolName) {
           case "query": {
