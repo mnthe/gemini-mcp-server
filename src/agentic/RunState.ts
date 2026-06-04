@@ -5,6 +5,7 @@
 
 import { Logger } from '../utils/Logger.js';
 import { Message } from '../types/index.js';
+import { Backend } from '../types/config.js';
 
 export interface RunItem {
   type: 'message' | 'tool_call' | 'tool_result' | 'reasoning';
@@ -38,7 +39,7 @@ export interface RunOptions {
   model?: string;
   thinkingLevel?: string;
   mediaResolution?: string;
-  backend?: 'vertex' | 'ai-studio';
+  backend?: Backend;
 }
 
 export class RunState {
