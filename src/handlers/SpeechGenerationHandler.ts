@@ -28,6 +28,7 @@ export class SpeechGenerationHandler {
       voiceName: input.voiceName,
       languageCode: input.languageCode,
       speakers: input.speakers,
+      backend: input.backend,
     });
 
     if (result.audios.length === 0) {

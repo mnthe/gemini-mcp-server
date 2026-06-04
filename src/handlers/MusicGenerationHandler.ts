@@ -32,6 +32,7 @@ export class MusicGenerationHandler {
       durationSeconds: input.durationSeconds,
       bpm: input.bpm,
       intensity: input.intensity,
+      backend: input.backend,
     });
 
     if (result.audios.length === 0) {

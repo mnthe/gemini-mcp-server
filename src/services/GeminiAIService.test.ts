@@ -199,6 +199,55 @@ describe('generated audio output config', () => {
   });
 });
 
+describe('backend availability detection', () => {
+  it('exposes both backends when both credentials are present', async () => {
+    const savedKey = process.env.GEMINI_API_KEY;
+    const savedGoogleKey = process.env.GOOGLE_API_KEY;
+    const savedProject = process.env.GOOGLE_CLOUD_PROJECT;
+    const savedUseVertex = process.env.GOOGLE_GENAI_USE_VERTEXAI;
+    process.env.GEMINI_API_KEY = 'test-key';
+    process.env.GOOGLE_CLOUD_PROJECT = 'test-project';
+    delete process.env.GOOGLE_GENAI_USE_VERTEXAI;
+
+    try {
+      const { loadConfig } = await import('../config/index.js');
+      const config = loadConfig();
+      expect(config.availableBackends).toContain('vertex');
+      expect(config.availableBackends).toContain('ai-studio');
+      expect(config.availableBackends).toHaveLength(2);
+      // project present and no explicit override -> vertex is the default
+      expect(config.defaultBackend).toBe('vertex');
+      expect(config.useVertexAI).toBe(true);
+    } finally {
+      if (savedKey !== undefined) process.env.GEMINI_API_KEY = savedKey; else delete process.env.GEMINI_API_KEY;
+      if (savedGoogleKey !== undefined) process.env.GOOGLE_API_KEY = savedGoogleKey; else delete process.env.GOOGLE_API_KEY;
+      if (savedProject !== undefined) process.env.GOOGLE_CLOUD_PROJECT = savedProject; else delete process.env.GOOGLE_CLOUD_PROJECT;
+      if (savedUseVertex !== undefined) process.env.GOOGLE_GENAI_USE_VERTEXAI = savedUseVertex; else delete process.env.GOOGLE_GENAI_USE_VERTEXAI;
+    }
+  });
+
+  it('explicit GOOGLE_GENAI_USE_VERTEXAI=false defaults to ai-studio even with a project set', async () => {
+    const savedKey = process.env.GEMINI_API_KEY;
+    const savedProject = process.env.GOOGLE_CLOUD_PROJECT;
+    const savedUseVertex = process.env.GOOGLE_GENAI_USE_VERTEXAI;
+    process.env.GEMINI_API_KEY = 'test-key';
+    process.env.GOOGLE_CLOUD_PROJECT = 'test-project';
+    process.env.GOOGLE_GENAI_USE_VERTEXAI = 'false';
+
+    try {
+      const { loadConfig } = await import('../config/index.js');
+      const config = loadConfig();
+      expect(config.defaultBackend).toBe('ai-studio');
+      expect(config.availableBackends).toContain('vertex');
+      expect(config.availableBackends[0]).toBe('ai-studio');
+    } finally {
+      if (savedKey !== undefined) process.env.GEMINI_API_KEY = savedKey; else delete process.env.GEMINI_API_KEY;
+      if (savedProject !== undefined) process.env.GOOGLE_CLOUD_PROJECT = savedProject; else delete process.env.GOOGLE_CLOUD_PROJECT;
+      if (savedUseVertex !== undefined) process.env.GOOGLE_GENAI_USE_VERTEXAI = savedUseVertex; else delete process.env.GOOGLE_GENAI_USE_VERTEXAI;
+    }
+  });
+});
+
 describe('generateVideo backend compatibility', () => {
   function createServiceConfig(overrides: Record<string, unknown> = {}) {
     return {
@@ -227,9 +276,10 @@ describe('generateVideo backend compatibility', () => {
     const generateVideos = vi.fn().mockResolvedValue({
       name: 'projects/test-project/locations/us-central1/operations/op-123',
     });
-    (service as any).client = {
+    (service as any).clientFor = () => ({
       models: { generateVideos },
-    };
+      operations: {},
+    });
     return generateVideos;
   }
 
@@ -295,6 +345,46 @@ describe('generateVideo backend compatibility', () => {
     const params = generateVideos.mock.calls[0][0];
     expect(params.config).not.toHaveProperty('compressionQuality');
     expect(params.config).not.toHaveProperty('resizeMode');
+  });
+
+  it('routes per-request backend override (default vertex, request ai-studio)', async () => {
+    // Default backend is vertex, but the request selects ai-studio.
+    const service = new GeminiAIService(createServiceConfig({
+      defaultBackend: 'vertex',
+      availableBackends: ['vertex', 'ai-studio'],
+    }));
+    const generateVideos = stubGenerateVideos(service);
+
+    await service.generateVideo('a cinematic ocean shot', {
+      backend: 'ai-studio',
+      seed: 123,
+      compressionQuality: 'lossless',
+    });
+
+    const params = generateVideos.mock.calls[0][0];
+    // ai-studio backend default model + Vertex-only fields omitted
+    expect(params.model).toBe('veo-3.1-fast-generate-preview');
+    expect(params.config).not.toHaveProperty('seed');
+    expect(params.config).not.toHaveProperty('compressionQuality');
+  });
+
+  it('routes per-request backend override (default ai-studio, request vertex)', async () => {
+    const service = new GeminiAIService(createServiceConfig({
+      useVertexAI: false,
+      defaultBackend: 'ai-studio',
+      availableBackends: ['ai-studio', 'vertex'],
+    }));
+    const generateVideos = stubGenerateVideos(service);
+
+    await service.generateVideo('a cinematic ocean shot', {
+      backend: 'vertex',
+      seed: 123,
+    });
+
+    const params = generateVideos.mock.calls[0][0];
+    expect(params.model).toBe('veo-3.1-fast-generate-001');
+    expect(params.config.seed).toBe(123);
+    expect(params.config.generateAudio).toBe(true);
   });
 });
 

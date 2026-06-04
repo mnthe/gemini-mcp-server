@@ -38,6 +38,7 @@ export interface RunOptions {
   model?: string;
   thinkingLevel?: string;
   mediaResolution?: string;
+  backend?: 'vertex' | 'ai-studio';
 }
 
 export class RunState {
