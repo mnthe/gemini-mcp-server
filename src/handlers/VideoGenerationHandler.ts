@@ -32,6 +32,8 @@ export class VideoGenerationHandler {
       lastFramePath: input.lastFramePath,
       referenceImagePaths: input.referenceImagePaths,
       videoPath: input.videoPath,
+      compressionQuality: input.compressionQuality,
+      resizeMode: input.resizeMode,
     });
 
     return {

@@ -265,6 +265,37 @@ describe('generateVideo backend compatibility', () => {
     expect(params.config).not.toHaveProperty('generateAudio');
     expect(params.config).not.toHaveProperty('seed');
   });
+
+  it('maps compressionQuality and resizeMode to SDK enum values in Vertex mode', async () => {
+    const service = new GeminiAIService(createServiceConfig());
+    const generateVideos = stubGenerateVideos(service);
+
+    await service.generateVideo('animate this frame', {
+      compressionQuality: 'lossless',
+      resizeMode: 'crop',
+    });
+
+    const params = generateVideos.mock.calls[0][0];
+    expect(params.config.compressionQuality).toBe('LOSSLESS');
+    expect(params.config.resizeMode).toBe('CROP');
+  });
+
+  it('omits compressionQuality and resizeMode in Gemini Developer API mode', async () => {
+    const service = new GeminiAIService(createServiceConfig({
+      useVertexAI: false,
+      projectId: undefined,
+    }));
+    const generateVideos = stubGenerateVideos(service);
+
+    await service.generateVideo('animate this frame', {
+      compressionQuality: 'lossless',
+      resizeMode: 'crop',
+    });
+
+    const params = generateVideos.mock.calls[0][0];
+    expect(params.config).not.toHaveProperty('compressionQuality');
+    expect(params.config).not.toHaveProperty('resizeMode');
+  });
 });
 
 describe('QueryOptions interface', () => {
