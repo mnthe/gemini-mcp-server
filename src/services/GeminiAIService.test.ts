@@ -22,12 +22,16 @@ describe('isGemini3Model regex pattern', () => {
     expect(isGemini3Pattern.test('gemini-3-flash-preview')).toBe(true);
   });
 
-  it('matches gemini-3-pro-image-preview', () => {
-    expect(isGemini3Pattern.test('gemini-3-pro-image-preview')).toBe(true);
+  it('matches gemini-3.5-flash', () => {
+    expect(isGemini3Pattern.test('gemini-3.5-flash')).toBe(true);
   });
 
-  it('matches gemini-3.1-flash-image-preview', () => {
-    expect(isGemini3Pattern.test('gemini-3.1-flash-image-preview')).toBe(true);
+  it('matches gemini-3-pro-image', () => {
+    expect(isGemini3Pattern.test('gemini-3-pro-image')).toBe(true);
+  });
+
+  it('matches gemini-3.1-flash-image', () => {
+    expect(isGemini3Pattern.test('gemini-3.1-flash-image')).toBe(true);
   });
 
   it('matches gemini3 (no separator)', () => {
@@ -58,7 +62,7 @@ describe('ThinkingLevel enum from SDK', () => {
 });
 
 describe('default model configuration', () => {
-  it('defaults to gemini-3-flash-preview', async () => {
+  it('defaults to gemini-3.5-flash', async () => {
     // Save and clear env
     const savedModel = process.env.GEMINI_MODEL;
     const savedProject = process.env.GOOGLE_CLOUD_PROJECT;
@@ -71,7 +75,7 @@ describe('default model configuration', () => {
       // Dynamic import to get fresh module
       const { loadConfig } = await import('../config/index.js');
       const config = loadConfig();
-      expect(config.model).toBe('gemini-3-flash-preview');
+      expect(config.model).toBe('gemini-3.5-flash');
       expect(config.useVertexAI).toBe(true);
     } finally {
       // Restore env
@@ -202,7 +206,7 @@ describe('generateVideo backend compatibility', () => {
       location: 'us-central1',
       apiKey: 'test-api-key',
       useVertexAI: true,
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-3.5-flash',
       temperature: 0.7,
       maxTokens: 8192,
       topP: 0.95,

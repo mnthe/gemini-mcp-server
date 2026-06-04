@@ -54,7 +54,7 @@ const MultimodalPartSchema = z.object({
 export const QuerySchema = z.object({
   prompt: z.string().describe("The text prompt to send to Vertex AI"),
   sessionId: z.string().optional().describe("Optional conversation session ID for multi-turn conversations"),
-  model: z.string().optional().describe("Optional model override (e.g., gemini-3-flash-preview, gemini-3.1-pro-preview, gemini-3.1-flash-lite-preview, gemini-3.1-pro-preview-customtools)"),
+  model: z.string().optional().describe("Optional model override (e.g., gemini-3.5-flash, gemini-3.1-pro-preview, gemini-3.1-flash-lite, gemini-3.1-pro-preview-customtools)"),
   thinkingLevel: z.enum(['minimal', 'low', 'medium', 'high', 'MINIMAL', 'LOW', 'MEDIUM', 'HIGH']).optional()
     .describe("Optional Gemini 3 thinking level override"),
   mediaResolution: z.enum(['low', 'medium', 'high', 'LOW', 'MEDIUM', 'HIGH']).optional()
@@ -71,8 +71,8 @@ export const FetchSchema = z.object({
 });
 
 const ALLOWED_IMAGE_MODELS = [
-  'gemini-3-pro-image-preview',
-  'gemini-3.1-flash-image-preview',
+  'gemini-3-pro-image',
+  'gemini-3.1-flash-image',
   'gemini-2.5-flash-image',
 ] as const;
 
@@ -85,17 +85,17 @@ const FLASH_IMAGE_ONLY_ASPECT_RATIOS: readonly string[] = ['1:4', '1:8', '4:1', 
 export const ImageGenerationSchema = z.object({
   prompt: z.string().describe("Image generation prompt"),
   model: z.enum(ALLOWED_IMAGE_MODELS).optional()
-    .describe("Image model (default: gemini-3-pro-image-preview)"),
+    .describe("Image model (default: gemini-3-pro-image)"),
   aspectRatio: z.enum(ALLOWED_IMAGE_ASPECT_RATIOS).optional()
-    .describe("Aspect ratio (default: 1:1; 1:4, 1:8, 4:1, and 8:1 require gemini-3.1-flash-image-preview)"),
+    .describe("Aspect ratio (default: 1:1; 1:4, 1:8, 4:1, and 8:1 require gemini-3.1-flash-image)"),
   imageSize: z.enum(['0.5K', '1K', '2K', '4K']).optional()
-    .describe("Resolution (0.5K requires gemini-3.1-flash-image-preview, default: 1K)"),
+    .describe("Resolution (0.5K requires gemini-3.1-flash-image, default: 1K)"),
   imagePaths: z.array(GeminiImageInputPathSchema).max(14).optional()
     .describe(`Local file paths of reference images to include as input (max 14; e.g., for image editing or style transfer). Supported file types: ${GEMINI_IMAGE_INPUT_FILE_TYPES}. Audio/video files are not accepted.`),
   systemInstruction: z.string().optional()
     .describe("Optional system instruction for Gemini 3 image models"),
   thinkingLevel: z.enum(['minimal', 'high', 'MINIMAL', 'HIGH']).optional()
-    .describe("Optional thinking level; only supported by gemini-3.1-flash-image-preview"),
+    .describe("Optional thinking level; only supported by gemini-3.1-flash-image"),
   mediaResolution: z.enum(['low', 'medium', 'high', 'LOW', 'MEDIUM', 'HIGH']).optional()
     .describe("Optional media resolution for reference image inputs"),
 }).strict().refine(
@@ -103,15 +103,15 @@ export const ImageGenerationSchema = z.object({
     if (!data.aspectRatio) {
       return true;
     }
-    return data.model === 'gemini-3.1-flash-image-preview' ||
+    return data.model === 'gemini-3.1-flash-image' ||
       !FLASH_IMAGE_ONLY_ASPECT_RATIOS.includes(data.aspectRatio);
   },
-  { message: "aspectRatio 1:4, 1:8, 4:1, and 8:1 require model='gemini-3.1-flash-image-preview'" }
+  { message: "aspectRatio 1:4, 1:8, 4:1, and 8:1 require model='gemini-3.1-flash-image'" }
 ).refine(
   (data) => {
-    return data.imageSize !== '0.5K' || data.model === 'gemini-3.1-flash-image-preview';
+    return data.imageSize !== '0.5K' || data.model === 'gemini-3.1-flash-image';
   },
-  { message: "imageSize '0.5K' requires model='gemini-3.1-flash-image-preview'" }
+  { message: "imageSize '0.5K' requires model='gemini-3.1-flash-image'" }
 ).refine(
   (data) => {
     return data.model !== 'gemini-2.5-flash-image' || data.imageSize === undefined;
@@ -119,9 +119,9 @@ export const ImageGenerationSchema = z.object({
   { message: "imageSize is not supported by model='gemini-2.5-flash-image'; omit imageSize for its 1K output" }
 ).refine(
   (data) => {
-    return !data.thinkingLevel || data.model === 'gemini-3.1-flash-image-preview';
+    return !data.thinkingLevel || data.model === 'gemini-3.1-flash-image';
   },
-  { message: "thinkingLevel is only supported by model='gemini-3.1-flash-image-preview'" }
+  { message: "thinkingLevel is only supported by model='gemini-3.1-flash-image'" }
 ).refine(
   (data) => {
     return data.model !== 'gemini-2.5-flash-image' || !data.imagePaths || data.imagePaths.length <= 3;
@@ -271,6 +271,10 @@ export function buildVideoGenerationSchema(useVertexAI: boolean = true) {
       .describe(`Local file paths of reference images (max 3). Supported file types: ${VEO_IMAGE_INPUT_FILE_TYPES}`),
     videoPath: VeoExtensionVideoPathSchema.optional()
       .describe(`Local file path of a Veo-generated 720p video to extend. Supported file types: ${VEO_EXTENSION_VIDEO_FILE_TYPES}`),
+    compressionQuality: z.enum(['optimized', 'lossless']).optional()
+      .describe("Output video compression quality (Vertex AI only): 'optimized' (smaller file, default) or 'lossless' (larger, highest quality)"),
+    resizeMode: z.enum(['crop', 'pad']).optional()
+      .describe("How the input image is fit to the target aspect ratio for image-to-video (Vertex AI only; requires imagePath): 'crop' or 'pad' (default pad)"),
   }).strict().refine(
     (data) => {
       if (data.resolution === '1080p' || data.resolution === '4k') {
@@ -368,6 +372,18 @@ export function buildVideoGenerationSchema(useVertexAI: boolean = true) {
       return data.personGeneration === 'allow_all';
     },
     { message: "Gemini Developer API Veo 3.1 uses personGeneration='allow_all' for text/video extension and 'allow_adult' for image/reference modes" }
+  ).refine(
+    (data) => useVertexAI || data.compressionQuality === undefined,
+    { message: "compressionQuality is only supported in Vertex AI mode" }
+  ).refine(
+    (data) => useVertexAI || data.resizeMode === undefined,
+    { message: "resizeMode is only supported in Vertex AI mode" }
+  ).refine(
+    (data) => !data.resizeMode || !!data.imagePath,
+    { message: "resizeMode requires imagePath (image-to-video mode)" }
+  ).refine(
+    (data) => !data.resizeMode || !data.referenceImagePaths?.length,
+    { message: "resizeMode cannot be used with referenceImagePaths" }
   );
 }
 

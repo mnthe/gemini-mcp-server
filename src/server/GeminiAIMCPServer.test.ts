@@ -204,8 +204,8 @@ describe('GeminiAIMCPServer generate_image wiring', () => {
     expect(imageGenTool.inputSchema.properties.aspectRatio).toBeDefined();
     expect(imageGenTool.inputSchema.properties.imageSize).toBeDefined();
     expect(imageGenTool.inputSchema.properties.model.enum).toEqual([
-      'gemini-3-pro-image-preview',
-      'gemini-3.1-flash-image-preview',
+      'gemini-3-pro-image',
+      'gemini-3.1-flash-image',
       'gemini-2.5-flash-image',
     ]);
     expect(imageGenTool.inputSchema.properties.aspectRatio.enum).toContain('1:4');
@@ -310,7 +310,7 @@ describe('GeminiAIMCPServer generate_image wiring', () => {
       'audio/mp3',
       'audio/wav',
     ]);
-    expect(musicTool.description).toContain('Gemini API/AI Studio mode supports audio/mp3 output');
+    expect(musicTool.description).toContain('Gemini API/AI Studio mode supports 44.1 kHz stereo audio/mp3 output');
 
     await handlers.callHandler({
       params: {
@@ -383,7 +383,7 @@ describe('GeminiAIMCPServer generate_image wiring', () => {
       {
         path: '(root)',
         code: 'custom',
-        message: "imageSize '0.5K' requires model='gemini-3.1-flash-image-preview'",
+        message: "imageSize '0.5K' requires model='gemini-3.1-flash-image'",
       },
     ]);
   });

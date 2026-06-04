@@ -8,7 +8,7 @@ This server provides:
 - **Agentic Loop**: Turn-based execution with automatic tool selection and reasoning
 - **Query Gemini**: Access Gemini models via Vertex AI or Google AI Studio
 - **Multimodal Support**: Send images, audio, video, and code files alongside text prompts
-- **Image Generation**: Generate images using Gemini image models (gemini-3-pro-image-preview, gemini-3.1-flash-image-preview, gemini-2.5-flash-image)
+- **Image Generation**: Generate images using Gemini image models (gemini-3-pro-image, gemini-3.1-flash-image, gemini-2.5-flash-image)
 - **Speech & Music Generation**: Generate TTS audio with Gemini TTS and music with Lyria
 - **Tool Execution**: Built-in WebFetch + integration with external MCP servers
 - **Multi-turn Conversations**: Maintain context across queries with session management
@@ -43,9 +43,9 @@ Inspired by OpenAI Agents SDK, the server operates as an autonomous agent:
 
 ### 🔮 Gemini 3 Model Support
 Full support for Gemini 3 generation models:
-- **gemini-3-flash-preview**: Default model — fast and capable
+- **gemini-3.5-flash**: Default model — fast and capable
 - **gemini-3.1-pro-preview**: High-capability reasoning model
-- **gemini-3.1-flash-lite-preview**: Cost-efficient multimodal model for high-volume workloads
+- **gemini-3.1-flash-lite**: Cost-efficient multimodal model for high-volume workloads
 - **gemini-3.1-pro-preview-customtools**: Agentic endpoint optimized for custom tools
 - **thinkingLevel**: Per-query thinking budget control for Gemini 3 models
 - **GEMINI_MEDIA_RESOLUTION**: Control media quality for multimodal inputs
@@ -56,9 +56,9 @@ Full support for Gemini 3 generation models:
 
 ### 🖼️ Image Generation
 Generate images directly from text prompts using Gemini image models:
-- **gemini-3-pro-image-preview**: Professional asset production with 4K resolution support (default)
-- **gemini-3.1-flash-image-preview**: High-efficiency generation with 0.5K-4K resolution and reference images
-- **gemini-2.5-flash-image**: Fast 1K image generation and editing
+- **gemini-3-pro-image**: Professional asset production with 4K resolution support (default)
+- **gemini-3.1-flash-image**: High-efficiency generation with 0.5K-4K resolution and reference images
+- **gemini-2.5-flash-image**: Fast 1K image generation and editing (retiring 2026-10-02; prefer gemini-3.1-flash-image)
 - Configurable aspect ratios: 1:1, 16:9, 9:16, 4:3, and more
 - Images automatically saved to configurable output directory
 
@@ -149,7 +149,7 @@ export GOOGLE_GENAI_USE_VERTEXAI="false"
 
 **Optional Model Settings:**
 ```bash
-export GEMINI_MODEL="gemini-3-flash-preview"  # Default model
+export GEMINI_MODEL="gemini-3.5-flash"  # Default model
 export GEMINI_TEMPERATURE="1.0"
 export GEMINI_MAX_TOKENS="8192"
 export GEMINI_TOP_P="0.95"
@@ -219,7 +219,7 @@ Add to your MCP client configuration:
       "env": {
         "GOOGLE_CLOUD_PROJECT": "your-gcp-project-id",
         "GOOGLE_CLOUD_LOCATION": "us-central1",
-        "GEMINI_MODEL": "gemini-3-flash-preview",
+        "GEMINI_MODEL": "gemini-3.5-flash",
         "GEMINI_ENABLE_CONVERSATIONS": "true"
       }
     }
@@ -237,7 +237,7 @@ Add to your MCP client configuration:
       "env": {
         "GOOGLE_CLOUD_PROJECT": "your-gcp-project-id",
         "GOOGLE_CLOUD_LOCATION": "us-central1",
-        "GEMINI_MODEL": "gemini-3-flash-preview"
+        "GEMINI_MODEL": "gemini-3.5-flash"
       }
     }
   }
@@ -295,7 +295,7 @@ Main agentic entrypoint that handles multi-turn execution with automatic tool se
 **Parameters:**
 - `prompt` (string, required): The text prompt to send
 - `sessionId` (string, optional): Conversation session ID
-- `model` (string, optional): Model override (e.g., `gemini-3-flash-preview`, `gemini-3.1-pro-preview`, `gemini-3.1-flash-lite-preview`, `gemini-3.1-pro-preview-customtools`)
+- `model` (string, optional): Model override (e.g., `gemini-3.5-flash`, `gemini-3.1-pro-preview`, `gemini-3.1-flash-lite`, `gemini-3.1-pro-preview-customtools`)
 - `thinkingLevel` (string, optional): Gemini 3 thinking level. Options: `minimal`, `low`, `medium`, `high`
 - `mediaResolution` (string, optional): Global media resolution for multimodal inputs. Options: `low`, `medium`, `high`
 - `parts` (array, optional): Multimodal content parts (images, audio, video, documents)
@@ -369,11 +369,11 @@ Generate images from text prompts using Gemini image models.
 **Parameters:**
 - `prompt` (string, required): Image generation prompt describing what to generate
 - `model` (string, optional): Image model to use. Options:
-  - `gemini-3-pro-image-preview` (default) — professional quality, supports up to 4K resolution
-  - `gemini-3.1-flash-image-preview` — high-efficiency with 0.5K-4K and reference image support
-  - `gemini-2.5-flash-image` — fast 1K image generation and editing
-- `aspectRatio` (string, optional): Image aspect ratio. Default: `1:1`. Options: `1:1`, `1:4`, `1:8`, `2:3`, `3:2`, `3:4`, `4:1`, `4:3`, `4:5`, `5:4`, `8:1`, `9:16`, `16:9`, `21:9` (`1:4`, `1:8`, `4:1`, `8:1` require `gemini-3.1-flash-image-preview`)
-- `imageSize` (string, optional): Output resolution. Default: `1K`. Options: `0.5K`, `1K`, `2K`, `4K` (`0.5K` requires `gemini-3.1-flash-image-preview`; omit for `gemini-2.5-flash-image`)
+  - `gemini-3-pro-image` (default) — professional quality, supports up to 4K resolution
+  - `gemini-3.1-flash-image` — high-efficiency with 0.5K-4K and reference image support
+  - `gemini-2.5-flash-image` — fast 1K image generation and editing (retiring 2026-10-02; prefer gemini-3.1-flash-image)
+- `aspectRatio` (string, optional): Image aspect ratio. Default: `1:1`. Options: `1:1`, `1:4`, `1:8`, `2:3`, `3:2`, `3:4`, `4:1`, `4:3`, `4:5`, `5:4`, `8:1`, `9:16`, `16:9`, `21:9` (`1:4`, `1:8`, `4:1`, `8:1` require `gemini-3.1-flash-image`)
+- `imageSize` (string, optional): Output resolution. Default: `1K`. Options: `0.5K`, `1K`, `2K`, `4K` (`0.5K` requires `gemini-3.1-flash-image`; omit for `gemini-2.5-flash-image`)
 - `imagePaths` (array, optional): Local reference images for editing or style transfer (max 14; `gemini-2.5-flash-image` supports at most 3). Supported file types: PNG (`.png`), JPEG (`.jpg`, `.jpeg`), WEBP (`.webp`), HEIC (`.heic`), HEIF (`.heif`)
 - `systemInstruction` (string, optional): System instruction for Gemini 3 image models
 - `thinkingLevel` (string, optional): Gemini 3.1 Flash Image thinking level: `minimal` or `high`
@@ -390,7 +390,7 @@ generate_image: "A serene mountain landscape at sunset"
 
 # Generate a wide-format image with Nano Banana 2 at 4K
 generate_image: "Futuristic cityscape at night"
-model: "gemini-3.1-flash-image-preview"
+model: "gemini-3.1-flash-image"
 aspectRatio: "16:9"
 imageSize: "4K"
 ```

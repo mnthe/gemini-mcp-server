@@ -46,6 +46,8 @@ export interface VideoGenerationOptions {
   lastFramePath?: string;
   referenceImagePaths?: string[];
   videoPath?: string;
+  compressionQuality?: string;
+  resizeMode?: string;
 }
 
 export interface GeneratedVideo {
@@ -411,7 +413,7 @@ export class GeminiAIService {
     prompt: string,
     options: ImageGenerationOptions = {}
   ): Promise<{ images: GeneratedImage[]; text?: string }> {
-    const model = options.model || 'gemini-3-pro-image-preview';
+    const model = options.model || 'gemini-3-pro-image';
     const contents = this.buildContentsWithInlineFiles(prompt, options.imagePaths);
     const config: GenerateContentConfig = {
       responseModalities: ['TEXT', 'IMAGE'],
@@ -690,6 +692,12 @@ export class GeminiAIService {
     if (this.config.useVertexAI) {
       params.config.generateAudio = options.generateAudio ?? true;
       params.config.seed = options.seed;
+      if (options.compressionQuality) {
+        params.config.compressionQuality = options.compressionQuality.toUpperCase();
+      }
+      if (options.resizeMode) {
+        params.config.resizeMode = options.resizeMode.toUpperCase();
+      }
     }
 
     // Video extension: attach a Veo-generated input video.

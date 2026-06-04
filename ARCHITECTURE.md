@@ -223,7 +223,7 @@ interface QueryOptions {
 **ImageGenerationOptions**:
 ```typescript
 interface ImageGenerationOptions {
-  model?: string;        // Default: 'gemini-3-pro-image-preview'
+  model?: string;        // Default: 'gemini-3-pro-image'
   aspectRatio?: string;  // e.g., '1:1', '16:9', '1:4'
   imageSize?: string;    // '0.5K' | '1K' | '2K' | '4K'
 }
@@ -594,7 +594,7 @@ Validates the `query` tool input:
 z.object({
   prompt: z.string(),
   sessionId: z.string().optional(),
-  model: z.string().optional(),  // e.g., 'gemini-3-flash-preview', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview'
+  model: z.string().optional(),  // e.g., 'gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite'
   thinkingLevel: z.enum(['minimal','low','medium','high']).optional(),
   mediaResolution: z.enum(['low','medium','high']).optional(),
   parts: z.array(MultimodalPartSchema).optional(),
@@ -608,7 +608,7 @@ Validates the `generate_image` tool input:
 ```typescript
 z.object({
   prompt: z.string(),
-  model: z.enum(['gemini-3-pro-image-preview', 'gemini-3.1-flash-image-preview', 'gemini-2.5-flash-image']).optional(),
+  model: z.enum(['gemini-3-pro-image', 'gemini-3.1-flash-image', 'gemini-2.5-flash-image']).optional(),
   aspectRatio: z.enum(['1:1','1:4','1:8','2:3','3:2','3:4','4:1','4:3','4:5','5:4','8:1','9:16','16:9','21:9']).optional(),
   imageSize: z.enum(['0.5K', '1K', '2K', '4K']).optional(),
   imagePaths: z.array(z.string()).max(14).optional(),
@@ -846,7 +846,7 @@ Each runs as separate process with independent:
 - `errors/` folder (SecurityError, ModelBehaviorError)
 - `utils/` folder (Logger, generated file savers, security validators)
 - `handlers/` folder (QueryHandler, SearchHandler, FetchHandler, generation handlers)
-- Gemini 3 model support (`gemini-3-flash-preview` default, `thinkingLevel` API)
+- Gemini 3 model support (`gemini-3.5-flash` default, `thinkingLevel` API)
 - File-output generation tools (`generate_image`, `generate_video`, `check_video`, `generate_speech`, `generate_music`)
 
 **Benefits**:

@@ -44,16 +44,16 @@ Three image generation models are available:
 
 | Model | Description |
 |-------|-------------|
-| `gemini-3-pro-image-preview` | Default. Professional asset production, supports up to 4K resolution |
-| `gemini-3.1-flash-image-preview` | High-efficiency with 0.5K-4K, reference images, and new aspect ratios |
-| `gemini-2.5-flash-image` | Fast 1K image generation and editing |
+| `gemini-3-pro-image` | Default. Professional asset production, supports up to 4K resolution |
+| `gemini-3.1-flash-image` | High-efficiency with 0.5K-4K, reference images, and new aspect ratios |
+| `gemini-2.5-flash-image` | Fast 1K image generation and editing (retiring 2026-10-02; prefer gemini-3.1-flash-image) |
 
 ```typescript
 const request = {
   name: "generate_image",
   arguments: {
     prompt: "A photorealistic portrait of a red fox in a forest",
-    model: "gemini-3.1-flash-image-preview"
+    model: "gemini-3.1-flash-image"
   }
 };
 ```
@@ -79,16 +79,16 @@ Control the image dimensions with the `aspectRatio` parameter. Defaults to `1:1`
 | Value | Use Case |
 |-------|----------|
 | `1:1` | Square (default), social media posts |
-| `1:4` | Tall banner (requires `gemini-3.1-flash-image-preview`) |
-| `1:8` | Extra-tall strip (requires `gemini-3.1-flash-image-preview`) |
+| `1:4` | Tall banner (requires `gemini-3.1-flash-image`) |
+| `1:8` | Extra-tall strip (requires `gemini-3.1-flash-image`) |
 | `2:3` | Portrait, mobile wallpaper |
 | `3:2` | Landscape, photography standard |
 | `3:4` | Portrait, tablet screen |
-| `4:1` | Wide banner (requires `gemini-3.1-flash-image-preview`) |
+| `4:1` | Wide banner (requires `gemini-3.1-flash-image`) |
 | `4:3` | Landscape, classic photo |
 | `4:5` | Portrait, Instagram |
 | `5:4` | Landscape |
-| `8:1` | Extra-wide strip (requires `gemini-3.1-flash-image-preview`) |
+| `8:1` | Extra-wide strip (requires `gemini-3.1-flash-image`) |
 | `9:16` | Portrait, mobile/story |
 | `16:9` | Widescreen, desktop wallpaper |
 | `21:9` | Ultrawide, cinematic |
@@ -109,17 +109,17 @@ The `imageSize` parameter sets the output resolution. Defaults to `1K`.
 
 | Value | Resolution | Supported Models |
 |-------|------------|-----------------|
-| `0.5K` | ~512px | `gemini-3.1-flash-image-preview` |
-| `1K` | ~1024px (default) | `gemini-3-pro-image-preview`, `gemini-3.1-flash-image-preview`; omit `imageSize` for `gemini-2.5-flash-image` |
-| `2K` | ~2048px | `gemini-3-pro-image-preview`, `gemini-3.1-flash-image-preview` |
-| `4K` | ~4096px | `gemini-3-pro-image-preview` or `gemini-3.1-flash-image-preview` |
+| `0.5K` | ~512px | `gemini-3.1-flash-image` |
+| `1K` | ~1024px (default) | `gemini-3-pro-image`, `gemini-3.1-flash-image`; omit `imageSize` for `gemini-2.5-flash-image` |
+| `2K` | ~2048px | `gemini-3-pro-image`, `gemini-3.1-flash-image` |
+| `4K` | ~4096px | `gemini-3-pro-image` or `gemini-3.1-flash-image` |
 
 ```typescript
 const request = {
   name: "generate_image",
   arguments: {
     prompt: "Ultra-detailed macro photograph of a butterfly wing",
-    model: "gemini-3.1-flash-image-preview",
+    model: "gemini-3.1-flash-image",
     imageSize: "4K"
   }
 };
@@ -132,7 +132,7 @@ const request = {
   name: "generate_image",
   arguments: {
     prompt: "A dramatic oil painting of a Viking longship on stormy seas, massive waves, lightning in the background, cinematic composition",
-    model: "gemini-3-pro-image-preview",
+    model: "gemini-3-pro-image",
     aspectRatio: "21:9",
     imageSize: "4K"
   }
@@ -183,4 +183,4 @@ export GEMINI_IMAGE_OUTPUT_DIR="/path/to/output/directory"
 1. **Be specific** - Include style, lighting, mood, and composition details
 2. **Use artistic references** - "in the style of impressionism", "cinematic lighting", "golden hour"
 3. **Specify what to avoid** - Some models support negative prompts in the main prompt field
-4. **For 4K results** - Use `gemini-3-pro-image-preview` or `gemini-3.1-flash-image-preview` with `imageSize: "4K"`; prompts with fine detail benefit most from higher resolution
+4. **For 4K results** - Use `gemini-3-pro-image` or `gemini-3.1-flash-image` with `imageSize: "4K"`; prompts with fine detail benefit most from higher resolution
