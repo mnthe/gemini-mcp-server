@@ -3,6 +3,7 @@
  */
 
 import { z } from "zod";
+import { Backend } from "../types/config.js";
 
 export const GEMINI_IMAGE_INPUT_FILE_TYPES = 'PNG (.png), JPEG (.jpg/.jpeg), WEBP (.webp), HEIC (.heic), HEIF (.heif)';
 export const VEO_IMAGE_INPUT_FILE_TYPES = 'PNG (.png), JPEG (.jpg/.jpeg), WEBP (.webp)';
@@ -55,6 +56,8 @@ export const QuerySchema = z.object({
   prompt: z.string().describe("The text prompt to send to Vertex AI"),
   sessionId: z.string().optional().describe("Optional conversation session ID for multi-turn conversations"),
   model: z.string().optional().describe("Optional model override (e.g., gemini-3.5-flash, gemini-3.1-pro-preview, gemini-3.1-flash-lite, gemini-3.1-pro-preview-customtools)"),
+  backend: z.enum(['vertex', 'ai-studio']).optional()
+    .describe("Optional backend override ('vertex' | 'ai-studio'); defaults to the server's configured backend"),
   thinkingLevel: z.enum(['minimal', 'low', 'medium', 'high', 'MINIMAL', 'LOW', 'MEDIUM', 'HIGH']).optional()
     .describe("Optional Gemini 3 thinking level override"),
   mediaResolution: z.enum(['low', 'medium', 'high', 'LOW', 'MEDIUM', 'HIGH']).optional()
@@ -86,6 +89,8 @@ export const ImageGenerationSchema = z.object({
   prompt: z.string().describe("Image generation prompt"),
   model: z.enum(ALLOWED_IMAGE_MODELS).optional()
     .describe("Image model (default: gemini-3-pro-image)"),
+  backend: z.enum(['vertex', 'ai-studio']).optional()
+    .describe("Optional backend override ('vertex' | 'ai-studio'); defaults to the server's configured backend"),
   aspectRatio: z.enum(ALLOWED_IMAGE_ASPECT_RATIOS).optional()
     .describe("Aspect ratio (default: 1:1; 1:4, 1:8, 4:1, and 8:1 require gemini-3.1-flash-image)"),
   imageSize: z.enum(['0.5K', '1K', '2K', '4K']).optional()
@@ -164,6 +169,8 @@ export const SpeechGenerationSchema = z.object({
   prompt: z.string().describe("Text or transcript to synthesize as speech. Gemini TTS is text-only input; audio/image/video reference files are not accepted."),
   model: z.enum(ALLOWED_SPEECH_MODELS).optional()
     .describe("Speech model (default: gemini-3.1-flash-tts-preview)"),
+  backend: z.enum(['vertex', 'ai-studio']).optional()
+    .describe("Optional backend override ('vertex' | 'ai-studio'); defaults to the server's configured backend"),
   voiceName: z.string().min(1).optional()
     .describe("Prebuilt voice name for single-speaker TTS (default: Kore)"),
   languageCode: z.string().min(2).optional()
@@ -195,15 +202,20 @@ export function getAllowedMusicOutputMimeTypes(useVertexAI: boolean = true): rea
   return useVertexAI ? ['audio/mp3'] : ['audio/mp3', 'audio/wav'];
 }
 
-export function buildMusicGenerationSchema(useVertexAI: boolean = true) {
+export function buildMusicGenerationSchema(
+  useVertexAI: boolean = true,
+  availableBackends: Backend[] = [useVertexAI ? 'vertex' : 'ai-studio'],
+) {
+  const defaultBackend: Backend = useVertexAI ? 'vertex' : 'ai-studio';
+  const isVertex = (data: { backend?: Backend }): boolean => (data.backend ?? defaultBackend) === 'vertex';
   return z.object({
     prompt: z.string().describe("Music generation prompt"),
+    backend: z.enum(availableBackends as [Backend, ...Backend[]]).optional()
+      .describe(`Backend for this request (default: ${defaultBackend}; available: ${availableBackends.join(', ')}). Vertex AI supports audio/mp3 only; Google AI Studio adds audio/wav for lyria-3-pro-preview.`),
     model: z.enum(ALLOWED_MUSIC_MODELS).optional()
       .describe("Music model (default: lyria-3-clip-preview)"),
     outputMimeType: z.enum(['audio/mp3', 'audio/wav']).optional()
-      .describe(useVertexAI
-        ? "Optional output MIME type; Vertex AI Lyria 3 model card supports audio/mp3 only"
-        : "Optional output MIME type; Gemini API defaults to audio/mp3 and supports audio/wav only with lyria-3-pro-preview"),
+      .describe("Optional output MIME type. Vertex AI supports audio/mp3 only; Google AI Studio supports audio/wav for lyria-3-pro-preview."),
     imagePaths: z.array(GeminiImageInputPathSchema).max(10).optional()
       .describe(`Optional local image paths to use as multimodal Lyria music generation inputs (max 10). Supported Gemini image input file types: ${GEMINI_IMAGE_INPUT_FILE_TYPES}. Audio/video reference files are not accepted by Lyria 3.`),
     lyrics: z.string().optional()
@@ -227,22 +239,36 @@ export function buildMusicGenerationSchema(useVertexAI: boolean = true) {
     (data) => !data.instrumental || (!data.lyrics && !data.vocalStyle),
     { message: "instrumental cannot be combined with lyrics or vocalStyle" }
   ).refine(
-    (data) => !useVertexAI || data.outputMimeType === undefined || data.outputMimeType === 'audio/mp3',
-    { message: "Vertex AI Lyria 3 supports outputMimeType='audio/mp3' only" }
+    (data) => !isVertex(data) || data.outputMimeType === undefined || data.outputMimeType === 'audio/mp3',
+    { message: "the Vertex AI backend supports outputMimeType='audio/mp3' only for Lyria 3" }
   ).refine(
-    (data) => useVertexAI || data.outputMimeType !== 'audio/wav' || data.model === 'lyria-3-pro-preview',
-    { message: "outputMimeType='audio/wav' requires model='lyria-3-pro-preview' in Gemini API mode" }
+    (data) => isVertex(data) || data.outputMimeType !== 'audio/wav' || data.model === 'lyria-3-pro-preview',
+    { message: "outputMimeType='audio/wav' requires model='lyria-3-pro-preview' on the Google AI Studio backend" }
   );
 }
 
 export const MusicGenerationSchema = buildMusicGenerationSchema(true);
 
-export function buildVideoGenerationSchema(useVertexAI: boolean = true) {
-  const allowedVideoModels = useVertexAI ? ALLOWED_VERTEX_VIDEO_MODELS : ALLOWED_GEMINI_API_VIDEO_MODELS;
-  const maxVideoCount = useVertexAI ? 4 : 1;
+export function buildVideoGenerationSchema(
+  useVertexAI: boolean = true,
+  availableBackends: Backend[] = [useVertexAI ? 'vertex' : 'ai-studio'],
+) {
+  const defaultBackend: Backend = useVertexAI ? 'vertex' : 'ai-studio';
+  const dual = availableBackends.length > 1;
+  const allowedVideoModels = (dual
+    ? [...ALLOWED_VERTEX_VIDEO_MODELS, ...ALLOWED_GEMINI_API_VIDEO_MODELS]
+    : (useVertexAI ? ALLOWED_VERTEX_VIDEO_MODELS : ALLOWED_GEMINI_API_VIDEO_MODELS)
+  ) as [string, ...string[]];
+  const maxVideoCount = dual ? 4 : (useVertexAI ? 4 : 1);
+  const effBackend = (data: { backend?: Backend }): Backend => data.backend ?? defaultBackend;
+  const isVertex = (data: { backend?: Backend }): boolean => effBackend(data) === 'vertex';
+  const modelsForBackend = (b: Backend): readonly string[] =>
+    b === 'vertex' ? ALLOWED_VERTEX_VIDEO_MODELS : ALLOWED_GEMINI_API_VIDEO_MODELS;
 
   return z.object({
     prompt: z.string().describe("Video generation prompt"),
+    backend: z.enum(availableBackends as [Backend, ...Backend[]]).optional()
+      .describe(`Backend for this request (default: ${defaultBackend}; available: ${availableBackends.join(', ')}). Vertex AI uses '-001' model IDs and Vertex-only controls (seed, generateAudio, numberOfVideos>1, compressionQuality, resizeMode); Google AI Studio uses '-preview' IDs.`),
     model: z.enum(allowedVideoModels).optional()
       .describe(`Video model (default: ${getDefaultVideoModel(useVertexAI)})`),
     aspectRatio: z.enum(['16:9', '9:16']).optional()
@@ -276,6 +302,9 @@ export function buildVideoGenerationSchema(useVertexAI: boolean = true) {
     resizeMode: z.enum(['crop', 'pad']).optional()
       .describe("How the input image is fit to the target aspect ratio for image-to-video (Vertex AI only; requires imagePath): 'crop' or 'pad' (default pad)"),
   }).strict().refine(
+    (data) => !data.model || modelsForBackend(effBackend(data)).includes(data.model),
+    { message: "model does not match the selected backend; Vertex AI uses '-001' model IDs and Google AI Studio uses '-preview' model IDs" }
+  ).refine(
     (data) => {
       if (data.resolution === '1080p' || data.resolution === '4k') {
         return data.durationSeconds === undefined || data.durationSeconds === '8';
@@ -352,17 +381,17 @@ export function buildVideoGenerationSchema(useVertexAI: boolean = true) {
     (data) => data.model !== 'veo-3.1-lite-generate-preview' || data.resolution !== '4k',
     { message: "resolution '4k' is not supported by model='veo-3.1-lite-generate-preview'" }
   ).refine(
-    (data) => useVertexAI || data.generateAudio === undefined,
-    { message: "generateAudio is always on and cannot be configured in Gemini Developer API mode" }
+    (data) => isVertex(data) || data.generateAudio === undefined,
+    { message: "generateAudio is always on and cannot be configured for the Google AI Studio backend" }
   ).refine(
-    (data) => useVertexAI || data.seed === undefined,
-    { message: "seed is not supported by @google/genai generateVideos in Gemini Developer API mode" }
+    (data) => isVertex(data) || data.seed === undefined,
+    { message: "seed is not supported by @google/genai generateVideos for the Google AI Studio backend" }
   ).refine(
-    (data) => useVertexAI || data.numberOfVideos === undefined || data.numberOfVideos === 1,
-    { message: "Gemini Developer API Veo 3.1 returns a single video; omit numberOfVideos or set it to 1" }
+    (data) => isVertex(data) || data.numberOfVideos === undefined || data.numberOfVideos === 1,
+    { message: "Google AI Studio Veo 3.1 returns a single video; omit numberOfVideos or set it to 1" }
   ).refine(
     (data) => {
-      if (useVertexAI || !data.personGeneration) {
+      if (isVertex(data) || !data.personGeneration) {
         return true;
       }
       const usesImageMode = !!data.imagePath || !!data.lastFramePath || !!data.referenceImagePaths?.length;
@@ -373,11 +402,11 @@ export function buildVideoGenerationSchema(useVertexAI: boolean = true) {
     },
     { message: "Gemini Developer API Veo 3.1 uses personGeneration='allow_all' for text/video extension and 'allow_adult' for image/reference modes" }
   ).refine(
-    (data) => useVertexAI || data.compressionQuality === undefined,
-    { message: "compressionQuality is only supported in Vertex AI mode" }
+    (data) => isVertex(data) || data.compressionQuality === undefined,
+    { message: "compressionQuality is only supported by the Vertex AI backend" }
   ).refine(
-    (data) => useVertexAI || data.resizeMode === undefined,
-    { message: "resizeMode is only supported in Vertex AI mode" }
+    (data) => isVertex(data) || data.resizeMode === undefined,
+    { message: "resizeMode is only supported by the Vertex AI backend" }
   ).refine(
     (data) => !data.resizeMode || !!data.imagePath,
     { message: "resizeMode requires imagePath (image-to-video mode)" }
