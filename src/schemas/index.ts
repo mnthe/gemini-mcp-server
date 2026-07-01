@@ -487,6 +487,58 @@ export const OmniVideoGenerationSchema = z.object({
     .describe("Optional system instruction to steer generation or editing"),
 }).strict();
 
+// AI-assisted reference search. Composes an answer from live web sources via
+// Gemini's Google Search grounding (config.tools = [{ googleSearch }]) and
+// returns organized citations from response groundingMetadata. Search-scope
+// tuning is backend-asymmetric per the @google/genai GoogleSearch tool:
+//   - excludeDomains / blockingConfidence: Vertex AI only
+//   - timeRange (timeRangeFilter): Google AI Studio (Gemini API) only
+const ALLOWED_BLOCKING_CONFIDENCE = ['low', 'medium', 'high'] as const;
+
+const ReferenceTimeRangeSchema = z.object({
+  startTime: z.string().min(1)
+    .describe("Inclusive RFC 3339 start timestamp, e.g. '2026-01-01T00:00:00Z'"),
+  endTime: z.string().min(1)
+    .describe("Exclusive RFC 3339 end timestamp, e.g. '2026-07-01T00:00:00Z'"),
+}).strict();
+
+export function buildReferenceSearchSchema(
+  useVertexAI: boolean = true,
+  availableBackends: Backend[] = [useVertexAI ? 'vertex' : 'ai-studio'],
+) {
+  const defaultBackend: Backend = useVertexAI ? 'vertex' : 'ai-studio';
+  const isVertex = (data: { backend?: Backend }): boolean => (data.backend ?? defaultBackend) === 'vertex';
+  return z.object({
+    prompt: z.string().describe("Research question or topic to answer from live web sources."),
+    backend: z.enum(availableBackends as [Backend, ...Backend[]]).optional()
+      .describe(`Backend for this request (default: ${defaultBackend}; available: ${availableBackends.join(', ')}). Search-scope tuning differs: Vertex AI supports excludeDomains/blockingConfidence; Google AI Studio supports timeRange.`),
+    model: z.string().optional()
+      .describe("Optional Gemini model override; must support Google Search grounding (default: server model)."),
+    excludeDomains: z.array(z.string().min(1)).max(2000).optional()
+      .describe("Domains to exclude from search results, e.g. ['reddit.com','pinterest.com'] (search-scope tuning; max 2000). Vertex AI backend only."),
+    blockingConfidence: z.enum(ALLOWED_BLOCKING_CONFIDENCE).optional()
+      .describe("Block risky/low-quality sites at or above this confidence ('low' is the most aggressive). Vertex AI backend only."),
+    timeRange: ReferenceTimeRangeSchema.optional()
+      .describe("Restrict results to a publish-time window for recency tuning; startTime and endTime are both required. Google AI Studio backend only."),
+    includeImages: z.boolean().optional()
+      .describe("Also enable image-search grounding in addition to web search."),
+    urls: z.array(z.string().min(1)).max(20).optional()
+      .describe("Specific http(s) URLs to ground the answer on via URL context (max 20; both backends)."),
+    systemInstruction: z.string().optional()
+      .describe("Optional system instruction to steer the tone, depth, or scope of the composed answer."),
+    thinkingLevel: z.enum(['minimal', 'low', 'medium', 'high', 'MINIMAL', 'LOW', 'MEDIUM', 'HIGH']).optional()
+      .describe("Optional Gemini 3 thinking level override for the reasoning depth of the answer."),
+  }).strict().refine(
+    (data) => isVertex(data) || (!data.excludeDomains && !data.blockingConfidence),
+    { message: "excludeDomains and blockingConfidence are supported by the Vertex AI backend only" }
+  ).refine(
+    (data) => !isVertex(data) || data.timeRange === undefined,
+    { message: "timeRange is supported by the Google AI Studio backend only" }
+  );
+}
+
+export const ReferenceSearchSchema = buildReferenceSearchSchema(true);
+
 export type QueryInput = z.infer<typeof QuerySchema>;
 export type SearchInput = z.infer<typeof SearchSchema>;
 export type FetchInput = z.infer<typeof FetchSchema>;
@@ -495,6 +547,7 @@ export type SpeechGenerationInput = z.infer<typeof SpeechGenerationSchema>;
 export type MusicGenerationInput = z.infer<ReturnType<typeof buildMusicGenerationSchema>>;
 export type VideoGenerationInput = z.infer<typeof VideoGenerationSchema>;
 export type OmniVideoGenerationInput = z.infer<typeof OmniVideoGenerationSchema>;
+export type ReferenceSearchInput = z.infer<ReturnType<typeof buildReferenceSearchSchema>>;
 
 export const CheckVideoSchema = z.object({
   operationId: z.string().describe("Operation ID returned by generate_video"),

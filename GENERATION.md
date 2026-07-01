@@ -20,6 +20,7 @@ On failures, generation tool calls return MCP error content instead of throwing 
 | `generate_video` | Veo 3.1 models | async operation ID | `text` metadata |
 | `check_video` | Veo operation polling | MP4 paths when complete | `text` metadata |
 | `generate_omni_video` | Gemini Omni Flash | MP4 path (synchronous) | `text` metadata |
+| `reference_search` | Gemini + Google Search grounding | synthesized answer + citations (no file) | `text` JSON |
 
 ## Default Output Directories
 
@@ -260,6 +261,53 @@ Interactive edit:
 ```
 
 More examples: [examples/video-generation.md](examples/video-generation.md)
+
+## reference_search
+
+`reference_search` answers a question from live web sources using Gemini's Google Search grounding, returning a synthesized answer plus organized citations in one call. It does not write a file — the result is a JSON `text` block. Unlike the OpenAI-spec `search`/`fetch` connector tools, it composes the answer AND returns the source links plus claim→source supports together.
+
+Search-scope tuning is backend-asymmetric per the `@google/genai` GoogleSearch tool, and invalid combinations are rejected at validation:
+
+| Tuning field | Vertex AI | Google AI Studio |
+|--------------|-----------|------------------|
+| `excludeDomains` (skip up to 2000 domains) | ✅ | ❌ |
+| `blockingConfidence` (block risky/low-quality sites) | ✅ | ❌ |
+| `timeRange` (restrict to a publish-time window) | ❌ | ✅ |
+| `includeImages`, `urls` (URL context) | ✅ | ✅ |
+
+Return shape (JSON in the `text` block):
+
+- `answer`: synthesized text grounded in the sources
+- `citations`: deduped `{ index, title, uri, domain }` sources
+- `supports`: answer segments mapped to citation indices with confidence scores
+- `searchQueries`: the queries the model actually ran
+- `searchSuggestionsHtml`: Google's required Search Suggestions markup (present when the API returns it) to display alongside the answer
+
+Recency-tuned research on Google AI Studio:
+
+```json
+{
+  "name": "reference_search",
+  "arguments": {
+    "prompt": "What changed in the latest Gemini API pricing?",
+    "backend": "ai-studio",
+    "timeRange": { "startTime": "2026-06-01T00:00:00Z", "endTime": "2026-07-01T00:00:00Z" }
+  }
+}
+```
+
+Curated web research on Vertex AI:
+
+```json
+{
+  "name": "reference_search",
+  "arguments": {
+    "prompt": "Production best practices for MCP servers",
+    "excludeDomains": ["reddit.com", "pinterest.com"],
+    "blockingConfidence": "medium"
+  }
+}
+```
 
 ## Authentication Mode Notes
 

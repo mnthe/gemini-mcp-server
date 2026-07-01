@@ -4,9 +4,11 @@ import {
   MusicGenerationSchema,
   OmniVideoGenerationSchema,
   QuerySchema,
+  ReferenceSearchSchema,
   SpeechGenerationSchema,
   VideoGenerationSchema,
   buildMusicGenerationSchema,
+  buildReferenceSearchSchema,
   buildSpeechGenerationSchema,
   buildVideoGenerationSchema,
 } from './index.js';
@@ -516,6 +518,112 @@ describe('OmniVideoGenerationSchema', () => {
       prompt: 'x',
       imagePaths: ['/tmp/ref.heic'],
     })).toThrow(/Unsupported Veo image source file type/);
+  });
+});
+
+describe('ReferenceSearchSchema (Vertex default)', () => {
+  it('accepts a minimal prompt-only request', () => {
+    expect(ReferenceSearchSchema.parse({ prompt: 'latest Gemini 3 pricing' }).prompt)
+      .toBe('latest Gemini 3 pricing');
+  });
+
+  it('accepts Vertex-only search-scope tuning (excludeDomains + blockingConfidence)', () => {
+    const parsed = ReferenceSearchSchema.parse({
+      prompt: 'best practices for MCP servers',
+      excludeDomains: ['reddit.com', 'pinterest.com'],
+      blockingConfidence: 'medium',
+      includeImages: true,
+      urls: ['https://ai.google.dev/gemini-api/docs'],
+    });
+
+    expect(parsed.excludeDomains).toHaveLength(2);
+    expect(parsed.blockingConfidence).toBe('medium');
+    expect(parsed.includeImages).toBe(true);
+    expect(parsed.urls).toEqual(['https://ai.google.dev/gemini-api/docs']);
+  });
+
+  it('rejects timeRange on the Vertex backend', () => {
+    expect(() => ReferenceSearchSchema.parse({
+      prompt: 'recent news',
+      timeRange: { startTime: '2026-01-01T00:00:00Z', endTime: '2026-07-01T00:00:00Z' },
+    })).toThrow(/timeRange is supported by the Google AI Studio backend only/);
+  });
+
+  it('rejects more than 2000 excluded domains and more than 20 urls', () => {
+    expect(() => ReferenceSearchSchema.parse({
+      prompt: 'x',
+      excludeDomains: Array.from({ length: 2001 }, (_, i) => `d${i}.com`),
+    })).toThrow();
+
+    expect(() => ReferenceSearchSchema.parse({
+      prompt: 'x',
+      urls: Array.from({ length: 21 }, (_, i) => `https://example.com/${i}`),
+    })).toThrow();
+  });
+
+  it('rejects unknown keys and a partial timeRange', () => {
+    expect(() => ReferenceSearchSchema.parse({
+      prompt: 'x',
+      maxResults: 5,
+    })).toThrow(/Unrecognized key/);
+
+    const AiStudio = buildReferenceSearchSchema(false);
+    expect(() => AiStudio.parse({
+      prompt: 'x',
+      timeRange: { startTime: '2026-01-01T00:00:00Z' },
+    })).toThrow();
+  });
+});
+
+describe('buildReferenceSearchSchema per-backend tuning', () => {
+  const AiStudio = buildReferenceSearchSchema(false);
+  const Dual = buildReferenceSearchSchema(true, ['vertex', 'ai-studio']);
+
+  it('accepts timeRange on the Google AI Studio backend', () => {
+    const parsed = AiStudio.parse({
+      prompt: 'headlines this month',
+      timeRange: { startTime: '2026-06-01T00:00:00Z', endTime: '2026-07-01T00:00:00Z' },
+    });
+
+    expect(parsed.timeRange?.startTime).toBe('2026-06-01T00:00:00Z');
+  });
+
+  it('rejects Vertex-only tuning on the Google AI Studio backend', () => {
+    expect(() => AiStudio.parse({
+      prompt: 'x',
+      excludeDomains: ['reddit.com'],
+    })).toThrow(/excludeDomains and blockingConfidence are supported by the Vertex AI backend only/);
+
+    expect(() => AiStudio.parse({
+      prompt: 'x',
+      blockingConfidence: 'high',
+    })).toThrow(/Vertex AI backend only/);
+  });
+
+  it('gates tuning by the per-request backend override in dual mode', () => {
+    // default backend is vertex -> timeRange rejected without an override
+    expect(() => Dual.parse({
+      prompt: 'x',
+      timeRange: { startTime: '2026-01-01T00:00:00Z', endTime: '2026-07-01T00:00:00Z' },
+    })).toThrow(/Google AI Studio backend only/);
+
+    // override to ai-studio -> timeRange allowed, excludeDomains rejected
+    expect(Dual.parse({
+      prompt: 'x',
+      backend: 'ai-studio',
+      timeRange: { startTime: '2026-01-01T00:00:00Z', endTime: '2026-07-01T00:00:00Z' },
+    }).backend).toBe('ai-studio');
+
+    expect(() => Dual.parse({
+      prompt: 'x',
+      backend: 'ai-studio',
+      excludeDomains: ['reddit.com'],
+    })).toThrow(/Vertex AI backend only/);
+  });
+
+  it('rejects a backend value that is not configured', () => {
+    const VertexOnly = buildReferenceSearchSchema(true, ['vertex']);
+    expect(() => VertexOnly.parse({ prompt: 'x', backend: 'ai-studio' })).toThrow();
   });
 });
 

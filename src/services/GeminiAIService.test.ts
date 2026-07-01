@@ -473,6 +473,142 @@ describe('generateOmniVideo (Interactions API)', () => {
   });
 });
 
+describe('referenceSearch (Google Search grounding)', () => {
+  function createServiceConfig(overrides: Record<string, unknown> = {}) {
+    return {
+      projectId: 'test-project',
+      location: 'us-central1',
+      apiKey: 'test-api-key',
+      useVertexAI: true,
+      model: 'gemini-3.5-flash',
+      temperature: 0.7,
+      maxTokens: 8192,
+      topP: 0.95,
+      topK: 40,
+      enableConversations: false,
+      sessionTimeout: 3600000,
+      maxHistory: 100,
+      enableReasoning: false,
+      maxReasoningSteps: 5,
+      disableLogging: true,
+      logToStderr: false,
+      allowFileUris: false,
+      ...overrides,
+    } as any;
+  }
+
+  function stubGenerateContent(service: GeminiAIService, response: Record<string, unknown>) {
+    const generateContent = vi.fn().mockResolvedValue(response);
+    (service as any).clientFor = () => ({ models: { generateContent } });
+    return generateContent;
+  }
+
+  const groundedResponse = {
+    candidates: [{
+      content: { parts: [{ text: 'Gemini 3 launched in 2026.' }] },
+      groundingMetadata: {
+        webSearchQueries: ['gemini 3 launch date'],
+        groundingChunks: [
+          { web: { uri: 'https://blog.google/gemini', title: 'Gemini blog', domain: 'blog.google' } },
+          { web: { uri: 'https://ai.google.dev', title: 'AI docs', domain: 'ai.google.dev' } },
+          { retrievedContext: {} }, // no web -> filtered out
+        ],
+        groundingSupports: [
+          {
+            segment: { startIndex: 0, endIndex: 9, text: 'Gemini 3' },
+            groundingChunkIndices: [0, 1],
+            confidenceScores: [0.98, 0.71],
+          },
+        ],
+        searchEntryPoint: { renderedContent: '<div>Search Suggestions</div>' },
+      },
+    }],
+  };
+
+  it('sends Vertex-only excludeDomains/blockingConfidence and maps grounding metadata', async () => {
+    const service = new GeminiAIService(createServiceConfig());
+    const generateContent = stubGenerateContent(service, groundedResponse);
+
+    const result = await service.referenceSearch('when did Gemini 3 launch?', {
+      excludeDomains: ['reddit.com'],
+      blockingConfidence: 'medium',
+      includeImages: true,
+    });
+
+    const params = generateContent.mock.calls[0][0];
+    const googleSearch = params.config.tools[0].googleSearch;
+    expect(googleSearch.excludeDomains).toEqual(['reddit.com']);
+    expect(googleSearch.blockingConfidence).toBe('BLOCK_MEDIUM_AND_ABOVE');
+    expect(googleSearch.searchTypes).toEqual({ webSearch: {}, imageSearch: {} });
+    expect(googleSearch).not.toHaveProperty('timeRangeFilter');
+    expect(params.config.tools).toHaveLength(1); // no urlContext without urls
+
+    expect(result.text).toBe('Gemini 3 launched in 2026.');
+    expect(result.searchQueries).toEqual(['gemini 3 launch date']);
+    // third chunk (no web) is filtered out
+    expect(result.citations).toEqual([
+      { index: 0, title: 'Gemini blog', uri: 'https://blog.google/gemini', domain: 'blog.google' },
+      { index: 1, title: 'AI docs', uri: 'https://ai.google.dev', domain: 'ai.google.dev' },
+    ]);
+    expect(result.supports[0].sourceIndices).toEqual([0, 1]);
+    expect(result.supports[0].confidenceScores).toEqual([0.98, 0.71]);
+    expect(result.searchEntryPoint).toBe('<div>Search Suggestions</div>');
+  });
+
+  it('sends timeRangeFilter and a urlContext tool on the Google AI Studio backend', async () => {
+    const service = new GeminiAIService(createServiceConfig({
+      useVertexAI: false,
+      projectId: undefined,
+      defaultBackend: 'ai-studio',
+      availableBackends: ['ai-studio'],
+    }));
+    const generateContent = stubGenerateContent(service, groundedResponse);
+
+    await service.referenceSearch('recent AI news', {
+      timeRange: { startTime: '2026-06-01T00:00:00Z', endTime: '2026-07-01T00:00:00Z' },
+      urls: ['https://ai.google.dev/docs'],
+    });
+
+    const params = generateContent.mock.calls[0][0];
+    const googleSearch = params.config.tools[0].googleSearch;
+    expect(googleSearch.timeRangeFilter).toEqual({
+      startTime: '2026-06-01T00:00:00Z',
+      endTime: '2026-07-01T00:00:00Z',
+    });
+    expect(params.config.tools[1]).toEqual({ urlContext: {} });
+    // explicit urls are appended to the request text so URL context fetches them
+    expect(params.contents).toContain('https://ai.google.dev/docs');
+    expect(params.contents).toContain('recent AI news');
+  });
+
+  it('falls back to byte-slicing the answer when a support segment omits text', async () => {
+    const service = new GeminiAIService(createServiceConfig());
+    stubGenerateContent(service, {
+      candidates: [{
+        content: { parts: [{ text: 'Hello world answer' }] },
+        groundingMetadata: {
+          groundingSupports: [
+            { segment: { startIndex: 0, endIndex: 5 }, groundingChunkIndices: [0] },
+          ],
+        },
+      }],
+    });
+
+    const result = await service.referenceSearch('x');
+    expect(result.supports[0].text).toBe('Hello');
+    expect(result.citations).toEqual([]);
+    expect(result.searchQueries).toEqual([]);
+  });
+
+  it('rejects an invalid blockingConfidence value', async () => {
+    const service = new GeminiAIService(createServiceConfig());
+    stubGenerateContent(service, groundedResponse);
+
+    await expect(service.referenceSearch('x', { blockingConfidence: 'extreme' }))
+      .rejects.toThrow(/Invalid blockingConfidence/);
+  });
+});
+
 describe('QueryOptions interface', () => {
   it('accepts mediaResolution option', async () => {
     const { ThinkingLevel } = await import('@google/genai');
