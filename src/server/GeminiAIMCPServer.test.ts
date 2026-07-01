@@ -314,8 +314,9 @@ describe('GeminiAIMCPServer generate_image wiring', () => {
     expect(omniTool.inputSchema.required).toContain('prompt');
     expect(omniTool.inputSchema.properties.model.enum).toEqual(['gemini-omni-flash-preview']);
     expect(omniTool.inputSchema.properties.aspectRatio.enum).toEqual(['16:9', '9:16']);
-    expect(omniTool.inputSchema.properties.durationSeconds.minimum).toBe(3);
-    expect(omniTool.inputSchema.properties.durationSeconds.maximum).toBe(10);
+    // Omni Flash does not support a structured duration or system instruction.
+    expect(omniTool.inputSchema.properties.durationSeconds).toBeUndefined();
+    expect(omniTool.inputSchema.properties.systemInstruction).toBeUndefined();
     expect(omniTool.inputSchema.properties.imagePaths.maxItems).toBe(7);
     expect(omniTool.inputSchema.properties.previousInteractionId).toBeDefined();
     expect(omniTool.description).toContain('Omni Flash');
@@ -325,11 +326,11 @@ describe('GeminiAIMCPServer generate_image wiring', () => {
     await callHandler({
       params: {
         name: 'generate_omni_video',
-        arguments: { prompt: 'a fox running', durationSeconds: 6 },
+        arguments: { prompt: 'a fox running' },
       },
     });
 
-    expect(mockOmniVideoHandle).toHaveBeenCalledWith({ prompt: 'a fox running', durationSeconds: 6 });
+    expect(mockOmniVideoHandle).toHaveBeenCalledWith({ prompt: 'a fox running' });
   });
 
   it('generate_music tool is exposed and routed to MusicGenerationHandler', async () => {

@@ -480,12 +480,10 @@ describe('OmniVideoGenerationSchema', () => {
     const parsed = OmniVideoGenerationSchema.parse({
       prompt: 'a fox darting through snow',
       aspectRatio: '9:16',
-      durationSeconds: 8,
       imagePaths: ['/tmp/fox.png', '/tmp/snow.jpg'],
     });
 
     expect(parsed.aspectRatio).toBe('9:16');
-    expect(parsed.durationSeconds).toBe(8);
     expect(parsed.imagePaths).toHaveLength(2);
   });
 
@@ -498,11 +496,7 @@ describe('OmniVideoGenerationSchema', () => {
     expect(parsed.previousInteractionId).toBe('interaction-123');
   });
 
-  it('rejects out-of-range duration, unsupported ratios, and too many references', () => {
-    expect(() => OmniVideoGenerationSchema.parse({
-      prompt: 'x', durationSeconds: 12,
-    })).toThrow();
-
+  it('rejects unsupported ratios and too many references', () => {
     expect(() => OmniVideoGenerationSchema.parse({
       prompt: 'x', aspectRatio: '1:1',
     })).toThrow();
@@ -510,6 +504,16 @@ describe('OmniVideoGenerationSchema', () => {
     expect(() => OmniVideoGenerationSchema.parse({
       prompt: 'x',
       imagePaths: Array.from({ length: 8 }, (_, index) => `/tmp/ref-${index}.png`),
+    })).toThrow();
+  });
+
+  it('rejects the removed duration and systemInstruction fields (Omni Flash unsupported)', () => {
+    expect(() => OmniVideoGenerationSchema.parse({
+      prompt: 'x', durationSeconds: 6,
+    })).toThrow();
+
+    expect(() => OmniVideoGenerationSchema.parse({
+      prompt: 'x', systemInstruction: 'be cinematic',
     })).toThrow();
   });
 

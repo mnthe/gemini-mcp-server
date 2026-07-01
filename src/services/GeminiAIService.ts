@@ -60,10 +60,8 @@ export interface GeneratedVideo {
 export interface OmniVideoGenerationOptions {
   model?: string;
   aspectRatio?: string;
-  durationSeconds?: number;
   imagePaths?: string[];
   previousInteractionId?: string;
-  systemInstruction?: string;
   backend?: Backend;
 }
 
@@ -908,17 +906,20 @@ export class GeminiAIService {
     prompt: string,
     options: OmniVideoGenerationOptions = {}
   ): Promise<GeneratedOmniVideo> {
-    const backend = this.resolveBackend(options.backend);
+    // Omni Flash (gemini-omni-flash-preview) is served on Google AI Studio
+    // (Gemini API) only; it is not available on Vertex AI yet. Default to
+    // ai-studio rather than the server default backend so a Vertex-default setup
+    // still reaches Omni; an explicit backend override is honored for when Vertex
+    // availability rolls out.
+    const backend = options.backend ?? 'ai-studio';
     const client = this.clientFor(backend);
     const model = options.model || 'gemini-omni-flash-preview';
 
-    // Video output format: aspect ratio and duration live on response_format.
+    // Video output format. Omni Flash documents only type and aspect_ratio here;
+    // duration is not a structured field (steer clip timing within the prompt).
     const responseFormat: any = { type: 'video' };
     if (options.aspectRatio) {
       responseFormat.aspect_ratio = options.aspectRatio;
-    }
-    if (options.durationSeconds !== undefined) {
-      responseFormat.duration = String(options.durationSeconds);
     }
 
     // Input is a plain string for text-to-video / interactive edits, or text plus
@@ -944,9 +945,6 @@ export class GeminiAIService {
     };
     if (options.previousInteractionId) {
       params.previous_interaction_id = options.previousInteractionId;
-    }
-    if (options.systemInstruction) {
-      params.system_instruction = options.systemInstruction;
     }
 
     const interaction: any = await client.interactions.create(params);
