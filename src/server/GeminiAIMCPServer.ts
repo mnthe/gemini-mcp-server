@@ -22,6 +22,7 @@ import {
   buildMusicGenerationSchema,
   buildVideoGenerationSchema,
   OmniVideoGenerationSchema,
+  buildReferenceSearchSchema,
   GEMINI_IMAGE_INPUT_FILE_TYPES,
   getAllowedVideoModels,
   getDefaultVideoModel,
@@ -46,6 +47,7 @@ import { SpeechGenerationHandler } from '../handlers/SpeechGenerationHandler.js'
 import { MusicGenerationHandler } from '../handlers/MusicGenerationHandler.js';
 import { VideoGenerationHandler } from '../handlers/VideoGenerationHandler.js';
 import { OmniVideoHandler } from '../handlers/OmniVideoHandler.js';
+import { ReferenceSearchHandler } from '../handlers/ReferenceSearchHandler.js';
 import { getEffectiveSafeDirectories } from '../utils/fileSecurity.js';
 import { resolveOutputDirs } from '../utils/generatedFileSaver.js';
 
@@ -70,6 +72,7 @@ export class GeminiAIMCPServer {
   private musicGenerationHandler: MusicGenerationHandler;
   private videoGenerationHandler: VideoGenerationHandler;
   private omniVideoHandler: OmniVideoHandler;
+  private referenceSearchHandler: ReferenceSearchHandler;
 
   // Cache
   private searchCache: Map<string, CachedDocument>;
@@ -132,6 +135,7 @@ export class GeminiAIMCPServer {
     this.musicGenerationHandler = new MusicGenerationHandler(this.geminiAI, config);
     this.videoGenerationHandler = new VideoGenerationHandler(this.geminiAI, config);
     this.omniVideoHandler = new OmniVideoHandler(this.geminiAI, config);
+    this.referenceSearchHandler = new ReferenceSearchHandler(this.geminiAI);
 
     this.setupHandlers();
   }
@@ -638,6 +642,69 @@ export class GeminiAIMCPServer {
             required: ["prompt"],
           },
         },
+        {
+          name: "reference_search",
+          description:
+            "AI-assisted reference search: answer a question from live web sources using Gemini's Google Search grounding, and return organized citations. " +
+            "Unlike the OpenAI-spec 'search'/'fetch' connector tools, this composes a synthesized answer AND returns the source links plus claim->source supports (citations) in one call. " +
+            "Returns: answer (synthesized text), citations (deduped {index,title,uri,domain} sources), supports (answer segments mapped to citation indices with confidence scores), searchQueries (the queries the model actually ran), and searchSuggestionsHtml (Google's required Search Suggestions markup to display alongside the answer). " +
+            "Search-scope tuning is backend-specific: Vertex AI supports excludeDomains (skip up to 2000 domains) and blockingConfidence (block risky/low-quality sites); Google AI Studio supports timeRange (restrict to a publish-time window). Both backends support includeImages and grounding on explicit urls via URL context.",
+          inputSchema: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              prompt: {
+                type: "string",
+                description: "Research question or topic to answer from live web sources.",
+              },
+              model: {
+                type: "string",
+                description: "Optional Gemini model override; must support Google Search grounding (default: server model).",
+              },
+              excludeDomains: {
+                type: "array",
+                items: { type: "string" },
+                maxItems: 2000,
+                description: "Domains to exclude from results, e.g. ['reddit.com','pinterest.com'] (search-scope tuning; max 2000). Vertex AI backend only.",
+              },
+              blockingConfidence: {
+                type: "string",
+                enum: ["low", "medium", "high"],
+                description: "Block risky/low-quality sites at or above this confidence ('low' is most aggressive). Vertex AI backend only.",
+              },
+              timeRange: {
+                type: "object",
+                additionalProperties: false,
+                properties: {
+                  startTime: { type: "string", description: "Inclusive RFC 3339 start timestamp, e.g. '2026-01-01T00:00:00Z'" },
+                  endTime: { type: "string", description: "Exclusive RFC 3339 end timestamp, e.g. '2026-07-01T00:00:00Z'" },
+                },
+                required: ["startTime", "endTime"],
+                description: "Restrict results to a publish-time window for recency tuning (both fields required). Google AI Studio backend only.",
+              },
+              includeImages: {
+                type: "boolean",
+                description: "Also enable image-search grounding in addition to web search.",
+              },
+              urls: {
+                type: "array",
+                items: { type: "string" },
+                maxItems: 20,
+                description: "Specific http(s) URLs to ground the answer on via URL context (max 20; both backends).",
+              },
+              systemInstruction: {
+                type: "string",
+                description: "Optional system instruction to steer the tone, depth, or scope of the composed answer.",
+              },
+              thinkingLevel: {
+                type: "string",
+                enum: ["minimal", "low", "medium", "high"],
+                description: "Optional Gemini 3 thinking level override for the reasoning depth of the answer.",
+              },
+            },
+            required: ["prompt"],
+          },
+        },
       ];
 
       // When more than one backend is configured, advertise the per-request
@@ -650,6 +717,7 @@ export class GeminiAIMCPServer {
           "generate_video",
           "generate_music",
           "generate_omni_video",
+          "reference_search",
         ]);
         for (const tool of tools) {
           if (backendTools.has(tool.name)) {
@@ -719,6 +787,11 @@ export class GeminiAIMCPServer {
           case "generate_omni_video": {
             const input = OmniVideoGenerationSchema.parse(args);
             return await this.omniVideoHandler.handle(input);
+          }
+
+          case "reference_search": {
+            const input = buildReferenceSearchSchema(this.config.useVertexAI, this.config.availableBackends).parse(args);
+            return await this.referenceSearchHandler.handle(input);
           }
 
           default:

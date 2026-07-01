@@ -73,6 +73,41 @@ export interface GeneratedOmniVideo {
   text?: string;
 }
 
+export interface ReferenceSearchOptions {
+  model?: string;
+  backend?: Backend;
+  excludeDomains?: string[];
+  blockingConfidence?: string;   // 'low' | 'medium' | 'high'
+  timeRange?: { startTime: string; endTime: string };
+  includeImages?: boolean;
+  urls?: string[];
+  systemInstruction?: string;
+  thinkingLevel?: ThinkingLevel | string;
+}
+
+export interface ReferenceCitation {
+  index: number;
+  title?: string;
+  uri?: string;
+  domain?: string;
+}
+
+export interface ReferenceSupport {
+  text: string;
+  startIndex?: number;
+  endIndex?: number;
+  sourceIndices: number[];
+  confidenceScores?: number[];
+}
+
+export interface ReferenceSearchResult {
+  text: string;
+  citations: ReferenceCitation[];
+  supports: ReferenceSupport[];
+  searchQueries: string[];
+  searchEntryPoint?: string;
+}
+
 export interface SpeechSpeakerOptions {
   speaker: string;
   voiceName: string;
@@ -935,6 +970,130 @@ export class GeminiAIService {
       interactionId: interaction.id,
       video: { data, mimeType: outputVideo.mime_type || 'video/mp4' },
       text: interaction.output_text,
+    };
+  }
+
+  private resolveBlockingConfidence(level?: string): string | undefined {
+    if (!level) {
+      return undefined;
+    }
+    switch (level.trim().toLowerCase()) {
+      case 'low':
+        return 'BLOCK_LOW_AND_ABOVE';
+      case 'medium':
+        return 'BLOCK_MEDIUM_AND_ABOVE';
+      case 'high':
+        return 'BLOCK_HIGH_AND_ABOVE';
+      default:
+        throw new Error(
+          `Invalid blockingConfidence: ${level}. Expected one of low, medium, high.`
+        );
+    }
+  }
+
+  /**
+   * AI-assisted reference search: compose an answer from live web sources using
+   * Gemini's Google Search grounding and return organized citations.
+   *
+   * Search-scope tuning is backend-asymmetric per the @google/genai GoogleSearch
+   * tool: excludeDomains/blockingConfidence are Vertex AI only, timeRange
+   * (timeRangeFilter) is Google AI Studio only. When urls are supplied the URL
+   * context tool is added so the model also grounds on those specific pages.
+   */
+  async referenceSearch(
+    prompt: string,
+    options: ReferenceSearchOptions = {}
+  ): Promise<ReferenceSearchResult> {
+    const backend = this.resolveBackend(options.backend);
+    const client = this.clientFor(backend);
+    const model = options.model || this.config.model;
+
+    const googleSearch: any = {};
+    if (options.excludeDomains && options.excludeDomains.length > 0) {
+      googleSearch.excludeDomains = options.excludeDomains;
+    }
+    if (options.blockingConfidence) {
+      googleSearch.blockingConfidence = this.resolveBlockingConfidence(options.blockingConfidence);
+    }
+    if (options.timeRange) {
+      googleSearch.timeRangeFilter = {
+        startTime: options.timeRange.startTime,
+        endTime: options.timeRange.endTime,
+      };
+    }
+    if (options.includeImages) {
+      googleSearch.searchTypes = { webSearch: {}, imageSearch: {} };
+    }
+
+    const tools: any[] = [{ googleSearch }];
+    if (options.urls && options.urls.length > 0) {
+      tools.push({ urlContext: {} });
+    }
+
+    const config: GenerateContentConfig = {
+      temperature: this.config.temperature,
+      maxOutputTokens: this.config.maxTokens,
+      tools,
+    };
+    if (options.systemInstruction) {
+      config.systemInstruction = options.systemInstruction;
+    }
+    if (this.isGemini3Model(model)) {
+      config.thinkingConfig = {
+        thinkingLevel: this.resolveThinkingLevel(options.thinkingLevel) ?? ThinkingLevel.HIGH,
+      };
+    }
+
+    // URL context is driven by URLs present in the prompt, so append any
+    // explicit urls to the request text for the model to fetch.
+    const contents = options.urls && options.urls.length > 0
+      ? `${prompt}\n\nGround your answer using these sources:\n${options.urls.join('\n')}`
+      : prompt;
+
+    const response: any = await client.models.generateContent({ model, contents, config });
+    return this.extractReferenceResult(response);
+  }
+
+  private extractReferenceResult(response: any): ReferenceSearchResult {
+    const text = this.extractResponseText(response);
+    const grounding = response?.candidates?.[0]?.groundingMetadata ?? {};
+
+    const chunks: any[] = grounding.groundingChunks ?? [];
+    const citations: ReferenceCitation[] = chunks
+      .map((chunk, index) => ({
+        index,
+        title: chunk?.web?.title,
+        uri: chunk?.web?.uri,
+        domain: chunk?.web?.domain,
+      }))
+      .filter((citation) => citation.uri || citation.title);
+
+    const answerBytes = Buffer.from(text, 'utf-8');
+    const supports: ReferenceSupport[] = (grounding.groundingSupports ?? []).map((support: any) => {
+      const segment = support?.segment ?? {};
+      let segmentText: string | undefined = segment.text;
+      // Grounding segment indices are byte offsets into the answer; slice as a
+      // fallback when the API omits the resolved text.
+      if (segmentText === undefined && (segment.startIndex !== undefined || segment.endIndex !== undefined)) {
+        const start = segment.startIndex ?? 0;
+        const end = segment.endIndex ?? answerBytes.length;
+        segmentText = answerBytes.subarray(start, end).toString('utf-8');
+      }
+      return {
+        text: segmentText ?? '',
+        startIndex: segment.startIndex,
+        endIndex: segment.endIndex,
+        sourceIndices: support?.groundingChunkIndices ?? [],
+        confidenceScores: support?.confidenceScores,
+      };
+    });
+
+    return {
+      text,
+      citations,
+      supports,
+      searchQueries: grounding.webSearchQueries ?? [],
+      searchEntryPoint: grounding.searchEntryPoint?.renderedContent,
     };
   }
 

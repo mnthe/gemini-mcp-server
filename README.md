@@ -71,6 +71,10 @@ Generate file-based audio outputs:
 - Generation failures return structured MCP error content with `status`, `tool`, `errorType`, `message`, and validation `issues` when available
 - See [GENERATION.md](GENERATION.md), [AUDIO_GENERATION.md](AUDIO_GENERATION.md), [examples/audio-generation.md](examples/audio-generation.md), and [examples/video-generation.md](examples/video-generation.md)
 
+### 🔎 AI-Assisted Reference Search
+- **reference_search**: Answer a question from live web sources using Gemini's Google Search grounding, returning a synthesized answer plus organized citations (links) and claim→source supports in one call
+- Search-scope tuning is backend-specific: Vertex AI supports `excludeDomains` and `blockingConfidence`; Google AI Studio supports `timeRange`; both support `includeImages` and grounding on explicit `urls`
+
 ### 🔐 Security First
 
 **Multi-Layer Defense**:
@@ -287,7 +291,7 @@ See [PROMPT_CUSTOMIZATION.md](PROMPT_CUSTOMIZATION.md) for comprehensive guide a
 
 ## Available Tools
 
-The server exposes nine MCP tools: `query`, `search`, `fetch`, `generate_image`, `generate_speech`, `generate_music`, `generate_video`, `check_video`, and `generate_omni_video`.
+The server exposes ten MCP tools: `query`, `search`, `fetch`, `generate_image`, `generate_speech`, `generate_music`, `generate_video`, `check_video`, `generate_omni_video`, and `reference_search`.
 
 ### query
 
@@ -532,6 +536,43 @@ imagePaths: ["/path/to/frame.png"]
 # Interactive edit of a prior result
 generate_omni_video: "Make it night time and add rain"
 previousInteractionId: "<interactionId from previous call>"
+```
+
+### reference_search
+
+AI-assisted reference search: answer a question from live web sources using Gemini's Google Search grounding, and return organized citations. Unlike the OpenAI-spec `search`/`fetch` connector tools, this composes a synthesized answer **and** returns the source links plus claim→source supports in one call.
+
+**Parameters:**
+- `prompt` (string, required): Research question or topic to answer from live web sources
+- `model` (string, optional): Gemini model override; must support Google Search grounding (default: server model)
+- `excludeDomains` (array, optional): Domains to exclude from results, e.g. `["reddit.com","pinterest.com"]` (max 2000). **Vertex AI backend only**
+- `blockingConfidence` (string, optional): Block risky/low-quality sites at or above this confidence. Options: `low` (most aggressive), `medium`, `high`. **Vertex AI backend only**
+- `timeRange` (object, optional): Restrict results to a publish-time window (`startTime`/`endTime`, both required RFC 3339). **Google AI Studio backend only**
+- `includeImages` (boolean, optional): Also enable image-search grounding in addition to web search
+- `urls` (array, optional): Specific http(s) URLs to ground the answer on via URL context (max 20; both backends)
+- `systemInstruction` (string, optional): System instruction to steer the tone, depth, or scope of the answer
+- `thinkingLevel` (string, optional): Gemini 3 thinking level override. Options: `minimal`, `low`, `medium`, `high`
+
+**Behavior:**
+- Returns a JSON payload: `answer` (synthesized text), `citations` (deduped `{index,title,uri,domain}` sources), `supports` (answer segments mapped to citation indices with confidence scores), `searchQueries` (the queries the model actually ran), and `searchSuggestionsHtml` (Google's required Search Suggestions markup to display alongside the answer)
+- Search-scope tuning is backend-asymmetric — invalid combinations are rejected at validation with a structured error naming the supported backend
+- When `urls` are supplied, a URL context tool is added so the model also grounds on those specific pages
+
+**Examples:**
+```
+# Recency-tuned research on Google AI Studio
+reference_search: "What changed in the latest Gemini API pricing?"
+backend: "ai-studio"
+timeRange: { "startTime": "2026-06-01T00:00:00Z", "endTime": "2026-07-01T00:00:00Z" }
+
+# Curated web research on Vertex AI (skip low-signal domains)
+reference_search: "Production best practices for MCP servers"
+excludeDomains: ["reddit.com", "pinterest.com"]
+blockingConfidence: "medium"
+
+# Ground on specific pages
+reference_search: "Summarize the key points from these docs"
+urls: ["https://ai.google.dev/gemini-api/docs/grounding"]
 ```
 
 ## Security

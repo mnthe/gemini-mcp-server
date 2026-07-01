@@ -134,6 +134,14 @@ vi.mock('../handlers/OmniVideoHandler.js', () => ({
   },
 }));
 
+const mockReferenceSearchHandle = vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] });
+vi.mock('../handlers/ReferenceSearchHandler.js', () => ({
+  ReferenceSearchHandler: class {
+    handle = mockReferenceSearchHandle;
+    constructor() {}
+  },
+}));
+
 vi.mock('../utils/imageSaver.js', () => ({
   getDefaultImageDir: vi.fn().mockReturnValue('/tmp/images'),
   saveImage: vi.fn(),
@@ -186,6 +194,7 @@ describe('GeminiAIMCPServer generate_image wiring', () => {
     mockSpeechGenHandle.mockClear();
     mockMusicGenHandle.mockClear();
     mockOmniVideoHandle.mockClear();
+    mockReferenceSearchHandle.mockClear();
     mcpServer = new GeminiAIMCPServer(createTestConfig());
     // Access the internal Server mock instance via the private field
     const internalServer = (mcpServer as any).server;
@@ -406,6 +415,52 @@ describe('GeminiAIMCPServer generate_image wiring', () => {
     expect(errorBody.tool).toBe('generate_music');
     expect(errorBody.errorType).toBe('validation_error');
     expect(errorBody.issues[0].message).toMatch(/lyria-3-pro-preview/);
+  });
+
+  it('reference_search tool is exposed and routed to ReferenceSearchHandler', async () => {
+    const result = await listHandler();
+    const refTool = result.tools.find((t: any) => t.name === 'reference_search');
+
+    expect(refTool).toBeDefined();
+    expect(refTool.inputSchema.required).toContain('prompt');
+    expect(refTool.inputSchema.properties.excludeDomains.maxItems).toBe(2000);
+    expect(refTool.inputSchema.properties.blockingConfidence.enum).toEqual(['low', 'medium', 'high']);
+    expect(refTool.inputSchema.properties.timeRange.required).toEqual(['startTime', 'endTime']);
+    expect(refTool.inputSchema.properties.urls.maxItems).toBe(20);
+    expect(refTool.inputSchema.properties.includeImages.type).toBe('boolean');
+    expect(refTool.inputSchema.properties.thinkingLevel.enum).toContain('high');
+    expect(refTool.description).toContain('citations');
+    expect(refTool.description).toContain('searchSuggestionsHtml');
+
+    await callHandler({
+      params: {
+        name: 'reference_search',
+        arguments: { prompt: 'when did Gemini 3 launch?', excludeDomains: ['reddit.com'] },
+      },
+    });
+
+    expect(mockReferenceSearchHandle).toHaveBeenCalledWith({
+      prompt: 'when did Gemini 3 launch?',
+      excludeDomains: ['reddit.com'],
+    });
+  });
+
+  it('rejects Vertex-only reference_search tuning on the Google AI Studio backend', async () => {
+    const aiStudioServer = new GeminiAIMCPServer(createTestConfig({ useVertexAI: false }));
+    const handlers = getHandlers((aiStudioServer as any).server);
+
+    const invalidResult = await handlers.callHandler({
+      params: {
+        name: 'reference_search',
+        arguments: { prompt: 'recent news', excludeDomains: ['reddit.com'] },
+      },
+    });
+    const errorBody = JSON.parse(invalidResult.content[0].text);
+
+    expect(invalidResult.isError).toBe(true);
+    expect(errorBody.tool).toBe('reference_search');
+    expect(errorBody.errorType).toBe('validation_error');
+    expect(errorBody.issues[0].message).toMatch(/Vertex AI backend only/);
   });
 
   it('returns structured error content for handler failures', async () => {

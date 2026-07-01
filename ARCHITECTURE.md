@@ -386,7 +386,33 @@ async handle(
 
 **Configuration**: Uses `config.musicOutputDir` (defaults to `getDefaultMusicDir()` from audioSaver)
 
-### 13. Logger (File-based Logging)
+### 13. ReferenceSearchHandler (Grounded Reference Search)
+
+**Location**: `src/handlers/ReferenceSearchHandler.ts`
+
+**Responsibilities**:
+- Validate and route `reference_search` requests
+- Coordinate with GeminiAIService (`referenceSearch`) to compose an answer via Google Search grounding
+- Serialize the answer, citations, supports, search queries, and Search Suggestions markup into a JSON `text` block
+
+**Key Method**:
+```typescript
+async handle(
+  input: ReferenceSearchInput
+): Promise<{ content: Array<{ type: string; text: string }> }>
+```
+
+**Features**:
+- No file output — returns synthesized text plus organized citations (links) and claim→source supports in one call
+- Search-scope tuning is backend-asymmetric per the `@google/genai` GoogleSearch tool: `excludeDomains`/`blockingConfidence` are Vertex AI only, `timeRange` is Google AI Studio only; `includeImages` and `urls` (URL context) work on both
+- Grounding metadata is extracted from `response.candidates[0].groundingMetadata`; support segment byte offsets are sliced from the answer when the API omits resolved text
+
+**Response Format**:
+`reference_search` returns a text block containing JSON: `{ answer, citations, supports, searchQueries, searchSuggestionsHtml? }`.
+
+**Configuration**: No output directory — the answer is returned inline.
+
+### 14. Logger (File-based Logging)
 
 **Location**: `src/utils/Logger.ts`
 
@@ -400,7 +426,7 @@ async handle(
 - `logs/general.log`: All logs (info, error, tool calls)
 - `logs/reasoning.log`: Thinking traces only
 
-### 14. Generated File Utilities
+### 15. Generated File Utilities
 
 **Locations**: `src/utils/generatedFileSaver.ts`, `src/utils/imageSaver.ts`, `src/utils/videoSaver.ts`, `src/utils/audioSaver.ts`
 
