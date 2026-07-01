@@ -586,7 +586,7 @@ function pcmToWav(pcmData: Buffer, options?: WavOptions): Buffer
 2. OmniVideoGenerationSchema.parse(input) → validated OmniVideoGenerationInput
    ↓
 3. OmniVideoHandler.handle(input)
-   ├─ GeminiAIService.generateOmniVideo(prompt, { model, aspectRatio, durationSeconds, imagePaths, previousInteractionId, systemInstruction, backend })
+   ├─ GeminiAIService.generateOmniVideo(prompt, { model, aspectRatio, imagePaths, previousInteractionId, backend })
    │  ├─ Calls client.interactions.create() → returns the finished video synchronously
    │  ├─ Oneshot: text or text + inline reference images (imagePaths max 7)
    │  ├─ Interactive edit: previousInteractionId reuses the prior video (no re-upload)
@@ -749,19 +749,17 @@ Validates the `generate_omni_video` tool input. `gemini-omni-flash-preview` is a
 z.object({
   prompt: z.string(),
   model: z.enum(['gemini-omni-flash-preview']).optional(),
-  backend: z.enum(['vertex', 'ai-studio']).optional(),
+  backend: z.enum(['vertex', 'ai-studio']).optional(),     // defaults to ai-studio (Vertex not supported yet)
   aspectRatio: z.enum(['16:9', '9:16']).optional(),
-  durationSeconds: z.number().min(3).max(10).optional(),
   imagePaths: z.array(z.string()).max(7).optional(),      // image/reference-to-video
   previousInteractionId: z.string().optional(),           // interactive editing (chain up to 3)
-  systemInstruction: z.string().optional(),
 })
 ```
 
 **Notes**:
-- Output is 720p only; audio is auto-generated
+- Output is 720p only; audio is auto-generated. Clips run a few seconds — Omni Flash exposes no structured `duration` or `system_instruction` (both unsupported by the model), so steer timing/tone within `prompt`
 - Oneshot vs interactive editing: omit `previousInteractionId` for a new generation; set it to a prior call's `interactionId` to edit that video without re-uploading source media
-- Runs on the Google AI Studio (Gemini API) backend
+- Runs on the Google AI Studio (Gemini API) backend only, and defaults to it regardless of the server's default backend (Vertex AI availability is deferred until it rolls out)
 
 ### SpeechGenerationSchema
 

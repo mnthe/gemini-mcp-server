@@ -223,17 +223,15 @@ More examples: [examples/video-generation.md](examples/video-generation.md)
 | `prompt` | string | Required. Generation prompt (oneshot) or a natural-language edit instruction when `previousInteractionId` is set |
 | `model` | enum | `gemini-omni-flash-preview` |
 | `aspectRatio` | enum | `16:9`, `9:16` |
-| `durationSeconds` | number | Integer 3-10 |
 | `imagePaths` | string[] | Optional source/reference images for image-to-video or reference-to-video, max 7. Supported file types: PNG (`.png`), JPEG (`.jpg`, `.jpeg`), WEBP (`.webp`) |
 | `previousInteractionId` | string | `interactionId` from a prior call; conversationally edits that video with no image re-upload; chain up to 3 edits |
-| `systemInstruction` | string | Optional system instruction to steer generation or editing |
 
 Two paths:
 
 - Oneshot: text-to-video, or image/reference-to-video with `imagePaths`. Omit `previousInteractionId`.
 - Interactive editing: set `previousInteractionId` to an id returned by a prior call to edit that video with a natural-language instruction. No image re-upload; chain up to 3 sequential edits.
 
-Output is 720p only. A synced audio track is generated automatically; audio reference inputs are not accepted, so describe dialogue, sound effects, and ambience in `prompt` as text. The response text includes `interactionId` (pass it back as `previousInteractionId` to edit) and the saved file path.
+Output is 720p only and clips run a few seconds; Omni Flash has no structured duration parameter, so steer pacing/timing within `prompt`. A synced audio track is generated automatically; audio reference inputs are not accepted, so describe dialogue, sound effects, and ambience in `prompt` as text. The response text includes `interactionId` (pass it back as `previousInteractionId` to edit) and the saved file path.
 
 Oneshot:
 
@@ -242,8 +240,7 @@ Oneshot:
   "name": "generate_omni_video",
   "arguments": {
     "prompt": "A cinematic tracking shot through a quiet neon-lit robotics lab.",
-    "aspectRatio": "16:9",
-    "durationSeconds": 8
+    "aspectRatio": "16:9"
   }
 }
 ```

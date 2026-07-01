@@ -474,17 +474,13 @@ export const OmniVideoGenerationSchema = z.object({
   model: z.enum(ALLOWED_OMNI_VIDEO_MODELS).optional()
     .describe("Omni video model (default: gemini-omni-flash-preview)"),
   backend: z.enum(['vertex', 'ai-studio']).optional()
-    .describe("Optional backend override. Gemini Omni Flash runs on the Google AI Studio (Gemini API) backend; Vertex AI availability is rolling out."),
+    .describe("Optional backend override. Gemini Omni Flash runs on the Google AI Studio (Gemini API) backend and defaults to it; Vertex AI is not supported yet (availability rolling out)."),
   aspectRatio: z.enum(['16:9', '9:16']).optional()
-    .describe("Aspect ratio (default: 16:9). Omni Flash supports 16:9 and 9:16 only."),
-  durationSeconds: z.number().int().min(3).max(10).optional()
-    .describe("Video duration in seconds (3-10; default: model default). Output is 720p only."),
+    .describe("Aspect ratio (default: 16:9). Omni Flash supports 16:9 and 9:16 only. Output is 720p only; clips run a few seconds — steer timing within the prompt."),
   imagePaths: z.array(VeoImageInputPathSchema).max(7).optional()
     .describe(`Local file paths of source/reference images for image-to-video or reference-to-video (max 7). Supported file types: ${VEO_IMAGE_INPUT_FILE_TYPES}. Omit for interactive edits — previousInteractionId reuses the prior video without re-uploading.`),
   previousInteractionId: z.string().min(1).optional()
     .describe("Interaction ID returned by a prior generate_omni_video call. When set, conversationally edits that video (no image re-upload) instead of generating a new one. Chain up to 3 sequential edits."),
-  systemInstruction: z.string().optional()
-    .describe("Optional system instruction to steer generation or editing"),
 }).strict();
 
 // AI-assisted reference search. Composes an answer from live web sources via

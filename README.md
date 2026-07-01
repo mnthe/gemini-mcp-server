@@ -510,11 +510,9 @@ Generate or conversationally edit short videos with Gemini Omni Flash (`gemini-o
 **Parameters:**
 - `prompt` (string, required): Video prompt for a new generation (oneshot), or a natural-language edit instruction when `previousInteractionId` is set
 - `model` (string, optional): Omni video model. Options: `gemini-omni-flash-preview` (default)
-- `aspectRatio` (string, optional): Aspect ratio. Default: `16:9`. Options: `16:9`, `9:16`
-- `durationSeconds` (number, optional): Video duration in seconds. Options: `3`–`10`. Output is 720p only
+- `aspectRatio` (string, optional): Aspect ratio. Default: `16:9`. Options: `16:9`, `9:16`. Output is 720p only; clips run a few seconds — steer timing within the `prompt` (Omni Flash has no structured duration parameter)
 - `imagePaths` (array, optional): Local file paths of source/reference images for image-to-video or reference-to-video (max 7). Supported file types: PNG (`.png`), JPEG (`.jpg`, `.jpeg`), WEBP (`.webp`). Omit for interactive edits
 - `previousInteractionId` (string, optional): Interaction ID from a prior `generate_omni_video` call. When set, conversationally edits that video (no image re-upload) instead of generating a new one
-- `systemInstruction` (string, optional): System instruction to steer generation or editing
 
 **Behavior:**
 - Two paths: (1) **oneshot** generation — text-to-video, or image/reference-to-video via `imagePaths`; (2) **interactive** editing — set `previousInteractionId` to edit a prior video with a natural-language instruction (no image re-upload; chain up to 3 sequential edits)
@@ -527,7 +525,6 @@ Generate or conversationally edit short videos with Gemini Omni Flash (`gemini-o
 # Oneshot text-to-video
 generate_omni_video: "A golden retriever surfing a wave at sunset"
 aspectRatio: "16:9"
-durationSeconds: 8
 
 # Image-to-video
 generate_omni_video: "Animate this scene with gentle camera motion"

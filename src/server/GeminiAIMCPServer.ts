@@ -597,7 +597,7 @@ export class GeminiAIMCPServer {
             "This is a NON-Veo model on the Google AI Studio (Gemini API) backend and does NOT use generate_video/check_video: it returns the finished video synchronously in one call (no operationId polling). " +
             "Two paths: (1) ONESHOT generation — text-to-video, or image/reference-to-video via imagePaths (max 7); " +
             "(2) INTERACTIVE editing — set previousInteractionId to an id returned by a prior call to edit that video with a natural-language instruction (no image re-upload; chain up to 3 sequential edits). " +
-            "Constraints: 720p output only; aspect ratio 16:9 or 9:16; duration 3-10 seconds; a synced audio track is generated automatically (audio reference inputs are not accepted — describe dialogue/SFX/ambience in the prompt). " +
+            "Constraints: 720p output only; aspect ratio 16:9 or 9:16; clips run a few seconds (steer pacing/timing within the prompt — duration is not a parameter); a synced audio track is generated automatically (audio reference inputs are not accepted — describe dialogue/SFX/ambience in the prompt). " +
             `Image source file types: ${OMNI_VIDEO_INPUT_FILE_TYPES}. ` +
             `The response includes interactionId (pass it back as previousInteractionId to edit) and the saved file path. Videos are saved to ${this.omniVideoHandler.getVideoOutputDir()}.`,
           inputSchema: {
@@ -616,13 +616,7 @@ export class GeminiAIMCPServer {
               aspectRatio: {
                 type: "string",
                 enum: ["16:9", "9:16"],
-                description: "Aspect ratio (default: 16:9). Omni Flash supports 16:9 and 9:16 only.",
-              },
-              durationSeconds: {
-                type: "number",
-                minimum: 3,
-                maximum: 10,
-                description: "Video duration in seconds (3-10; default: model default). Output is 720p only.",
+                description: "Aspect ratio (default: 16:9). Omni Flash supports 16:9 and 9:16 only. Output is 720p only.",
               },
               imagePaths: {
                 type: "array",
@@ -633,10 +627,6 @@ export class GeminiAIMCPServer {
               previousInteractionId: {
                 type: "string",
                 description: "Interaction ID from a prior generate_omni_video call. When set, conversationally edits that video (no image re-upload) instead of generating a new one.",
-              },
-              systemInstruction: {
-                type: "string",
-                description: "Optional system instruction to steer generation or editing",
               },
             },
             required: ["prompt"],

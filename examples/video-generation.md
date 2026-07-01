@@ -102,7 +102,7 @@ When completed, `check_video` saves files under the configured video output dire
 
 ## Omni Flash: Synchronous Generation and Interactive Editing
 
-`generate_omni_video` uses the non-Veo Gemini Omni Flash model (`gemini-omni-flash-preview`) on the Google AI Studio (Gemini API) backend. Unlike `generate_video`, it is synchronous: a single call returns the finished, saved video, so there is no `operationId` and no `check_video` polling. Output is 720p only, aspect ratio is `16:9` or `9:16`, duration is 3-10 seconds, and a synced audio track is generated automatically.
+`generate_omni_video` uses the non-Veo Gemini Omni Flash model (`gemini-omni-flash-preview`) on the Google AI Studio (Gemini API) backend. Unlike `generate_video`, it is synchronous: a single call returns the finished, saved video, so there is no `operationId` and no `check_video` polling. Output is 720p only, aspect ratio is `16:9` or `9:16`, clips run a few seconds (steer timing within the prompt — there is no duration parameter), and a synced audio track is generated automatically.
 
 Oneshot generation (text-to-video). Add `imagePaths` (max 7, PNG/JPEG/WEBP) for image- or reference-to-video.
 
@@ -111,8 +111,7 @@ Oneshot generation (text-to-video). Add `imagePaths` (max 7, PNG/JPEG/WEBP) for 
   name: "generate_omni_video",
   arguments: {
     prompt: "A cinematic tracking shot through a quiet neon-lit robotics lab, soft ambient hum.",
-    aspectRatio: "16:9",
-    durationSeconds: 8
+    aspectRatio: "16:9"
   }
 }
 ```

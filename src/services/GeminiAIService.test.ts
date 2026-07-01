@@ -416,13 +416,14 @@ describe('generateOmniVideo (Interactions API)', () => {
 
   function stubInteractions(service: GeminiAIService, interaction: Record<string, unknown>) {
     const create = vi.fn().mockResolvedValue(interaction);
-    (service as any).clientFor = () => ({ interactions: { create } });
-    return create;
+    const clientFor = vi.fn(() => ({ interactions: { create } }));
+    (service as any).clientFor = clientFor;
+    return { create, clientFor };
   }
 
   it('oneshot text-to-video builds a video response_format and returns the interactionId', async () => {
     const service = new GeminiAIService(createServiceConfig());
-    const create = stubInteractions(service, {
+    const { create } = stubInteractions(service, {
       id: 'omni-1',
       status: 'completed',
       output_video: { data: Buffer.from('fake-mp4').toString('base64'), mime_type: 'video/mp4' },
@@ -431,15 +432,17 @@ describe('generateOmniVideo (Interactions API)', () => {
 
     const result = await service.generateOmniVideo('a fox running through snow', {
       aspectRatio: '9:16',
-      durationSeconds: 8,
     });
 
     const params = create.mock.calls[0][0];
     expect(params.model).toBe('gemini-omni-flash-preview');
     expect(params.input).toBe('a fox running through snow');
-    expect(params.response_format).toEqual({ type: 'video', aspect_ratio: '9:16', duration: '8' });
+    // Omni Flash does not support a structured duration field on response_format.
+    expect(params.response_format).toEqual({ type: 'video', aspect_ratio: '9:16' });
     expect(params.store).toBe(true);
     expect(params).not.toHaveProperty('previous_interaction_id');
+    // system_instruction is not supported by Omni Flash and must not be forwarded.
+    expect(params).not.toHaveProperty('system_instruction');
 
     expect(result.interactionId).toBe('omni-1');
     expect(result.video.mimeType).toBe('video/mp4');
@@ -447,9 +450,38 @@ describe('generateOmniVideo (Interactions API)', () => {
     expect(result.text).toBe('here is your clip');
   });
 
+  it('defaults to the Google AI Studio backend even when the server default is Vertex', async () => {
+    const service = new GeminiAIService(
+      createServiceConfig({ useVertexAI: true, defaultBackend: 'vertex', availableBackends: ['vertex', 'ai-studio'] })
+    );
+    const { clientFor } = stubInteractions(service, {
+      id: 'omni-vx',
+      status: 'completed',
+      output_video: { data: Buffer.from('clip').toString('base64'), mime_type: 'video/mp4' },
+    });
+
+    await service.generateOmniVideo('a kite in the wind');
+
+    // Omni is AI-Studio-only; it must not route to Vertex despite the server default.
+    expect(clientFor).toHaveBeenCalledWith('ai-studio');
+  });
+
+  it('honors an explicit backend override', async () => {
+    const service = new GeminiAIService(createServiceConfig());
+    const { clientFor } = stubInteractions(service, {
+      id: 'omni-ov',
+      status: 'completed',
+      output_video: { data: Buffer.from('clip').toString('base64'), mime_type: 'video/mp4' },
+    });
+
+    await service.generateOmniVideo('a kite in the wind', { backend: 'vertex' });
+
+    expect(clientFor).toHaveBeenCalledWith('vertex');
+  });
+
   it('interactive edit forwards previousInteractionId as previous_interaction_id', async () => {
     const service = new GeminiAIService(createServiceConfig());
-    const create = stubInteractions(service, {
+    const { create } = stubInteractions(service, {
       id: 'omni-2',
       status: 'completed',
       output_video: { data: Buffer.from('edited').toString('base64'), mime_type: 'video/mp4' },

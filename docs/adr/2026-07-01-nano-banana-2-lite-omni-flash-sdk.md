@@ -47,8 +47,8 @@ Add a new `generate_omni_video` tool (model `gemini-omni-flash-preview`) with it
 - **Dual path**:
   - *Oneshot*: text-to-video, image-to-video, or reference-to-video (`imagePaths` max 7).
   - *Interactive editing*: `previousInteractionId` chains up to 3 sequential edits, reusing the prior video without re-uploading source media.
-- **Constraints**: 720p only, `16:9`/`9:16`, duration 3-10s, audio auto-generated.
-- **Backend**: Google AI Studio (Gemini API).
+- **Constraints**: 720p only, `16:9`/`9:16`, short clips (a few seconds), audio auto-generated. Per the Omni Flash docs, `duration` is **not** a structured `response_format` field and `system_instruction` is **not supported** — neither is exposed as a tool parameter; timing/tone are steered within the prompt.
+- **Backend**: Google AI Studio (Gemini API) only. `generateOmniVideo` defaults the backend to `ai-studio` (not the server default backend) so a Vertex-default setup still reaches Omni; an explicit `backend` override is honored for when Vertex availability rolls out.
 - **Output**: saved to the same video output directory as `generate_video` (`config.videoOutputDir` / `getDefaultVideoDir()`), via the existing `videoSaver`.
 
 ### Backend-aware TTS split
@@ -72,7 +72,7 @@ The text, Lyria music, and Veo video model id lists were audited against officia
 The Veo `generate_video` schema and pipeline are structurally incompatible with Omni Flash:
 
 - **Different SDK surface**: Veo uses `models.generateVideos` returning a long-running operation polled with `operations.getVideosOperation`; the tool contract exposes this as `generate_video` → `{ operationId }` → `check_video`. Omni Flash uses `interactions.create` and returns the video synchronously. Folding it in would force one of the two models into the wrong async contract.
-- **Different parameter surface**: `VideoGenerationSchema` carries Veo-specific fields (`seed`, `numberOfVideos`, `enhancePrompt`, `personGeneration`, `compressionQuality`, `resizeMode`, `lastFramePath`, `videoPath`, `referenceImagePaths` max 3, resolutions up to `4k`, backend-specific `-001`/`-preview` id enums). Omni Flash accepts none of these; it adds `previousInteractionId` and a different `imagePaths` cap (7) and constraint set (720p only, duration 3-10s as a number). Overloading one schema would require mutually exclusive branches gated on the model, degrading validation clarity.
+- **Different parameter surface**: `VideoGenerationSchema` carries Veo-specific fields (`seed`, `numberOfVideos`, `enhancePrompt`, `personGeneration`, `compressionQuality`, `resizeMode`, `lastFramePath`, `videoPath`, `referenceImagePaths` max 3, resolutions up to `4k`, backend-specific `-001`/`-preview` id enums). Omni Flash accepts none of these; it adds `previousInteractionId` and a different `imagePaths` cap (7) and constraint set (720p only, short clips with no structured duration parameter). Overloading one schema would require mutually exclusive branches gated on the model, degrading validation clarity.
 - **Different state model**: Omni Flash's `previousInteractionId` editing has no Veo analogue. Expressing a stateful edit chain inside a stateless one-shot Veo schema would be misleading.
 
 A separate tool keeps each schema deterministic and each pipeline honest about its async/state behavior, consistent with the existing "separate tools for distinct model families" principle used for speech vs music.
