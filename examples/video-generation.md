@@ -99,3 +99,32 @@ Image source fields (`imagePath`, `lastFramePath`, `referenceImagePaths`) accept
 ```
 
 When completed, `check_video` saves files under the configured video output directory and returns saved file paths.
+
+## Omni Flash: Synchronous Generation and Interactive Editing
+
+`generate_omni_video` uses the non-Veo Gemini Omni Flash model (`gemini-omni-flash-preview`) on the Google AI Studio (Gemini API) backend. Unlike `generate_video`, it is synchronous: a single call returns the finished, saved video, so there is no `operationId` and no `check_video` polling. Output is 720p only, aspect ratio is `16:9` or `9:16`, duration is 3-10 seconds, and a synced audio track is generated automatically.
+
+Oneshot generation (text-to-video). Add `imagePaths` (max 7, PNG/JPEG/WEBP) for image- or reference-to-video.
+
+```typescript
+{
+  name: "generate_omni_video",
+  arguments: {
+    prompt: "A cinematic tracking shot through a quiet neon-lit robotics lab, soft ambient hum.",
+    aspectRatio: "16:9",
+    durationSeconds: 8
+  }
+}
+```
+
+The response text includes an `interactionId` and the saved file path. Pass that `interactionId` back as `previousInteractionId` to conversationally edit the same video with a natural-language instruction, with no image re-upload. Chain up to 3 sequential edits.
+
+```typescript
+{
+  name: "generate_omni_video",
+  arguments: {
+    prompt: "Add warm sunrise lighting and slow the camera down.",
+    previousInteractionId: "<interactionId-from-previous-call>"
+  }
+}
+```

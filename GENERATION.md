@@ -19,6 +19,7 @@ On failures, generation tool calls return MCP error content instead of throwing 
 | `generate_music` | Lyria 3 models | MP3; WAV only for Gemini API/AI Studio Pro | `text` metadata + `audio` content |
 | `generate_video` | Veo 3.1 models | async operation ID | `text` metadata |
 | `check_video` | Veo operation polling | MP4 paths when complete | `text` metadata |
+| `generate_omni_video` | Gemini Omni Flash | MP4 path (synchronous) | `text` metadata |
 
 ## Default Output Directories
 
@@ -45,12 +46,12 @@ export GEMINI_MUSIC_OUTPUT_DIR="/path/to/music"
 | Parameter | Type | Notes |
 |-----------|------|-------|
 | `prompt` | string | Required |
-| `model` | enum | `gemini-3-pro-image`, `gemini-3.1-flash-image`, `gemini-2.5-flash-image` |
-| `aspectRatio` | enum | Includes standard ratios and 3.1 Flash-only wide/tall ratios |
-| `imageSize` | enum | `0.5K`, `1K`, `2K`, `4K`; omit for `gemini-2.5-flash-image` |
+| `model` | enum | `gemini-3-pro-image`, `gemini-3.1-flash-image`, `gemini-3.1-flash-lite-image`, `gemini-2.5-flash-image` |
+| `aspectRatio` | enum | Includes standard ratios and 3.1 Flash-only wide/tall ratios. `gemini-3.1-flash-lite-image` supports standard ratios only (not `1:4`/`1:8`/`4:1`/`8:1`) |
+| `imageSize` | enum | `0.5K`, `1K`, `2K`, `4K`; `gemini-3.1-flash-lite-image` supports `1K` only; omit for `gemini-2.5-flash-image` |
 | `imagePaths` | string[] | Optional local reference images, max 14; `gemini-2.5-flash-image` supports at most 3. Supported file types: PNG (`.png`), JPEG (`.jpg`, `.jpeg`), WEBP (`.webp`), HEIC (`.heic`), HEIF (`.heif`) |
 | `systemInstruction` | string | Optional Gemini 3 image system instruction |
-| `thinkingLevel` | enum | Optional Gemini 3.1 Flash Image thinking level: `minimal` or `high` |
+| `thinkingLevel` | enum | Optional Gemini 3.1 Flash Image thinking level: `minimal` or `high` (not supported by `gemini-3.1-flash-lite-image`) |
 | `mediaResolution` | enum | Optional media resolution for reference image inputs |
 
 Example:
@@ -67,6 +68,8 @@ Example:
 }
 ```
 
+`gemini-3.1-flash-lite-image` (Nano Banana 2 Lite) is the fast, low-cost GA tier: 1K output only, standard aspect ratios, no `thinkingLevel`, up to 14 reference images, and editing support. It is the recommended replacement for the legacy `gemini-2.5-flash-image` (still available, retires 2026-10-02).
+
 More examples: [examples/image-generation.md](examples/image-generation.md)
 
 ## generate_speech
@@ -78,7 +81,7 @@ Gemini TTS has a 32k-token context limit and does not support streaming in this 
 | Parameter | Type | Notes |
 |-----------|------|-------|
 | `prompt` | string | Required text or transcript |
-| `model` | enum | `gemini-3.1-flash-tts-preview`, `gemini-2.5-flash-preview-tts`, `gemini-2.5-pro-preview-tts` |
+| `model` | enum | `gemini-3.1-flash-tts-preview` (default, both backends). Backend-specific 2.5 tiers: Vertex AI GA `gemini-2.5-flash-tts`/`gemini-2.5-pro-tts`; Google AI Studio preview `gemini-2.5-flash-preview-tts`/`gemini-2.5-pro-preview-tts` |
 | `voiceName` | string | Single-speaker prebuilt voice, default `Kore` |
 | `languageCode` | string | Optional BCP-47 language code |
 | `speakers` | object[] | Exactly two `{ speaker, voiceName }` entries |
@@ -204,6 +207,54 @@ Poll:
   "name": "check_video",
   "arguments": {
     "operationId": "<operation-id-from-generate-video>"
+  }
+}
+```
+
+More examples: [examples/video-generation.md](examples/video-generation.md)
+
+## generate_omni_video
+
+`generate_omni_video` generates or conversationally edits short videos with Gemini Omni Flash (`gemini-omni-flash-preview`). This is a NON-Veo model on the Google AI Studio (Gemini API) backend and does not use `generate_video`/`check_video`: it returns the finished, saved video synchronously in one call, with no `operationId` and no `check_video` polling.
+
+| Parameter | Type | Notes |
+|-----------|------|-------|
+| `prompt` | string | Required. Generation prompt (oneshot) or a natural-language edit instruction when `previousInteractionId` is set |
+| `model` | enum | `gemini-omni-flash-preview` |
+| `aspectRatio` | enum | `16:9`, `9:16` |
+| `durationSeconds` | number | Integer 3-10 |
+| `imagePaths` | string[] | Optional source/reference images for image-to-video or reference-to-video, max 7. Supported file types: PNG (`.png`), JPEG (`.jpg`, `.jpeg`), WEBP (`.webp`) |
+| `previousInteractionId` | string | `interactionId` from a prior call; conversationally edits that video with no image re-upload; chain up to 3 edits |
+| `systemInstruction` | string | Optional system instruction to steer generation or editing |
+
+Two paths:
+
+- Oneshot: text-to-video, or image/reference-to-video with `imagePaths`. Omit `previousInteractionId`.
+- Interactive editing: set `previousInteractionId` to an id returned by a prior call to edit that video with a natural-language instruction. No image re-upload; chain up to 3 sequential edits.
+
+Output is 720p only. A synced audio track is generated automatically; audio reference inputs are not accepted, so describe dialogue, sound effects, and ambience in `prompt` as text. The response text includes `interactionId` (pass it back as `previousInteractionId` to edit) and the saved file path.
+
+Oneshot:
+
+```json
+{
+  "name": "generate_omni_video",
+  "arguments": {
+    "prompt": "A cinematic tracking shot through a quiet neon-lit robotics lab.",
+    "aspectRatio": "16:9",
+    "durationSeconds": 8
+  }
+}
+```
+
+Interactive edit:
+
+```json
+{
+  "name": "generate_omni_video",
+  "arguments": {
+    "prompt": "Add warm sunrise lighting and slow the camera down.",
+    "previousInteractionId": "<interaction-id-from-previous-call>"
   }
 }
 ```

@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   ImageGenerationSchema,
   MusicGenerationSchema,
+  OmniVideoGenerationSchema,
   QuerySchema,
   SpeechGenerationSchema,
   VideoGenerationSchema,
   buildMusicGenerationSchema,
+  buildSpeechGenerationSchema,
   buildVideoGenerationSchema,
 } from './index.js';
 
@@ -112,6 +114,50 @@ describe('ImageGenerationSchema model compatibility', () => {
       prompt: 'edit from this reference',
       imagePaths: ['/tmp/reference.mp3'],
     })).toThrow(/Unsupported image source file type/);
+  });
+
+  it('accepts Nano Banana 2 Lite with 1K and up to 14 references', () => {
+    const parsed = ImageGenerationSchema.parse({
+      prompt: 'fast product shot',
+      model: 'gemini-3.1-flash-lite-image',
+      imageSize: '1K',
+      aspectRatio: '16:9',
+      imagePaths: Array.from({ length: 14 }, (_, index) => `/tmp/ref-${index}.png`),
+    });
+
+    expect(parsed.model).toBe('gemini-3.1-flash-lite-image');
+    expect(parsed.imageSize).toBe('1K');
+    expect(parsed.imagePaths).toHaveLength(14);
+  });
+
+  it('restricts Nano Banana 2 Lite to its supported options', () => {
+    // Lite is 1K only — 2K/4K rejected.
+    expect(() => ImageGenerationSchema.parse({
+      prompt: 'hires lite',
+      model: 'gemini-3.1-flash-lite-image',
+      imageSize: '4K',
+    })).toThrow(/gemini-3\.1-flash-lite-image supports imageSize='1K' only/);
+
+    // 0.5K still requires flash-image.
+    expect(() => ImageGenerationSchema.parse({
+      prompt: 'tiny lite',
+      model: 'gemini-3.1-flash-lite-image',
+      imageSize: '0.5K',
+    })).toThrow(/gemini-3\.1-flash-image/);
+
+    // Extreme aspect ratios still require flash-image.
+    expect(() => ImageGenerationSchema.parse({
+      prompt: 'wide lite',
+      model: 'gemini-3.1-flash-lite-image',
+      aspectRatio: '8:1',
+    })).toThrow(/gemini-3\.1-flash-image/);
+
+    // Lite does not support thinkingLevel.
+    expect(() => ImageGenerationSchema.parse({
+      prompt: 'thinking lite',
+      model: 'gemini-3.1-flash-lite-image',
+      thinkingLevel: 'high',
+    })).toThrow(/gemini-3\.1-flash-image/);
   });
 });
 
@@ -389,6 +435,87 @@ describe('SpeechGenerationSchema TTS models', () => {
         { speaker: 'Bob', voiceName: 'Puck' },
       ],
     })).toThrow(/voiceName cannot be used with speakers/);
+  });
+});
+
+describe('buildSpeechGenerationSchema per-backend TTS models', () => {
+  const VertexSpeech = buildSpeechGenerationSchema(true);
+  const AiStudioSpeech = buildSpeechGenerationSchema(false);
+  const DualSpeech = buildSpeechGenerationSchema(true, ['vertex', 'ai-studio']);
+
+  it('accepts Vertex GA TTS ids on the Vertex backend', () => {
+    expect(VertexSpeech.parse({ prompt: 'hi', model: 'gemini-2.5-flash-tts' }).model)
+      .toBe('gemini-2.5-flash-tts');
+    expect(VertexSpeech.parse({ prompt: 'hi', model: 'gemini-2.5-pro-tts' }).model)
+      .toBe('gemini-2.5-pro-tts');
+  });
+
+  it('accepts Google AI Studio preview TTS ids on the ai-studio backend', () => {
+    expect(AiStudioSpeech.parse({ prompt: 'hi', model: 'gemini-2.5-flash-preview-tts' }).model)
+      .toBe('gemini-2.5-flash-preview-tts');
+    expect(AiStudioSpeech.parse({ prompt: 'hi', model: 'gemini-2.5-pro-preview-tts' }).model)
+      .toBe('gemini-2.5-pro-preview-tts');
+  });
+
+  it('accepts the shared gemini-3.1 TTS id on both backends', () => {
+    expect(VertexSpeech.parse({ prompt: 'hi', model: 'gemini-3.1-flash-tts-preview' }).model)
+      .toBe('gemini-3.1-flash-tts-preview');
+    expect(AiStudioSpeech.parse({ prompt: 'hi', model: 'gemini-3.1-flash-tts-preview' }).model)
+      .toBe('gemini-3.1-flash-tts-preview');
+  });
+
+  it('rejects a TTS id that does not match the selected backend', () => {
+    // dual defaults to vertex; an AI-Studio-only preview id must be rejected there
+    expect(() => DualSpeech.parse({ prompt: 'hi', model: 'gemini-2.5-flash-preview-tts' }))
+      .toThrow(/does not match the selected backend/);
+    expect(DualSpeech.parse({ prompt: 'hi', backend: 'ai-studio', model: 'gemini-2.5-flash-preview-tts' }).model)
+      .toBe('gemini-2.5-flash-preview-tts');
+  });
+});
+
+describe('OmniVideoGenerationSchema', () => {
+  it('accepts a oneshot generation with reference images', () => {
+    const parsed = OmniVideoGenerationSchema.parse({
+      prompt: 'a fox darting through snow',
+      aspectRatio: '9:16',
+      durationSeconds: 8,
+      imagePaths: ['/tmp/fox.png', '/tmp/snow.jpg'],
+    });
+
+    expect(parsed.aspectRatio).toBe('9:16');
+    expect(parsed.durationSeconds).toBe(8);
+    expect(parsed.imagePaths).toHaveLength(2);
+  });
+
+  it('accepts an interactive edit via previousInteractionId', () => {
+    const parsed = OmniVideoGenerationSchema.parse({
+      prompt: 'make the sky sunset orange',
+      previousInteractionId: 'interaction-123',
+    });
+
+    expect(parsed.previousInteractionId).toBe('interaction-123');
+  });
+
+  it('rejects out-of-range duration, unsupported ratios, and too many references', () => {
+    expect(() => OmniVideoGenerationSchema.parse({
+      prompt: 'x', durationSeconds: 12,
+    })).toThrow();
+
+    expect(() => OmniVideoGenerationSchema.parse({
+      prompt: 'x', aspectRatio: '1:1',
+    })).toThrow();
+
+    expect(() => OmniVideoGenerationSchema.parse({
+      prompt: 'x',
+      imagePaths: Array.from({ length: 8 }, (_, index) => `/tmp/ref-${index}.png`),
+    })).toThrow();
+  });
+
+  it('rejects unsupported image source file types', () => {
+    expect(() => OmniVideoGenerationSchema.parse({
+      prompt: 'x',
+      imagePaths: ['/tmp/ref.heic'],
+    })).toThrow(/Unsupported Veo image source file type/);
   });
 });
 

@@ -76,6 +76,7 @@ export const FetchSchema = z.object({
 const ALLOWED_IMAGE_MODELS = [
   'gemini-3-pro-image',
   'gemini-3.1-flash-image',
+  'gemini-3.1-flash-lite-image',
   'gemini-2.5-flash-image',
 ] as const;
 
@@ -94,7 +95,7 @@ export const ImageGenerationSchema = z.object({
   aspectRatio: z.enum(ALLOWED_IMAGE_ASPECT_RATIOS).optional()
     .describe("Aspect ratio (default: 1:1; 1:4, 1:8, 4:1, and 8:1 require gemini-3.1-flash-image)"),
   imageSize: z.enum(['0.5K', '1K', '2K', '4K']).optional()
-    .describe("Resolution (0.5K requires gemini-3.1-flash-image, default: 1K)"),
+    .describe("Resolution (0.5K requires gemini-3.1-flash-image; gemini-3.1-flash-lite-image supports 1K only; default: 1K)"),
   imagePaths: z.array(GeminiImageInputPathSchema).max(14).optional()
     .describe(`Local file paths of reference images to include as input (max 14; e.g., for image editing or style transfer). Supported file types: ${GEMINI_IMAGE_INPUT_FILE_TYPES}. Audio/video files are not accepted.`),
   systemInstruction: z.string().optional()
@@ -132,6 +133,11 @@ export const ImageGenerationSchema = z.object({
     return data.model !== 'gemini-2.5-flash-image' || !data.imagePaths || data.imagePaths.length <= 3;
   },
   { message: "gemini-2.5-flash-image supports at most 3 reference images" }
+).refine(
+  (data) => {
+    return data.model !== 'gemini-3.1-flash-lite-image' || data.imageSize === undefined || data.imageSize === '1K';
+  },
+  { message: "gemini-3.1-flash-lite-image supports imageSize='1K' only; omit imageSize for its default 1K output" }
 );
 
 const ALLOWED_VERTEX_VIDEO_MODELS = [
@@ -154,33 +160,66 @@ export function getDefaultVideoModel(useVertexAI: boolean): string {
   return useVertexAI ? ALLOWED_VERTEX_VIDEO_MODELS[0] : ALLOWED_GEMINI_API_VIDEO_MODELS[0];
 }
 
-const ALLOWED_SPEECH_MODELS = [
+// gemini-3.1-flash-tts-preview uses the SAME id on both backends. The 2.5 TTS
+// tiers differ by backend: Google AI Studio exposes '-preview-tts' preview ids,
+// Vertex AI / Cloud Text-to-Speech exposes GA '-tts' ids.
+const ALLOWED_VERTEX_SPEECH_MODELS = [
+  'gemini-3.1-flash-tts-preview',
+  'gemini-2.5-flash-tts',
+  'gemini-2.5-pro-tts',
+] as const;
+
+const ALLOWED_GEMINI_API_SPEECH_MODELS = [
   'gemini-3.1-flash-tts-preview',
   'gemini-2.5-flash-preview-tts',
   'gemini-2.5-pro-preview-tts',
 ] as const;
+
+export function getAllowedSpeechModels(useVertexAI: boolean): readonly string[] {
+  return useVertexAI ? ALLOWED_VERTEX_SPEECH_MODELS : ALLOWED_GEMINI_API_SPEECH_MODELS;
+}
 
 const SpeechSpeakerSchema = z.object({
   speaker: z.string().min(1).describe("Speaker name exactly as it appears in the prompt"),
   voiceName: z.string().min(1).describe("Prebuilt voice name for this speaker"),
 }).strict();
 
-export const SpeechGenerationSchema = z.object({
-  prompt: z.string().describe("Text or transcript to synthesize as speech. Gemini TTS is text-only input; audio/image/video reference files are not accepted."),
-  model: z.enum(ALLOWED_SPEECH_MODELS).optional()
-    .describe("Speech model (default: gemini-3.1-flash-tts-preview)"),
-  backend: z.enum(['vertex', 'ai-studio']).optional()
-    .describe("Optional backend override ('vertex' | 'ai-studio'); defaults to the server's configured backend"),
-  voiceName: z.string().min(1).optional()
-    .describe("Prebuilt voice name for single-speaker TTS (default: Kore)"),
-  languageCode: z.string().min(2).optional()
-    .describe("Optional BCP-47 language code for speech synthesis"),
-  speakers: z.array(SpeechSpeakerSchema).length(2).optional()
-    .describe("Exactly two speaker voice configs for multi-speaker TTS"),
-}).strict().refine(
-  (data) => !data.voiceName || !data.speakers,
-  { message: "voiceName cannot be used with speakers; set voiceName per speaker instead" }
-);
+export function buildSpeechGenerationSchema(
+  useVertexAI: boolean = true,
+  availableBackends: Backend[] = [useVertexAI ? 'vertex' : 'ai-studio'],
+) {
+  const defaultBackend: Backend = useVertexAI ? 'vertex' : 'ai-studio';
+  const dual = availableBackends.length > 1;
+  const allowedSpeechModels = (dual
+    ? Array.from(new Set([...ALLOWED_VERTEX_SPEECH_MODELS, ...ALLOWED_GEMINI_API_SPEECH_MODELS]))
+    : (useVertexAI ? ALLOWED_VERTEX_SPEECH_MODELS : ALLOWED_GEMINI_API_SPEECH_MODELS)
+  ) as [string, ...string[]];
+  const effBackend = (data: { backend?: Backend }): Backend => data.backend ?? defaultBackend;
+  const modelsForBackend = (b: Backend): readonly string[] =>
+    b === 'vertex' ? ALLOWED_VERTEX_SPEECH_MODELS : ALLOWED_GEMINI_API_SPEECH_MODELS;
+
+  return z.object({
+    prompt: z.string().describe("Text or transcript to synthesize as speech. Gemini TTS is text-only input; audio/image/video reference files are not accepted."),
+    model: z.enum(allowedSpeechModels).optional()
+      .describe("Speech model (default: gemini-3.1-flash-tts-preview, valid on both backends). The 2.5 tiers differ by backend: Vertex AI uses gemini-2.5-flash-tts/gemini-2.5-pro-tts; Google AI Studio uses gemini-2.5-flash-preview-tts/gemini-2.5-pro-preview-tts."),
+    backend: z.enum(availableBackends as [Backend, ...Backend[]]).optional()
+      .describe(`Backend for this request (default: ${defaultBackend}; available: ${availableBackends.join(', ')}). gemini-3.1-flash-tts-preview works on both; the 2.5 TTS ids differ per backend.`),
+    voiceName: z.string().min(1).optional()
+      .describe("Prebuilt voice name for single-speaker TTS (default: Kore)"),
+    languageCode: z.string().min(2).optional()
+      .describe("Optional BCP-47 language code for speech synthesis"),
+    speakers: z.array(SpeechSpeakerSchema).length(2).optional()
+      .describe("Exactly two speaker voice configs for multi-speaker TTS"),
+  }).strict().refine(
+    (data) => !data.model || modelsForBackend(effBackend(data)).includes(data.model),
+    { message: "speech model does not match the selected backend; Vertex AI uses gemini-2.5-flash-tts/gemini-2.5-pro-tts, Google AI Studio uses gemini-2.5-flash-preview-tts/gemini-2.5-pro-preview-tts (gemini-3.1-flash-tts-preview works on both)" }
+  ).refine(
+    (data) => !data.voiceName || !data.speakers,
+    { message: "voiceName cannot be used with speakers; set voiceName per speaker instead" }
+  );
+}
+
+export const SpeechGenerationSchema = buildSpeechGenerationSchema(true);
 
 const ALLOWED_MUSIC_MODELS = [
   'lyria-3-clip-preview',
@@ -418,6 +457,36 @@ export function buildVideoGenerationSchema(
 
 export const VideoGenerationSchema = buildVideoGenerationSchema(true);
 
+// Gemini Omni Flash is a NON-Veo video model invoked through the Interactions API
+// (client.interactions.create), not the Veo generateVideos long-running-operation
+// pipeline. It returns the finished video synchronously (no check_video polling)
+// and supports stateful conversational editing via previousInteractionId.
+const ALLOWED_OMNI_VIDEO_MODELS = [
+  'gemini-omni-flash-preview',
+] as const;
+
+export const OMNI_VIDEO_INPUT_FILE_TYPES = VEO_IMAGE_INPUT_FILE_TYPES;
+
+export const OmniVideoGenerationSchema = z.object({
+  prompt: z.string().describe(
+    "Video prompt for a new generation (oneshot), or a natural-language edit instruction when previousInteractionId is set (interactive editing). Describe dialogue/SFX/ambience as text; audio reference files are not accepted."
+  ),
+  model: z.enum(ALLOWED_OMNI_VIDEO_MODELS).optional()
+    .describe("Omni video model (default: gemini-omni-flash-preview)"),
+  backend: z.enum(['vertex', 'ai-studio']).optional()
+    .describe("Optional backend override. Gemini Omni Flash runs on the Google AI Studio (Gemini API) backend; Vertex AI availability is rolling out."),
+  aspectRatio: z.enum(['16:9', '9:16']).optional()
+    .describe("Aspect ratio (default: 16:9). Omni Flash supports 16:9 and 9:16 only."),
+  durationSeconds: z.number().int().min(3).max(10).optional()
+    .describe("Video duration in seconds (3-10; default: model default). Output is 720p only."),
+  imagePaths: z.array(VeoImageInputPathSchema).max(7).optional()
+    .describe(`Local file paths of source/reference images for image-to-video or reference-to-video (max 7). Supported file types: ${VEO_IMAGE_INPUT_FILE_TYPES}. Omit for interactive edits — previousInteractionId reuses the prior video without re-uploading.`),
+  previousInteractionId: z.string().min(1).optional()
+    .describe("Interaction ID returned by a prior generate_omni_video call. When set, conversationally edits that video (no image re-upload) instead of generating a new one. Chain up to 3 sequential edits."),
+  systemInstruction: z.string().optional()
+    .describe("Optional system instruction to steer generation or editing"),
+}).strict();
+
 export type QueryInput = z.infer<typeof QuerySchema>;
 export type SearchInput = z.infer<typeof SearchSchema>;
 export type FetchInput = z.infer<typeof FetchSchema>;
@@ -425,6 +494,7 @@ export type ImageGenerationInput = z.infer<typeof ImageGenerationSchema>;
 export type SpeechGenerationInput = z.infer<typeof SpeechGenerationSchema>;
 export type MusicGenerationInput = z.infer<ReturnType<typeof buildMusicGenerationSchema>>;
 export type VideoGenerationInput = z.infer<typeof VideoGenerationSchema>;
+export type OmniVideoGenerationInput = z.infer<typeof OmniVideoGenerationSchema>;
 
 export const CheckVideoSchema = z.object({
   operationId: z.string().describe("Operation ID returned by generate_video"),

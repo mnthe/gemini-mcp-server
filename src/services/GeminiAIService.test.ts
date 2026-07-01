@@ -388,6 +388,91 @@ describe('generateVideo backend compatibility', () => {
   });
 });
 
+describe('generateOmniVideo (Interactions API)', () => {
+  function createServiceConfig(overrides: Record<string, unknown> = {}) {
+    return {
+      projectId: 'test-project',
+      location: 'us-central1',
+      apiKey: 'test-api-key',
+      useVertexAI: false,
+      defaultBackend: 'ai-studio',
+      availableBackends: ['ai-studio'],
+      model: 'gemini-3.5-flash',
+      temperature: 0.7,
+      maxTokens: 8192,
+      topP: 0.95,
+      topK: 40,
+      enableConversations: false,
+      sessionTimeout: 3600000,
+      maxHistory: 100,
+      enableReasoning: false,
+      maxReasoningSteps: 5,
+      disableLogging: true,
+      logToStderr: false,
+      allowFileUris: false,
+      ...overrides,
+    } as any;
+  }
+
+  function stubInteractions(service: GeminiAIService, interaction: Record<string, unknown>) {
+    const create = vi.fn().mockResolvedValue(interaction);
+    (service as any).clientFor = () => ({ interactions: { create } });
+    return create;
+  }
+
+  it('oneshot text-to-video builds a video response_format and returns the interactionId', async () => {
+    const service = new GeminiAIService(createServiceConfig());
+    const create = stubInteractions(service, {
+      id: 'omni-1',
+      status: 'completed',
+      output_video: { data: Buffer.from('fake-mp4').toString('base64'), mime_type: 'video/mp4' },
+      output_text: 'here is your clip',
+    });
+
+    const result = await service.generateOmniVideo('a fox running through snow', {
+      aspectRatio: '9:16',
+      durationSeconds: 8,
+    });
+
+    const params = create.mock.calls[0][0];
+    expect(params.model).toBe('gemini-omni-flash-preview');
+    expect(params.input).toBe('a fox running through snow');
+    expect(params.response_format).toEqual({ type: 'video', aspect_ratio: '9:16', duration: '8' });
+    expect(params.store).toBe(true);
+    expect(params).not.toHaveProperty('previous_interaction_id');
+
+    expect(result.interactionId).toBe('omni-1');
+    expect(result.video.mimeType).toBe('video/mp4');
+    expect(result.video.data.toString()).toBe('fake-mp4');
+    expect(result.text).toBe('here is your clip');
+  });
+
+  it('interactive edit forwards previousInteractionId as previous_interaction_id', async () => {
+    const service = new GeminiAIService(createServiceConfig());
+    const create = stubInteractions(service, {
+      id: 'omni-2',
+      status: 'completed',
+      output_video: { data: Buffer.from('edited').toString('base64'), mime_type: 'video/mp4' },
+    });
+
+    const result = await service.generateOmniVideo('make the sky orange', {
+      previousInteractionId: 'omni-1',
+    });
+
+    const params = create.mock.calls[0][0];
+    expect(params.previous_interaction_id).toBe('omni-1');
+    expect(params.input).toBe('make the sky orange');
+    expect(result.interactionId).toBe('omni-2');
+  });
+
+  it('throws a descriptive error when no video is returned', async () => {
+    const service = new GeminiAIService(createServiceConfig());
+    stubInteractions(service, { id: 'omni-3', status: 'failed', output_text: 'blocked' });
+
+    await expect(service.generateOmniVideo('x')).rejects.toThrow(/no video \(status: failed\): blocked/);
+  });
+});
+
 describe('QueryOptions interface', () => {
   it('accepts mediaResolution option', async () => {
     const { ThinkingLevel } = await import('@google/genai');

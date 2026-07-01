@@ -57,6 +57,22 @@ export interface GeneratedVideo {
   mimeType: string;
 }
 
+export interface OmniVideoGenerationOptions {
+  model?: string;
+  aspectRatio?: string;
+  durationSeconds?: number;
+  imagePaths?: string[];
+  previousInteractionId?: string;
+  systemInstruction?: string;
+  backend?: Backend;
+}
+
+export interface GeneratedOmniVideo {
+  interactionId: string;
+  video: GeneratedVideo;
+  text?: string;
+}
+
 export interface SpeechSpeakerOptions {
   speaker: string;
   voiceName: string;
@@ -842,6 +858,84 @@ export class GeminiAIService {
     }
 
     return { done: true, videos };
+  }
+
+  /**
+   * Generate or conversationally edit a video with Gemini Omni Flash.
+   *
+   * Unlike Veo (generateVideo), Omni Flash uses the Interactions API
+   * (client.interactions.create) and returns the finished video synchronously —
+   * there is no long-running operation to poll via check_video. The returned
+   * interactionId can be passed back as previousInteractionId to edit the result
+   * without re-uploading any source media.
+   */
+  async generateOmniVideo(
+    prompt: string,
+    options: OmniVideoGenerationOptions = {}
+  ): Promise<GeneratedOmniVideo> {
+    const backend = this.resolveBackend(options.backend);
+    const client = this.clientFor(backend);
+    const model = options.model || 'gemini-omni-flash-preview';
+
+    // Video output format: aspect ratio and duration live on response_format.
+    const responseFormat: any = { type: 'video' };
+    if (options.aspectRatio) {
+      responseFormat.aspect_ratio = options.aspectRatio;
+    }
+    if (options.durationSeconds !== undefined) {
+      responseFormat.duration = String(options.durationSeconds);
+    }
+
+    // Input is a plain string for text-to-video / interactive edits, or text plus
+    // inline reference images for image-to-video / reference-to-video.
+    let input: any = prompt;
+    if (options.imagePaths && options.imagePaths.length > 0) {
+      input = [
+        { type: 'text', text: prompt },
+        ...options.imagePaths.map((filePath) => ({
+          type: 'image',
+          data: readFileSync(filePath).toString('base64'),
+          mime_type: this.getMimeTypeFromExtension(extname(filePath)),
+        })),
+      ];
+    }
+
+    const params: any = {
+      model,
+      input,
+      response_format: responseFormat,
+      // Persist the interaction so a later edit can reference it by id.
+      store: true,
+    };
+    if (options.previousInteractionId) {
+      params.previous_interaction_id = options.previousInteractionId;
+    }
+    if (options.systemInstruction) {
+      params.system_instruction = options.systemInstruction;
+    }
+
+    const interaction: any = await client.interactions.create(params);
+
+    const outputVideo = interaction?.output_video;
+    if (!outputVideo || (!outputVideo.data && !outputVideo.uri)) {
+      const status = interaction?.status ?? 'unknown';
+      const detail = interaction?.output_text ? `: ${interaction.output_text}` : '';
+      throw new Error(`Omni video generation returned no video (status: ${status})${detail}`);
+    }
+
+    let data: Buffer;
+    if (outputVideo.data) {
+      data = Buffer.from(outputVideo.data, 'base64');
+    } else {
+      const resp = await fetch(outputVideo.uri);
+      data = Buffer.from(await resp.arrayBuffer());
+    }
+
+    return {
+      interactionId: interaction.id,
+      video: { data, mimeType: outputVideo.mime_type || 'video/mp4' },
+      text: interaction.output_text,
+    };
   }
 
   /**

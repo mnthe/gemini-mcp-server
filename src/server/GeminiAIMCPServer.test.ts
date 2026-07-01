@@ -125,6 +125,15 @@ vi.mock('../handlers/VideoGenerationHandler.js', () => ({
   },
 }));
 
+const mockOmniVideoHandle = vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] });
+vi.mock('../handlers/OmniVideoHandler.js', () => ({
+  OmniVideoHandler: class {
+    handle = mockOmniVideoHandle;
+    getVideoOutputDir = vi.fn().mockReturnValue('/tmp/videos');
+    constructor() {}
+  },
+}));
+
 vi.mock('../utils/imageSaver.js', () => ({
   getDefaultImageDir: vi.fn().mockReturnValue('/tmp/images'),
   saveImage: vi.fn(),
@@ -176,6 +185,7 @@ describe('GeminiAIMCPServer generate_image wiring', () => {
     mockImageGenHandle.mockClear();
     mockSpeechGenHandle.mockClear();
     mockMusicGenHandle.mockClear();
+    mockOmniVideoHandle.mockClear();
     mcpServer = new GeminiAIMCPServer(createTestConfig());
     // Access the internal Server mock instance via the private field
     const internalServer = (mcpServer as any).server;
@@ -206,6 +216,7 @@ describe('GeminiAIMCPServer generate_image wiring', () => {
     expect(imageGenTool.inputSchema.properties.model.enum).toEqual([
       'gemini-3-pro-image',
       'gemini-3.1-flash-image',
+      'gemini-3.1-flash-lite-image',
       'gemini-2.5-flash-image',
     ]);
     expect(imageGenTool.inputSchema.properties.aspectRatio.enum).toContain('1:4');
@@ -242,10 +253,11 @@ describe('GeminiAIMCPServer generate_image wiring', () => {
 
     expect(speechTool).toBeDefined();
     expect(speechTool.inputSchema.required).toContain('prompt');
+    // Vertex mode (createTestConfig useVertexAI: true) advertises the GA '-tts' ids.
     expect(speechTool.inputSchema.properties.model.enum).toEqual([
       'gemini-3.1-flash-tts-preview',
-      'gemini-2.5-flash-preview-tts',
-      'gemini-2.5-pro-preview-tts',
+      'gemini-2.5-flash-tts',
+      'gemini-2.5-pro-tts',
     ]);
     expect(speechTool.description).toContain('Input is text-only');
     expect(speechTool.inputSchema.properties.speakers.minItems).toBe(2);
@@ -259,6 +271,56 @@ describe('GeminiAIMCPServer generate_image wiring', () => {
     });
 
     expect(mockSpeechGenHandle).toHaveBeenCalledWith({ prompt: 'say hello', voiceName: 'Kore' });
+  });
+
+  it('advertises Google AI Studio TTS ids when Vertex mode is disabled', async () => {
+    const aiStudioServer = new GeminiAIMCPServer(createTestConfig({ useVertexAI: false }));
+    const handlers = getHandlers((aiStudioServer as any).server);
+    const result = await handlers.listHandler();
+    const speechTool = result.tools.find((t: any) => t.name === 'generate_speech');
+
+    expect(speechTool.inputSchema.properties.model.enum).toEqual([
+      'gemini-3.1-flash-tts-preview',
+      'gemini-2.5-flash-preview-tts',
+      'gemini-2.5-pro-preview-tts',
+    ]);
+
+    // A Vertex-only GA id must be rejected on the AI Studio backend.
+    const invalidResult = await handlers.callHandler({
+      params: {
+        name: 'generate_speech',
+        arguments: { prompt: 'hi', model: 'gemini-2.5-flash-tts' },
+      },
+    });
+    const errorBody = JSON.parse(invalidResult.content[0].text);
+    expect(invalidResult.isError).toBe(true);
+    expect(errorBody.errorType).toBe('validation_error');
+  });
+
+  it('generate_omni_video tool is exposed and routed to OmniVideoHandler', async () => {
+    const result = await listHandler();
+    const omniTool = result.tools.find((t: any) => t.name === 'generate_omni_video');
+
+    expect(omniTool).toBeDefined();
+    expect(omniTool.inputSchema.required).toContain('prompt');
+    expect(omniTool.inputSchema.properties.model.enum).toEqual(['gemini-omni-flash-preview']);
+    expect(omniTool.inputSchema.properties.aspectRatio.enum).toEqual(['16:9', '9:16']);
+    expect(omniTool.inputSchema.properties.durationSeconds.minimum).toBe(3);
+    expect(omniTool.inputSchema.properties.durationSeconds.maximum).toBe(10);
+    expect(omniTool.inputSchema.properties.imagePaths.maxItems).toBe(7);
+    expect(omniTool.inputSchema.properties.previousInteractionId).toBeDefined();
+    expect(omniTool.description).toContain('Omni Flash');
+    expect(omniTool.description).toContain('previousInteractionId');
+    expect(omniTool.description).toContain('720p');
+
+    await callHandler({
+      params: {
+        name: 'generate_omni_video',
+        arguments: { prompt: 'a fox running', durationSeconds: 6 },
+      },
+    });
+
+    expect(mockOmniVideoHandle).toHaveBeenCalledWith({ prompt: 'a fox running', durationSeconds: 6 });
   });
 
   it('generate_music tool is exposed and routed to MusicGenerationHandler', async () => {
