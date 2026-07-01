@@ -537,13 +537,11 @@ describe('ReferenceSearchSchema (Vertex default)', () => {
       excludeDomains: ['reddit.com', 'pinterest.com'],
       blockingConfidence: 'medium',
       includeImages: true,
-      urls: ['https://ai.google.dev/gemini-api/docs'],
     });
 
     expect(parsed.excludeDomains).toHaveLength(2);
     expect(parsed.blockingConfidence).toBe('medium');
     expect(parsed.includeImages).toBe(true);
-    expect(parsed.urls).toEqual(['https://ai.google.dev/gemini-api/docs']);
   });
 
   it('rejects timeRange on the Vertex backend', () => {
@@ -553,16 +551,31 @@ describe('ReferenceSearchSchema (Vertex default)', () => {
     })).toThrow(/timeRange is supported by the Google AI Studio backend only/);
   });
 
+  it('rejects urls (URL context) on Vertex but accepts them on Google AI Studio', () => {
+    // URL context is a Gemini API (AI Studio) only tool; Vertex rejects it.
+    expect(() => ReferenceSearchSchema.parse({
+      prompt: 'ground on these pages',
+      urls: ['https://ai.google.dev/gemini-api/docs'],
+    })).toThrow(/urls \(URL context\) is supported by the Google AI Studio backend only/);
+
+    const AiStudio = buildReferenceSearchSchema(false);
+    expect(AiStudio.parse({
+      prompt: 'ground on these pages',
+      urls: ['https://ai.google.dev/gemini-api/docs'],
+    }).urls).toEqual(['https://ai.google.dev/gemini-api/docs']);
+  });
+
   it('rejects more than 2000 excluded domains and more than 20 urls', () => {
     expect(() => ReferenceSearchSchema.parse({
       prompt: 'x',
       excludeDomains: Array.from({ length: 2001 }, (_, i) => `d${i}.com`),
     })).toThrow();
 
-    expect(() => ReferenceSearchSchema.parse({
+    // urls is Google AI Studio only, so exercise the max-20 cap on that backend
+    expect(() => buildReferenceSearchSchema(false).parse({
       prompt: 'x',
       urls: Array.from({ length: 21 }, (_, i) => `https://example.com/${i}`),
-    })).toThrow();
+    })).toThrow(/20 items/);
   });
 
   it('rejects unknown keys and a partial timeRange', () => {

@@ -489,6 +489,7 @@ export const OmniVideoGenerationSchema = z.object({
 // tuning is backend-asymmetric per the @google/genai GoogleSearch tool:
 //   - excludeDomains / blockingConfidence: Vertex AI only
 //   - timeRange (timeRangeFilter): Google AI Studio (Gemini API) only
+//   - urls (URL context tool): Google AI Studio (Gemini API) only
 const ALLOWED_BLOCKING_CONFIDENCE = ['low', 'medium', 'high'] as const;
 
 const ReferenceTimeRangeSchema = z.object({
@@ -507,7 +508,7 @@ export function buildReferenceSearchSchema(
   return z.object({
     prompt: z.string().describe("Research question or topic to answer from live web sources."),
     backend: z.enum(availableBackends as [Backend, ...Backend[]]).optional()
-      .describe(`Backend for this request (default: ${defaultBackend}; available: ${availableBackends.join(', ')}). Search-scope tuning differs: Vertex AI supports excludeDomains/blockingConfidence; Google AI Studio supports timeRange.`),
+      .describe(`Backend for this request (default: ${defaultBackend}; available: ${availableBackends.join(', ')}). Search-scope tuning differs: Vertex AI supports excludeDomains/blockingConfidence; Google AI Studio supports timeRange and urls (URL context).`),
     model: z.string().optional()
       .describe("Optional Gemini model override; must support Google Search grounding (default: server model)."),
     excludeDomains: z.array(z.string().min(1)).max(2000).optional()
@@ -519,7 +520,7 @@ export function buildReferenceSearchSchema(
     includeImages: z.boolean().optional()
       .describe("Also enable image-search grounding in addition to web search."),
     urls: z.array(z.string().min(1)).max(20).optional()
-      .describe("Specific http(s) URLs to ground the answer on via URL context (max 20; both backends)."),
+      .describe("Specific http(s) URLs to ground the answer on via URL context (max 20). Google AI Studio backend only; the URL context tool is not available on Vertex AI."),
     systemInstruction: z.string().optional()
       .describe("Optional system instruction to steer the tone, depth, or scope of the composed answer."),
     thinkingLevel: z.enum(['minimal', 'low', 'medium', 'high', 'MINIMAL', 'LOW', 'MEDIUM', 'HIGH']).optional()
@@ -530,6 +531,9 @@ export function buildReferenceSearchSchema(
   ).refine(
     (data) => !isVertex(data) || data.timeRange === undefined,
     { message: "timeRange is supported by the Google AI Studio backend only" }
+  ).refine(
+    (data) => !isVertex(data) || !data.urls || data.urls.length === 0,
+    { message: "urls (URL context) is supported by the Google AI Studio backend only; the URL context tool is not available on Vertex AI" }
   );
 }
 
