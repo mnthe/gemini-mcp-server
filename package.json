@@ -37,8 +37,8 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@google/genai": "^2.8.0",
-    "@modelcontextprotocol/sdk": "^1.26.0",
+    "@google/genai": "^2.10.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "dotenv": "^17.3.1",
     "zod": "^4.3.6"
   },
