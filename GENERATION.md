@@ -270,7 +270,8 @@ Search-scope tuning is backend-asymmetric per the `@google/genai` GoogleSearch t
 | `excludeDomains` (skip up to 2000 domains) | ✅ | ❌ |
 | `blockingConfidence` (block risky/low-quality sites) | ✅ | ❌ |
 | `timeRange` (restrict to a publish-time window) | ❌ | ✅ |
-| `includeImages`, `urls` (URL context) | ✅ | ✅ |
+| `urls` (URL context) | ❌ | ✅ |
+| `includeImages` | ✅ | ✅ |
 
 Return shape (JSON in the `text` block):
 

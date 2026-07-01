@@ -404,7 +404,7 @@ async handle(
 
 **Features**:
 - No file output — returns synthesized text plus organized citations (links) and claim→source supports in one call
-- Search-scope tuning is backend-asymmetric per the `@google/genai` GoogleSearch tool: `excludeDomains`/`blockingConfidence` are Vertex AI only, `timeRange` is Google AI Studio only; `includeImages` and `urls` (URL context) work on both
+- Search-scope tuning is backend-asymmetric per the `@google/genai` GoogleSearch tool: `excludeDomains`/`blockingConfidence` are Vertex AI only, `timeRange` and `urls` (URL context) are Google AI Studio only; `includeImages` works on both
 - Grounding metadata is extracted from `response.candidates[0].groundingMetadata`; support segment byte offsets are sliced from the answer when the API omits resolved text
 
 **Response Format**:

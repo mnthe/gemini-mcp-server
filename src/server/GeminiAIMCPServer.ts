@@ -638,7 +638,7 @@ export class GeminiAIMCPServer {
             "AI-assisted reference search: answer a question from live web sources using Gemini's Google Search grounding, and return organized citations. " +
             "Unlike the OpenAI-spec 'search'/'fetch' connector tools, this composes a synthesized answer AND returns the source links plus claim->source supports (citations) in one call. " +
             "Returns: answer (synthesized text), citations (deduped {index,title,uri,domain} sources), supports (answer segments mapped to citation indices with confidence scores), searchQueries (the queries the model actually ran), and searchSuggestionsHtml (Google's required Search Suggestions markup to display alongside the answer). " +
-            "Search-scope tuning is backend-specific: Vertex AI supports excludeDomains (skip up to 2000 domains) and blockingConfidence (block risky/low-quality sites); Google AI Studio supports timeRange (restrict to a publish-time window). Both backends support includeImages and grounding on explicit urls via URL context.",
+            "Search-scope tuning is backend-specific: Vertex AI supports excludeDomains (skip up to 2000 domains) and blockingConfidence (block risky/low-quality sites); Google AI Studio supports timeRange (restrict to a publish-time window) and grounding on explicit urls via URL context (Gemini API only, not Vertex AI). Both backends support includeImages.",
           inputSchema: {
             type: "object",
             additionalProperties: false,
@@ -680,7 +680,7 @@ export class GeminiAIMCPServer {
                 type: "array",
                 items: { type: "string" },
                 maxItems: 20,
-                description: "Specific http(s) URLs to ground the answer on via URL context (max 20; both backends).",
+                description: "Specific http(s) URLs to ground the answer on via URL context (max 20). Google AI Studio backend only; the URL context tool is not available on Vertex AI.",
               },
               systemInstruction: {
                 type: "string",

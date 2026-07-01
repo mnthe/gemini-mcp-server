@@ -995,8 +995,9 @@ export class GeminiAIService {
    *
    * Search-scope tuning is backend-asymmetric per the @google/genai GoogleSearch
    * tool: excludeDomains/blockingConfidence are Vertex AI only, timeRange
-   * (timeRangeFilter) is Google AI Studio only. When urls are supplied the URL
-   * context tool is added so the model also grounds on those specific pages.
+   * (timeRangeFilter) and urls (URL context) are Google AI Studio only. When urls
+   * are supplied the URL context tool is added so the model also grounds on those
+   * specific pages; the schema rejects urls on Vertex before reaching this call.
    */
   async referenceSearch(
     prompt: string,
