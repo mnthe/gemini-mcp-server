@@ -323,8 +323,8 @@ async handleCheck(
 - Image-to-video animation from local image files
 - Interpolation between start and end frames
 - Reference images for style/asset guidance (max 3, Veo 3.1)
-- Default model: `veo-3.1-fast-generate-001`
-- Audio generation enabled by default
+- Backend-aware model ids: Vertex AI uses `veo-3.1-*-generate-001`, Google AI Studio uses `veo-3.1-*-generate-preview`
+- Audio generation is configurable on Vertex AI; Google AI Studio has audio always on
 
 **Response Format**:
 `generate_video` returns a text block containing JSON: `{ operationId }`.
@@ -716,30 +716,38 @@ Validates the `generate_video` tool input:
 ```typescript
 z.object({
   prompt: z.string(),
-  model: z.enum(['veo-3.1-fast-generate-001', 'veo-3.1-generate-001', 'veo-3.1-lite-generate-001']).optional(),
+  backend: z.enum(['vertex', 'ai-studio']).optional(),
+  model: z.enum([
+    'veo-3.1-fast-generate-001', 'veo-3.1-generate-001', 'veo-3.1-lite-generate-001',
+    'veo-3.1-fast-generate-preview', 'veo-3.1-generate-preview', 'veo-3.1-lite-generate-preview'
+  ]).optional(), // enum is narrowed to the active backend unless both backends are configured
   aspectRatio: z.enum(['16:9', '9:16']).optional(),
   durationSeconds: z.enum(['4', '6', '8']).optional(),
   resolution: z.enum(['720p', '1080p', '4k']).optional(),
-  generateAudio: z.boolean().optional(),  // default: true
+  generateAudio: z.boolean().optional(),  // Vertex AI only; Google AI Studio has audio always on
   enhancePrompt: z.boolean().optional(),
-  personGeneration: z.enum(['allow_adult', 'dont_allow']).optional(),
+  personGeneration: z.enum(['allow_all', 'allow_adult', 'dont_allow']).optional(),
   negativePrompt: z.string().optional(),
-  seed: z.number().optional(),
-  numberOfVideos: z.number().optional(),
+  seed: z.number().optional(),            // Vertex AI only
+  numberOfVideos: z.number().optional(),  // max 4 on Vertex AI, fixed to 1 on Google AI Studio
   imagePath: z.string().optional(),         // image-to-video
   lastFramePath: z.string().optional(),     // interpolation (requires imagePath)
   referenceImagePaths: z.array(z.string()).optional(),  // max 3, Veo 3.1 only
   videoPath: z.string().optional(),         // Veo video extension
+  compressionQuality: z.enum(['optimized', 'lossless']).optional(), // Vertex AI only
+  resizeMode: z.enum(['crop', 'pad']).optional(),                   // Vertex AI only, requires imagePath
 })
 ```
 
 **Validation Refines**:
+- `model` must match the selected backend (`-001` ids for Vertex AI, `-preview` ids for Google AI Studio)
 - 1080p/4k resolution requires durationSeconds to be '8'
 - `lastFramePath` requires `imagePath` (interpolation mode constraint)
 - Maximum 3 reference images allowed
 - `videoPath` cannot be combined with image or reference-image source modes
 - `videoPath` requires 720p and returns one extended video
 - Veo 3.1 Lite rejects `4k` and `referenceImagePaths`
+- `generateAudio`, `seed`, `compressionQuality`, and `resizeMode` are Vertex-only controls
 
 ### OmniVideoGenerationSchema
 

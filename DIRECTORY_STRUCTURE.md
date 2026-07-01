@@ -25,12 +25,18 @@ src/
 │
 ├── handlers/          # MCP tool request handlers
 │   ├── QueryHandler.ts
+│   ├── QueryHandler.test.ts
 │   ├── SearchHandler.ts
 │   ├── FetchHandler.ts
 │   ├── ImageGenerationHandler.ts
 │   ├── SpeechGenerationHandler.ts
 │   ├── MusicGenerationHandler.ts
-│   └── VideoGenerationHandler.ts
+│   ├── VideoGenerationHandler.ts
+│   ├── VideoGenerationHandler.test.ts
+│   ├── VideoGenerationHandler.forwarding.test.ts
+│   ├── OmniVideoHandler.ts
+│   ├── ReferenceSearchHandler.ts
+│   └── GenerationErrorHandling.test.ts
 │
 ├── managers/          # Business logic managers
 │   └── ConversationManager.ts
@@ -59,6 +65,7 @@ src/
 │   ├── urlSecurity.ts
 │   ├── fileSecurity.ts
 │   ├── generatedFileSaver.ts
+│   ├── generatedFileSaver.test.ts
 │   ├── imageSaver.ts
 │   ├── videoSaver.ts
 │   └── audioSaver.ts
@@ -85,7 +92,7 @@ Contains the **heart of the agentic system** - the loop, state management, and t
 **External service integrations** - Gemini AI API service for model interactions. Includes integration tests co-located with the service.
 
 ### handlers/
-**MCP request handlers** - process tool call requests from MCP clients (query, search, fetch, image generation, speech generation, music generation, video generation).
+**MCP request handlers** - process tool call requests from MCP clients (query, search, fetch, image generation, speech generation, music generation, Veo video generation, Omni video generation, and grounded reference search).
 
 ### managers/
 **Business logic managers** - ConversationManager maintains multi-turn conversation state.

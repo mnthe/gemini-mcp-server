@@ -1,6 +1,6 @@
 # Generation Tools
 
-The server exposes file-output generation tools for images, speech, music, and video. These tools share a common persistence pattern:
+The server exposes file-output generation tools for images, speech, music, and video, plus `reference_search` for grounded citation output. File-output tools share a common persistence pattern:
 
 1. Validate tool input with Zod schemas in `src/schemas/index.ts`
 2. Generate media through `GeminiAIService`
@@ -21,6 +21,8 @@ On failures, generation tool calls return MCP error content instead of throwing 
 | `check_video` | Veo operation polling | MP4 paths when complete | `text` metadata |
 | `generate_omni_video` | Gemini Omni Flash | MP4 path (synchronous) | `text` metadata |
 | `reference_search` | Gemini + Google Search grounding | synthesized answer + citations (no file) | `text` JSON |
+
+When both Vertex AI and Google AI Studio credentials are configured, `query`, generation tools, and `reference_search` accept `backend` (`vertex` or `ai-studio`) to route a single request to a specific backend. In single-backend deployments, stray `backend` arguments are ignored.
 
 ## Default Output Directories
 
@@ -148,20 +150,23 @@ Detailed guide: [AUDIO_GENERATION.md](AUDIO_GENERATION.md)
 | Parameter | Type | Notes |
 |-----------|------|-------|
 | `prompt` | string | Required |
-| `model` | enum | `veo-3.1-fast-generate-001`, `veo-3.1-generate-001`, `veo-3.1-lite-generate-001` |
+| `backend` | enum | Optional `vertex` or `ai-studio` request override when both backends are configured |
+| `model` | enum | Vertex AI: `veo-3.1-fast-generate-001`, `veo-3.1-generate-001`, `veo-3.1-lite-generate-001`; Google AI Studio: `veo-3.1-fast-generate-preview`, `veo-3.1-generate-preview`, `veo-3.1-lite-generate-preview` |
 | `aspectRatio` | enum | `16:9`, `9:16` |
 | `durationSeconds` | enum | `4`, `6`, `8` |
 | `resolution` | enum | `720p`, `1080p`, `4k`; 1080p/4k require 8 seconds |
-| `generateAudio` | boolean | Defaults to true |
+| `generateAudio` | boolean | Vertex AI only; Google AI Studio has audio always on |
 | `enhancePrompt` | boolean | Optional Veo prompt rewriting/enhancement |
-| `personGeneration` | enum | `allow_adult`, `dont_allow` |
+| `personGeneration` | enum | `allow_all`, `allow_adult`, `dont_allow`; Google AI Studio accepts `allow_all` for text/video extension and `allow_adult` for image/reference modes |
 | `negativePrompt` | string | Optional exclusions |
-| `seed` | number | 0-4294967295 |
-| `numberOfVideos` | number | 1-4 |
+| `seed` | number | 0-4294967295; Vertex AI only |
+| `numberOfVideos` | number | 1-4 on Vertex AI; fixed to 1 on Google AI Studio |
 | `imagePath` | string | Optional first frame for image-to-video. Supported file types: PNG (`.png`), JPEG (`.jpg`, `.jpeg`), WEBP (`.webp`) |
 | `lastFramePath` | string | Optional last frame, requires `imagePath`. Same supported image file types as `imagePath` |
 | `referenceImagePaths` | string[] | Optional references, max 3. Same supported image file types as `imagePath` |
 | `videoPath` | string | Optional Veo-generated 720p MP4 (`.mp4`) video to extend |
+| `compressionQuality` | enum | Vertex AI only: `optimized`, `lossless` |
+| `resizeMode` | enum | Vertex AI image-to-video fit mode for `imagePath`: `crop`, `pad` |
 
 Source modes are mutually exclusive:
 
@@ -171,7 +176,7 @@ Source modes are mutually exclusive:
 - Video extension: use `videoPath` only. Veo extension requires a Veo-generated 720p input video and returns one extended video.
 - Audio file references are not supported by Veo generation. Put dialogue, sound effects, and ambience in `prompt` as text audio cues.
 
-Veo 3.1 standard and fast support reference asset images; Lite does not. Lite also does not support `4k` output.
+Veo 3.1 standard and fast support reference asset images; Lite does not. Lite also does not support `4k` output. Vertex AI uses `-001` model ids; Google AI Studio uses `-preview` model ids.
 
 Example:
 
@@ -222,6 +227,7 @@ More examples: [examples/video-generation.md](examples/video-generation.md)
 |-----------|------|-------|
 | `prompt` | string | Required. Generation prompt (oneshot) or a natural-language edit instruction when `previousInteractionId` is set |
 | `model` | enum | `gemini-omni-flash-preview` |
+| `backend` | enum | Optional override. Defaults to `ai-studio`; Vertex AI availability is rolling out |
 | `aspectRatio` | enum | `16:9`, `9:16` |
 | `imagePaths` | string[] | Optional source/reference images for image-to-video or reference-to-video, max 7. Supported file types: PNG (`.png`), JPEG (`.jpg`, `.jpeg`), WEBP (`.webp`) |
 | `previousInteractionId` | string | `interactionId` from a prior call; conversationally edits that video with no image re-upload; chain up to 3 edits |
@@ -272,6 +278,8 @@ Search-scope tuning is backend-asymmetric per the `@google/genai` GoogleSearch t
 | `timeRange` (restrict to a publish-time window) | ❌ | ✅ |
 | `urls` (URL context) | ❌ | ✅ |
 | `includeImages` | ✅ | ✅ |
+
+Use `backend: "vertex"` or `backend: "ai-studio"` to select the backend when both are configured. In single-backend deployments, the server ignores stray `backend` arguments before validation.
 
 Return shape (JSON in the `text` block):
 

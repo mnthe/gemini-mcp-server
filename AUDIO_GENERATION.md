@@ -34,8 +34,10 @@ Gemini TTS accepts text-only input, returns audio-only output, has a 32k-token c
 | Model | Notes |
 |-------|-------|
 | `gemini-3.1-flash-tts-preview` | Default, low-latency Gemini TTS |
-| `gemini-2.5-flash-preview-tts` | Fast, cost-efficient Gemini TTS |
-| `gemini-2.5-pro-preview-tts` | Higher-quality Gemini TTS for longer narration |
+| `gemini-2.5-flash-tts` / `gemini-2.5-pro-tts` | Vertex AI GA 2.5 TTS ids |
+| `gemini-2.5-flash-preview-tts` / `gemini-2.5-pro-preview-tts` | Google AI Studio preview 2.5 TTS ids |
+
+When both Vertex AI and Google AI Studio credentials are configured, pass `backend: "vertex"` or `backend: "ai-studio"` to select the matching 2.5 TTS model id. `gemini-3.1-flash-tts-preview` is valid on both backends.
 
 ### Single Speaker
 

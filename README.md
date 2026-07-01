@@ -293,6 +293,8 @@ See [PROMPT_CUSTOMIZATION.md](PROMPT_CUSTOMIZATION.md) for comprehensive guide a
 
 The server exposes ten MCP tools: `query`, `search`, `fetch`, `generate_image`, `generate_speech`, `generate_music`, `generate_video`, `check_video`, `generate_omni_video`, and `reference_search`.
 
+When both Vertex AI and Google AI Studio credentials are configured, `query`, generation tools, and `reference_search` also accept `backend` (`vertex` or `ai-studio`) to route a single request to a specific backend. In single-backend deployments, stray `backend` arguments are ignored.
+
 ### query
 
 Main agentic entrypoint that handles multi-turn execution with automatic tool selection and **multimodal input support**.
@@ -301,6 +303,7 @@ Main agentic entrypoint that handles multi-turn execution with automatic tool se
 - `prompt` (string, required): The text prompt to send
 - `sessionId` (string, optional): Conversation session ID
 - `model` (string, optional): Model override (e.g., `gemini-3.5-flash`, `gemini-3.1-pro-preview`, `gemini-3.1-flash-lite`, `gemini-3.1-pro-preview-customtools`)
+- `backend` (string, optional): Request backend override, `vertex` or `ai-studio` (advertised when both backends are configured)
 - `thinkingLevel` (string, optional): Gemini 3 thinking level. Options: `minimal`, `low`, `medium`, `high`
 - `mediaResolution` (string, optional): Global media resolution for multimodal inputs. Options: `low`, `medium`, `high`
 - `parts` (array, optional): Multimodal content parts (images, audio, video, documents)
@@ -365,7 +368,14 @@ Fetch full content of a search result (OpenAI MCP spec).
 - `id` (string, required): Document ID from search results
 
 **Returns:**
-- `id`, `title`, `text`, `url`, `metadata`
+- `id` (string): Document identifier
+- `title` (string): Document title
+- `text` (string): Full document content
+- `url` (string): Document URL
+- `metadata` (object, optional): Search context from the original `search` result:
+  - `query` (string): Original search query
+  - `timestamp` (string): ISO 8601 timestamp when the search result was cached
+  - `model` (string): Gemini model used for the search
 
 ### generate_image
 
@@ -378,6 +388,7 @@ Generate images from text prompts using Gemini image models.
   - `gemini-3.1-flash-image` — high-efficiency with 0.5K-4K and reference image support
   - `gemini-3.1-flash-lite-image` (Nano Banana 2 Lite) — fast, low-cost GA tier; 1K output only, standard aspect ratios (no `1:4`/`1:8`/`4:1`/`8:1`), no `thinkingLevel`, up to 14 reference images and image editing (recommended replacement for gemini-2.5-flash-image)
   - `gemini-2.5-flash-image` — fast 1K image generation and editing (legacy, retiring 2026-10-02; prefer gemini-3.1-flash-lite-image)
+- `backend` (string, optional): Request backend override, `vertex` or `ai-studio` (advertised when both backends are configured)
 - `aspectRatio` (string, optional): Image aspect ratio. Default: `1:1`. Options: `1:1`, `1:4`, `1:8`, `2:3`, `3:2`, `3:4`, `4:1`, `4:3`, `4:5`, `5:4`, `8:1`, `9:16`, `16:9`, `21:9` (`1:4`, `1:8`, `4:1`, `8:1` require `gemini-3.1-flash-image`)
 - `imageSize` (string, optional): Output resolution. Default: `1K`. Options: `0.5K`, `1K`, `2K`, `4K` (`0.5K` requires `gemini-3.1-flash-image`; `gemini-3.1-flash-lite-image` supports `1K` only; omit for `gemini-2.5-flash-image`)
 - `imagePaths` (array, optional): Local reference images for editing or style transfer (max 14; `gemini-2.5-flash-image` supports at most 3). Supported file types: PNG (`.png`), JPEG (`.jpg`, `.jpeg`), WEBP (`.webp`), HEIC (`.heic`), HEIF (`.heif`)
@@ -408,6 +419,7 @@ Generate speech from text using Gemini TTS models.
 **Parameters:**
 - `prompt` (string, required): Text or transcript to synthesize
 - `model` (string, optional): Speech model. `gemini-3.1-flash-tts-preview` (default) works on both backends. The 2.5 tiers differ per backend: Vertex AI uses `gemini-2.5-flash-tts` / `gemini-2.5-pro-tts`; Google AI Studio uses `gemini-2.5-flash-preview-tts` / `gemini-2.5-pro-preview-tts`
+- `backend` (string, optional): Request backend override, `vertex` or `ai-studio` (advertised when both backends are configured)
 - `voiceName` (string, optional): Prebuilt voice for single-speaker TTS. Default: `Kore`
 - `languageCode` (string, optional): BCP-47 language code
 - `speakers` (array, optional): Exactly two `{ speaker, voiceName }` entries for multi-speaker TTS
@@ -424,6 +436,7 @@ Generate music using Lyria 3 models.
 **Parameters:**
 - `prompt` (string, required): Music generation prompt
 - `model` (string, optional): Music model. Options: `lyria-3-clip-preview` (default), `lyria-3-pro-preview`
+- `backend` (string, optional): Request backend override, `vertex` or `ai-studio` (advertised when both backends are configured)
 - `outputMimeType` (string, optional): Vertex AI mode supports `audio/mp3` only. Gemini API/AI Studio mode supports `audio/mp3`, or `audio/wav` with `lyria-3-pro-preview`
 - `imagePaths` (array, optional): Local image paths for multimodal music generation inputs (max 10). Supported file types: PNG (`.png`), JPEG (`.jpg`, `.jpeg`), WEBP (`.webp`), HEIC (`.heic`), HEIF (`.heif`)
 - `lyrics` (string, optional): User-provided lyrics
@@ -447,29 +460,36 @@ Generate videos from text prompts using Veo video generation models.
 
 **Parameters:**
 - `prompt` (string, required): Video generation prompt describing what to generate
-- `model` (string, optional): Video model to use. Default: `veo-3.1-fast-generate-001`. Options:
-  - `veo-3.1-fast-generate-001` (default) — fast video generation
-  - `veo-3.1-generate-001` — standard quality generation
-  - `veo-3.1-lite-generate-001` — cost-efficient generation
+- `backend` (string, optional): Request backend override, `vertex` or `ai-studio` (advertised when both backends are configured)
+- `model` (string, optional): Video model to use. Defaults to the fast model for the selected backend. Vertex AI options:
+  - `veo-3.1-fast-generate-001`
+  - `veo-3.1-generate-001`
+  - `veo-3.1-lite-generate-001`
+  Google AI Studio options:
+  - `veo-3.1-fast-generate-preview`
+  - `veo-3.1-generate-preview`
+  - `veo-3.1-lite-generate-preview`
 - `aspectRatio` (string, optional): Video aspect ratio. Default: `16:9`. Options: `16:9`, `9:16`
 - `durationSeconds` (string, optional): Video duration. Default: `8`. Options: `4`, `6`, `8` (1080p/4k require 8)
 - `resolution` (string, optional): Video resolution. Default: `720p`. Options: `720p`, `1080p`, `4k` (1080p/4k require 8 second duration)
-- `generateAudio` (boolean, optional): Generate audio for the video. Default: `true`
+- `generateAudio` (boolean, optional): Generate audio for the video. Vertex AI only; Google AI Studio has audio always on
 - `enhancePrompt` (boolean, optional): Use Veo prompt rewriting/enhancement
-- `personGeneration` (string, optional): Person generation control: `allow_adult`, `dont_allow`
+- `personGeneration` (string, optional): Person generation control: `allow_all`, `allow_adult`, `dont_allow`. Google AI Studio accepts `allow_all` for text/video extension and `allow_adult` for image/reference modes
 - `negativePrompt` (string, optional): Description of what to exclude from the video
-- `seed` (number, optional): Random seed for reproducibility
-- `numberOfVideos` (number, optional): Number of videos to generate. Default: `1`
+- `seed` (number, optional): Random seed for reproducibility. Vertex AI only
+- `numberOfVideos` (number, optional): Number of videos to generate. Default: `1`; max `4` on Vertex AI, fixed to `1` on Google AI Studio
 - `imagePath` (string, optional): Local file path of input image for image-to-video generation. Supported file types: PNG (`.png`), JPEG (`.jpg`, `.jpeg`), WEBP (`.webp`)
 - `lastFramePath` (string, optional): Local file path of last frame for interpolation (requires `imagePath`). Same supported image file types as `imagePath`
 - `referenceImagePaths` (array, optional): Local file paths of reference images for style guidance (max 3, Veo 3.1 only). Same supported image file types as `imagePath`
 - `videoPath` (string, optional): Local file path of a Veo-generated 720p MP4 (`.mp4`) video to extend
+- `compressionQuality` (string, optional): Vertex AI output compression quality: `optimized` or `lossless`
+- `resizeMode` (string, optional): Vertex AI image-to-video fit mode for `imagePath`: `crop` or `pad`
 
 **Behavior:**
 - Generated videos are saved to `GEMINI_VIDEO_OUTPUT_DIR` (defaults to `~/Movies/gemini-generated` on macOS, `~/Videos/gemini-generated` on Windows/Linux)
 - `generate_video` returns an operation ID; `check_video` polls the operation and returns saved file paths when complete
 - Supports text-to-video, image-to-video, interpolation, reference image, and Veo video extension modes
-- Veo 3.1 Lite does not support `4k` or reference asset images; model availability can differ between Vertex AI and Google AI Studio
+- Veo 3.1 Lite does not support `4k` or reference asset images; Vertex AI uses `-001` model ids and Google AI Studio uses `-preview` model ids
 - Audio file references are not supported by `generate_video`; describe dialogue, sound effects, and ambience in `prompt`
 
 **Examples:**
@@ -510,6 +530,7 @@ Generate or conversationally edit short videos with Gemini Omni Flash (`gemini-o
 **Parameters:**
 - `prompt` (string, required): Video prompt for a new generation (oneshot), or a natural-language edit instruction when `previousInteractionId` is set
 - `model` (string, optional): Omni video model. Options: `gemini-omni-flash-preview` (default)
+- `backend` (string, optional): Request backend override. Omni Flash defaults to Google AI Studio (`ai-studio`); Vertex AI availability is rolling out
 - `aspectRatio` (string, optional): Aspect ratio. Default: `16:9`. Options: `16:9`, `9:16`. Output is 720p only; clips run a few seconds — steer timing within the `prompt` (Omni Flash has no structured duration parameter)
 - `imagePaths` (array, optional): Local file paths of source/reference images for image-to-video or reference-to-video (max 7). Supported file types: PNG (`.png`), JPEG (`.jpg`, `.jpeg`), WEBP (`.webp`). Omit for interactive edits
 - `previousInteractionId` (string, optional): Interaction ID from a prior `generate_omni_video` call. When set, conversationally edits that video (no image re-upload) instead of generating a new one
@@ -541,6 +562,7 @@ AI-assisted reference search: answer a question from live web sources using Gemi
 
 **Parameters:**
 - `prompt` (string, required): Research question or topic to answer from live web sources
+- `backend` (string, optional): Request backend override, `vertex` or `ai-studio` (advertised when both backends are configured)
 - `model` (string, optional): Gemini model override; must support Google Search grounding (default: server model)
 - `excludeDomains` (array, optional): Domains to exclude from results, e.g. `["reddit.com","pinterest.com"]` (max 2000). **Vertex AI backend only**
 - `blockingConfidence` (string, optional): Block risky/low-quality sites at or above this confidence. Options: `low` (most aggressive), `medium`, `high`. **Vertex AI backend only**

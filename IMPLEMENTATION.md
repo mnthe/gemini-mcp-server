@@ -229,8 +229,8 @@ User Input → Turn 1..10 Loop:
 ### Dependencies
 ```json
 {
-  "@google/genai": "^1.43.0",                 // Google Gen AI SDK
-  "@modelcontextprotocol/sdk": "^1.26.0",     // MCP protocol
+  "@google/genai": "^2.10.0",                 // Google Gen AI SDK
+  "@modelcontextprotocol/sdk": "^1.29.0",     // MCP protocol
   "zod": "^4.3.6",                            // Schema validation (migrated to Zod v4)
   "dotenv": "^17.3.1"                         // Environment variable loading
 }
