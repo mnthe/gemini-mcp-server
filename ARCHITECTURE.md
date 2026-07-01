@@ -4,7 +4,7 @@
 
 The Gemini AI MCP Server implements an **intelligent agentic loop** inspired by the OpenAI Agents SDK. The architecture supports turn-based execution, automatic tool selection, parallel tool execution, and robust error handling.
 
-**Last Updated**: 2026-04-28
+**Last Updated**: 2026-07-01
 
 ## Core Architecture
 
@@ -174,7 +174,8 @@ ARGUMENTS: {"url": "https://example.com", "extract": true}
 - Image generation via native image models
 - Speech generation via Gemini TTS models
 - Music generation via Lyria models
-- Video generation via Veo models
+- Video generation via Veo models (async long-running operations)
+- Omni video generation via Gemini Omni Flash through the Interactions API (synchronous)
 - Response text, image, and audio extraction
 
 **Key Methods**:
@@ -208,6 +209,11 @@ async generateVideo(
 async checkVideoOperation(
   operationId: string
 ): Promise<{ done: boolean; videos?: GeneratedVideo[]; error?: string }>
+
+async generateOmniVideo(
+  prompt: string,
+  options: OmniVideoGenerationOptions
+): Promise<GeneratedOmniVideo>  // Interactions API, synchronous (no operationId)
 ```
 
 **QueryOptions**:
@@ -326,7 +332,36 @@ async handleCheck(
 
 **Configuration**: Uses `config.videoOutputDir` (defaults to `getDefaultVideoDir()` from videoSaver)
 
-### 10. SpeechGenerationHandler (Speech Requests)
+### 10. OmniVideoHandler (Omni Video Requests)
+
+**Location**: `src/handlers/OmniVideoHandler.ts`
+
+**Responsibilities**:
+- Validate and route `generate_omni_video` requests (model `gemini-omni-flash-preview`)
+- Coordinate with GeminiAIService via the Interactions API (`client.interactions.create`)
+- Save the finished video to local filesystem via videoSaver
+- Surface the `interactionId` so callers can chain conversational edits
+
+**Key Method**:
+```typescript
+async handle(
+  input: OmniVideoGenerationInput
+): Promise<{ content: Array<{ type: string; text: string }> }>
+```
+
+**Features**:
+- Non-Veo video model; **synchronous** — returns the finished video in one call (no `operationId`/`check_video` polling), unlike the Veo `generate_video`/`check_video` long-running-operation pipeline
+- Oneshot path: text/image/reference-to-video (`imagePaths` max 7)
+- Interactive editing path: `previousInteractionId` chains up to 3 sequential edits without re-uploading source media
+- Constraints: 720p only, 16:9/9:16, duration 3-10s, audio auto-generated
+- Runs on the Google AI Studio (Gemini API) backend
+
+**Response Format**:
+`generate_omni_video` returns a text block containing JSON: `{ status: 'completed', interactionId, video: { filePath, mimeType }, text?, hint }`.
+
+**Configuration**: Uses `config.videoOutputDir` (defaults to `getDefaultVideoDir()` from videoSaver) — the same output directory as `generate_video`
+
+### 11. SpeechGenerationHandler (Speech Requests)
 
 **Location**: `src/handlers/SpeechGenerationHandler.ts`
 
@@ -339,7 +374,7 @@ async handleCheck(
 
 **Configuration**: Uses `config.speechOutputDir` (defaults to `getDefaultSpeechDir()` from audioSaver)
 
-### 11. MusicGenerationHandler (Music Requests)
+### 12. MusicGenerationHandler (Music Requests)
 
 **Location**: `src/handlers/MusicGenerationHandler.ts`
 
@@ -351,7 +386,7 @@ async handleCheck(
 
 **Configuration**: Uses `config.musicOutputDir` (defaults to `getDefaultMusicDir()` from audioSaver)
 
-### 12. Logger (File-based Logging)
+### 13. Logger (File-based Logging)
 
 **Location**: `src/utils/Logger.ts`
 
@@ -365,7 +400,7 @@ async handleCheck(
 - `logs/general.log`: All logs (info, error, tool calls)
 - `logs/reasoning.log`: Thinking traces only
 
-### 13. Generated File Utilities
+### 14. Generated File Utilities
 
 **Locations**: `src/utils/generatedFileSaver.ts`, `src/utils/imageSaver.ts`, `src/utils/videoSaver.ts`, `src/utils/audioSaver.ts`
 
@@ -517,6 +552,28 @@ function pcmToWav(pcmData: Buffer, options?: WavOptions): Buffer
    └─ text block: JSON { status: "completed", videos: [{ filePath, mimeType }] }
 ```
 
+### Omni Video Generation Flow
+
+```
+1. MCP Client → GeminiAIMCPServer (generate_omni_video tool call)
+   ↓
+2. OmniVideoGenerationSchema.parse(input) → validated OmniVideoGenerationInput
+   ↓
+3. OmniVideoHandler.handle(input)
+   ├─ GeminiAIService.generateOmniVideo(prompt, { model, aspectRatio, durationSeconds, imagePaths, previousInteractionId, systemInstruction, backend })
+   │  ├─ Calls client.interactions.create() → returns the finished video synchronously
+   │  ├─ Oneshot: text or text + inline reference images (imagePaths max 7)
+   │  ├─ Interactive edit: previousInteractionId reuses the prior video (no re-upload)
+   │  └─ Returns { interactionId, video: { data, mimeType }, text? }
+   │
+   ├─ generateVideoFilename(1) → "vid-{timestamp}-001.mp4"
+   ├─ saveVideo(data, videoOutputDir, filename) → saved file path
+   │
+   └─ text block: JSON { status: "completed", interactionId, video: { filePath, mimeType }, text?, hint }
+```
+
+Unlike the Veo pipeline, there is no `operationId` and no `check_video` follow-up call — the video is available immediately.
+
 ### Speech Generation Flow
 
 ```
@@ -608,15 +665,23 @@ Validates the `generate_image` tool input:
 ```typescript
 z.object({
   prompt: z.string(),
-  model: z.enum(['gemini-3-pro-image', 'gemini-3.1-flash-image', 'gemini-2.5-flash-image']).optional(),
+  model: z.enum(['gemini-3-pro-image', 'gemini-3.1-flash-image', 'gemini-3.1-flash-lite-image', 'gemini-2.5-flash-image']).optional(),
   aspectRatio: z.enum(['1:1','1:4','1:8','2:3','3:2','3:4','4:1','4:3','4:5','5:4','8:1','9:16','16:9','21:9']).optional(),
   imageSize: z.enum(['0.5K', '1K', '2K', '4K']).optional(),
   imagePaths: z.array(z.string()).max(14).optional(),
   systemInstruction: z.string().optional(),
-  thinkingLevel: z.enum(['minimal','low','medium','high']).optional(),
+  thinkingLevel: z.enum(['minimal','high']).optional(),
   mediaResolution: z.enum(['low','medium','high']).optional(),
 })
 ```
+
+**Validation Refines**:
+- `aspectRatio` 1:4, 1:8, 4:1, and 8:1 require `model: 'gemini-3.1-flash-image'`
+- `imageSize: '0.5K'` requires `model: 'gemini-3.1-flash-image'`
+- `imageSize` is not supported by `gemini-2.5-flash-image` (fixed 1K output)
+- `gemini-3.1-flash-lite-image` supports `imageSize: '1K'` only (standard ratios; no `thinkingLevel`)
+- `thinkingLevel` is only supported by `gemini-3.1-flash-image`
+- `gemini-2.5-flash-image` accepts at most 3 reference images (other models: 14)
 
 ### VideoGenerationSchema
 
@@ -650,14 +715,40 @@ z.object({
 - `videoPath` requires 720p and returns one extended video
 - Veo 3.1 Lite rejects `4k` and `referenceImagePaths`
 
-### SpeechGenerationSchema
+### OmniVideoGenerationSchema
 
-Validates the `generate_speech` tool input:
+Validates the `generate_omni_video` tool input. `gemini-omni-flash-preview` is a non-Veo video model driven through the Interactions API, so this schema is separate from `VideoGenerationSchema`:
 
 ```typescript
 z.object({
   prompt: z.string(),
-  model: z.enum(['gemini-3.1-flash-tts-preview', 'gemini-2.5-flash-preview-tts', 'gemini-2.5-pro-preview-tts']).optional(),
+  model: z.enum(['gemini-omni-flash-preview']).optional(),
+  backend: z.enum(['vertex', 'ai-studio']).optional(),
+  aspectRatio: z.enum(['16:9', '9:16']).optional(),
+  durationSeconds: z.number().min(3).max(10).optional(),
+  imagePaths: z.array(z.string()).max(7).optional(),      // image/reference-to-video
+  previousInteractionId: z.string().optional(),           // interactive editing (chain up to 3)
+  systemInstruction: z.string().optional(),
+})
+```
+
+**Notes**:
+- Output is 720p only; audio is auto-generated
+- Oneshot vs interactive editing: omit `previousInteractionId` for a new generation; set it to a prior call's `interactionId` to edit that video without re-uploading source media
+- Runs on the Google AI Studio (Gemini API) backend
+
+### SpeechGenerationSchema
+
+Validates the `generate_speech` tool input. The schema is backend-aware: `buildSpeechGenerationSchema(useVertexAI, availableBackends)` (mirroring `buildVideoGenerationSchema`) selects the model enum for the active backend. `SpeechGenerationSchema` is kept as the Vertex default export.
+
+```typescript
+z.object({
+  prompt: z.string(),
+  // Vertex AI GA ids: gemini-2.5-flash-tts, gemini-2.5-pro-tts
+  // Google AI Studio preview ids: gemini-2.5-flash-preview-tts, gemini-2.5-pro-preview-tts
+  // gemini-3.1-flash-tts-preview works on both backends
+  model: z.enum([/* backend-specific TTS ids */]).optional(),
+  backend: z.enum(['vertex', 'ai-studio']).optional(),
   voiceName: z.string().optional(),
   languageCode: z.string().optional(),
   speakers: z.array(z.object({
@@ -668,6 +759,7 @@ z.object({
 ```
 
 **Validation Refines**:
+- `model` must match the selected backend's TTS ids (Vertex AI: `gemini-2.5-flash-tts`/`gemini-2.5-pro-tts`; Google AI Studio: `gemini-2.5-flash-preview-tts`/`gemini-2.5-pro-preview-tts`; `gemini-3.1-flash-tts-preview` works on both)
 - `voiceName` cannot be used with `speakers`; set a voice per speaker instead
 
 ### MusicGenerationSchema
@@ -847,7 +939,7 @@ Each runs as separate process with independent:
 - `utils/` folder (Logger, generated file savers, security validators)
 - `handlers/` folder (QueryHandler, SearchHandler, FetchHandler, generation handlers)
 - Gemini 3 model support (`gemini-3.5-flash` default, `thinkingLevel` API)
-- File-output generation tools (`generate_image`, `generate_video`, `check_video`, `generate_speech`, `generate_music`)
+- File-output generation tools (`generate_image`, `generate_video`, `check_video`, `generate_omni_video`, `generate_speech`, `generate_music`)
 
 **Benefits**:
 - Keyword-based → LLM-driven decisions

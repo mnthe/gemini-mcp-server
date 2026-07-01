@@ -17,17 +17,20 @@ import {
   SearchSchema,
   FetchSchema,
   ImageGenerationSchema,
-  SpeechGenerationSchema,
+  buildSpeechGenerationSchema,
   CheckVideoSchema,
   buildMusicGenerationSchema,
   buildVideoGenerationSchema,
+  OmniVideoGenerationSchema,
   GEMINI_IMAGE_INPUT_FILE_TYPES,
   getAllowedVideoModels,
   getDefaultVideoModel,
+  getAllowedSpeechModels,
   getAllowedMusicOutputMimeTypes,
   ALLOWED_LYRIA_LANGUAGES,
   VEO_IMAGE_INPUT_FILE_TYPES,
   VEO_EXTENSION_VIDEO_FILE_TYPES,
+  OMNI_VIDEO_INPUT_FILE_TYPES,
 } from '../schemas/index.js';
 import { ConversationManager } from '../managers/ConversationManager.js';
 import { GeminiAIService } from '../services/GeminiAIService.js';
@@ -42,6 +45,7 @@ import { ImageGenerationHandler } from '../handlers/ImageGenerationHandler.js';
 import { SpeechGenerationHandler } from '../handlers/SpeechGenerationHandler.js';
 import { MusicGenerationHandler } from '../handlers/MusicGenerationHandler.js';
 import { VideoGenerationHandler } from '../handlers/VideoGenerationHandler.js';
+import { OmniVideoHandler } from '../handlers/OmniVideoHandler.js';
 import { getEffectiveSafeDirectories } from '../utils/fileSecurity.js';
 import { resolveOutputDirs } from '../utils/generatedFileSaver.js';
 
@@ -65,6 +69,7 @@ export class GeminiAIMCPServer {
   private speechGenerationHandler: SpeechGenerationHandler;
   private musicGenerationHandler: MusicGenerationHandler;
   private videoGenerationHandler: VideoGenerationHandler;
+  private omniVideoHandler: OmniVideoHandler;
 
   // Cache
   private searchCache: Map<string, CachedDocument>;
@@ -126,6 +131,7 @@ export class GeminiAIMCPServer {
     this.speechGenerationHandler = new SpeechGenerationHandler(this.geminiAI, config);
     this.musicGenerationHandler = new MusicGenerationHandler(this.geminiAI, config);
     this.videoGenerationHandler = new VideoGenerationHandler(this.geminiAI, config);
+    this.omniVideoHandler = new OmniVideoHandler(this.geminiAI, config);
 
     this.setupHandlers();
   }
@@ -149,6 +155,9 @@ export class GeminiAIMCPServer {
         : getAllowedVideoModels(this.config.useVertexAI);
       const defaultVideoModel = getDefaultVideoModel(this.config.useVertexAI);
       const maxVideoCount = dual ? 4 : (this.config.useVertexAI ? 4 : 1);
+      const speechModelEnum = dual
+        ? Array.from(new Set([...getAllowedSpeechModels(true), ...getAllowedSpeechModels(false)]))
+        : getAllowedSpeechModels(this.config.useVertexAI);
       const musicOutputMimeTypes = dual ? ['audio/mp3', 'audio/wav'] : getAllowedMusicOutputMimeTypes(this.config.useVertexAI);
       const musicOutputMimeDescription = dual
         ? "Optional output MIME type. Vertex AI supports audio/mp3 only; Google AI Studio supports audio/wav for lyria-3-pro-preview."
@@ -279,8 +288,10 @@ export class GeminiAIMCPServer {
           name: "generate_image",
           description:
             "Generate images using Gemini's native image generation (Nano Banana). " +
-            "Supports gemini-3-pro-image, gemini-3.1-flash-image, and gemini-2.5-flash-image models. " +
-            "gemini-2.5-flash-image supports at most 3 reference images and does not support imageSize; gemini-3.1-flash-image is required for 0.5K and 1:4/1:8/4:1/8:1 ratios. " +
+            "Supports gemini-3-pro-image, gemini-3.1-flash-image, gemini-3.1-flash-lite-image, and gemini-2.5-flash-image models. " +
+            "gemini-3.1-flash-lite-image (Nano Banana 2 Lite) is the fast, low-cost GA tier: 1K output only, standard aspect ratios (no 1:4/1:8/4:1/8:1), no thinkingLevel, up to 14 reference images. " +
+            "gemini-3.1-flash-image is required for 0.5K and 1:4/1:8/4:1/8:1 ratios. " +
+            "gemini-2.5-flash-image (legacy, retires 2026-10-02) supports at most 3 reference images and does not support imageSize. " +
             `Reference images use imagePaths and must be ${GEMINI_IMAGE_INPUT_FILE_TYPES}. ` +
             "Audio and video reference files are not accepted by generate_image. " +
             `Images are saved to ${this.imageGenerationHandler.getImageOutputDir()} and returned as base64.`,
@@ -294,8 +305,8 @@ export class GeminiAIMCPServer {
               },
               model: {
                 type: "string",
-                enum: ["gemini-3-pro-image", "gemini-3.1-flash-image", "gemini-2.5-flash-image"],
-                description: "Image model (default: gemini-3-pro-image; gemini-2.5-flash-image supports at most 3 reference images and does not support imageSize, and retires 2026-10-02 — prefer gemini-3.1-flash-image)",
+                enum: ["gemini-3-pro-image", "gemini-3.1-flash-image", "gemini-3.1-flash-lite-image", "gemini-2.5-flash-image"],
+                description: "Image model (default: gemini-3-pro-image). gemini-3.1-flash-lite-image = fast/low-cost GA tier (1K only, no thinkingLevel, no 1:4/1:8/4:1/8:1 ratios). gemini-2.5-flash-image = legacy (at most 3 reference images, no imageSize, retires 2026-10-02) — prefer gemini-3.1-flash-lite-image.",
               },
               aspectRatio: {
                 type: "string",
@@ -305,7 +316,7 @@ export class GeminiAIMCPServer {
               imageSize: {
                 type: "string",
                 enum: ["0.5K", "1K", "2K", "4K"],
-                description: "Resolution (0.5K requires gemini-3.1-flash-image, default: 1K)",
+                description: "Resolution (0.5K requires gemini-3.1-flash-image; gemini-3.1-flash-lite-image supports 1K only; default: 1K)",
               },
               imagePaths: {
                 type: "array",
@@ -348,8 +359,8 @@ export class GeminiAIMCPServer {
               },
               model: {
                 type: "string",
-                enum: ["gemini-3.1-flash-tts-preview", "gemini-2.5-flash-preview-tts", "gemini-2.5-pro-preview-tts"],
-                description: "Speech model (default: gemini-3.1-flash-tts-preview)",
+                enum: speechModelEnum,
+                description: "Speech model (default: gemini-3.1-flash-tts-preview, valid on both backends). Vertex AI uses GA ids gemini-2.5-flash-tts/gemini-2.5-pro-tts; Google AI Studio uses gemini-2.5-flash-preview-tts/gemini-2.5-pro-preview-tts.",
               },
               voiceName: {
                 type: "string",
@@ -575,6 +586,58 @@ export class GeminiAIMCPServer {
             required: ["operationId"],
           },
         },
+        {
+          name: "generate_omni_video",
+          description:
+            "Generate or conversationally edit short videos with Gemini Omni Flash (gemini-omni-flash-preview). " +
+            "This is a NON-Veo model on the Google AI Studio (Gemini API) backend and does NOT use generate_video/check_video: it returns the finished video synchronously in one call (no operationId polling). " +
+            "Two paths: (1) ONESHOT generation — text-to-video, or image/reference-to-video via imagePaths (max 7); " +
+            "(2) INTERACTIVE editing — set previousInteractionId to an id returned by a prior call to edit that video with a natural-language instruction (no image re-upload; chain up to 3 sequential edits). " +
+            "Constraints: 720p output only; aspect ratio 16:9 or 9:16; duration 3-10 seconds; a synced audio track is generated automatically (audio reference inputs are not accepted — describe dialogue/SFX/ambience in the prompt). " +
+            `Image source file types: ${OMNI_VIDEO_INPUT_FILE_TYPES}. ` +
+            `The response includes interactionId (pass it back as previousInteractionId to edit) and the saved file path. Videos are saved to ${this.omniVideoHandler.getVideoOutputDir()}.`,
+          inputSchema: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              prompt: {
+                type: "string",
+                description: "Video prompt for a new generation (oneshot), or a natural-language edit instruction when previousInteractionId is set (interactive editing). Describe dialogue/SFX/ambience as text; audio reference files are not accepted.",
+              },
+              model: {
+                type: "string",
+                enum: ["gemini-omni-flash-preview"],
+                description: "Omni video model (default: gemini-omni-flash-preview)",
+              },
+              aspectRatio: {
+                type: "string",
+                enum: ["16:9", "9:16"],
+                description: "Aspect ratio (default: 16:9). Omni Flash supports 16:9 and 9:16 only.",
+              },
+              durationSeconds: {
+                type: "number",
+                minimum: 3,
+                maximum: 10,
+                description: "Video duration in seconds (3-10; default: model default). Output is 720p only.",
+              },
+              imagePaths: {
+                type: "array",
+                items: { type: "string" },
+                maxItems: 7,
+                description: `Local file paths of source/reference images for image-to-video or reference-to-video (max 7). Supported file types: ${OMNI_VIDEO_INPUT_FILE_TYPES}. Omit for interactive edits — previousInteractionId reuses the prior video.`,
+              },
+              previousInteractionId: {
+                type: "string",
+                description: "Interaction ID from a prior generate_omni_video call. When set, conversationally edits that video (no image re-upload) instead of generating a new one.",
+              },
+              systemInstruction: {
+                type: "string",
+                description: "Optional system instruction to steer generation or editing",
+              },
+            },
+            required: ["prompt"],
+          },
+        },
       ];
 
       // When more than one backend is configured, advertise the per-request
@@ -586,6 +649,7 @@ export class GeminiAIMCPServer {
           "generate_speech",
           "generate_video",
           "generate_music",
+          "generate_omni_video",
         ]);
         for (const tool of tools) {
           if (backendTools.has(tool.name)) {
@@ -633,7 +697,7 @@ export class GeminiAIMCPServer {
           }
 
           case "generate_speech": {
-            const input = SpeechGenerationSchema.parse(args);
+            const input = buildSpeechGenerationSchema(this.config.useVertexAI, this.config.availableBackends).parse(args);
             return await this.speechGenerationHandler.handle(input);
           }
 
@@ -650,6 +714,11 @@ export class GeminiAIMCPServer {
           case "check_video": {
             const input = CheckVideoSchema.parse(args);
             return await this.videoGenerationHandler.handleCheck(input);
+          }
+
+          case "generate_omni_video": {
+            const input = OmniVideoGenerationSchema.parse(args);
+            return await this.omniVideoHandler.handle(input);
           }
 
           default:

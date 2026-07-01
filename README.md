@@ -8,7 +8,7 @@ This server provides:
 - **Agentic Loop**: Turn-based execution with automatic tool selection and reasoning
 - **Query Gemini**: Access Gemini models via Vertex AI or Google AI Studio
 - **Multimodal Support**: Send images, audio, video, and code files alongside text prompts
-- **Image Generation**: Generate images using Gemini image models (gemini-3-pro-image, gemini-3.1-flash-image, gemini-2.5-flash-image)
+- **Image Generation**: Generate images using Gemini image models (gemini-3-pro-image, gemini-3.1-flash-image, gemini-3.1-flash-lite-image, gemini-2.5-flash-image)
 - **Speech & Music Generation**: Generate TTS audio with Gemini TTS and music with Lyria
 - **Tool Execution**: Built-in WebFetch + integration with external MCP servers
 - **Multi-turn Conversations**: Maintain context across queries with session management
@@ -58,7 +58,8 @@ Full support for Gemini 3 generation models:
 Generate images directly from text prompts using Gemini image models:
 - **gemini-3-pro-image**: Professional asset production with 4K resolution support (default)
 - **gemini-3.1-flash-image**: High-efficiency generation with 0.5K-4K resolution and reference images
-- **gemini-2.5-flash-image**: Fast 1K image generation and editing (retiring 2026-10-02; prefer gemini-3.1-flash-image)
+- **gemini-3.1-flash-lite-image** (Nano Banana 2 Lite): Fast, low-cost GA tier — 1K output only, standard aspect ratios, up to 14 reference images, image editing (recommended replacement for gemini-2.5-flash-image)
+- **gemini-2.5-flash-image**: Fast 1K image generation and editing (legacy, retiring 2026-10-02; prefer gemini-3.1-flash-lite-image)
 - Configurable aspect ratios: 1:1, 16:9, 9:16, 4:3, and more
 - Images automatically saved to configurable output directory
 
@@ -286,7 +287,7 @@ See [PROMPT_CUSTOMIZATION.md](PROMPT_CUSTOMIZATION.md) for comprehensive guide a
 
 ## Available Tools
 
-The server exposes eight MCP tools: `query`, `search`, `fetch`, `generate_image`, `generate_speech`, `generate_music`, `generate_video`, and `check_video`.
+The server exposes nine MCP tools: `query`, `search`, `fetch`, `generate_image`, `generate_speech`, `generate_music`, `generate_video`, `check_video`, and `generate_omni_video`.
 
 ### query
 
@@ -371,9 +372,10 @@ Generate images from text prompts using Gemini image models.
 - `model` (string, optional): Image model to use. Options:
   - `gemini-3-pro-image` (default) — professional quality, supports up to 4K resolution
   - `gemini-3.1-flash-image` — high-efficiency with 0.5K-4K and reference image support
-  - `gemini-2.5-flash-image` — fast 1K image generation and editing (retiring 2026-10-02; prefer gemini-3.1-flash-image)
+  - `gemini-3.1-flash-lite-image` (Nano Banana 2 Lite) — fast, low-cost GA tier; 1K output only, standard aspect ratios (no `1:4`/`1:8`/`4:1`/`8:1`), no `thinkingLevel`, up to 14 reference images and image editing (recommended replacement for gemini-2.5-flash-image)
+  - `gemini-2.5-flash-image` — fast 1K image generation and editing (legacy, retiring 2026-10-02; prefer gemini-3.1-flash-lite-image)
 - `aspectRatio` (string, optional): Image aspect ratio. Default: `1:1`. Options: `1:1`, `1:4`, `1:8`, `2:3`, `3:2`, `3:4`, `4:1`, `4:3`, `4:5`, `5:4`, `8:1`, `9:16`, `16:9`, `21:9` (`1:4`, `1:8`, `4:1`, `8:1` require `gemini-3.1-flash-image`)
-- `imageSize` (string, optional): Output resolution. Default: `1K`. Options: `0.5K`, `1K`, `2K`, `4K` (`0.5K` requires `gemini-3.1-flash-image`; omit for `gemini-2.5-flash-image`)
+- `imageSize` (string, optional): Output resolution. Default: `1K`. Options: `0.5K`, `1K`, `2K`, `4K` (`0.5K` requires `gemini-3.1-flash-image`; `gemini-3.1-flash-lite-image` supports `1K` only; omit for `gemini-2.5-flash-image`)
 - `imagePaths` (array, optional): Local reference images for editing or style transfer (max 14; `gemini-2.5-flash-image` supports at most 3). Supported file types: PNG (`.png`), JPEG (`.jpg`, `.jpeg`), WEBP (`.webp`), HEIC (`.heic`), HEIF (`.heif`)
 - `systemInstruction` (string, optional): System instruction for Gemini 3 image models
 - `thinkingLevel` (string, optional): Gemini 3.1 Flash Image thinking level: `minimal` or `high`
@@ -401,7 +403,7 @@ Generate speech from text using Gemini TTS models.
 
 **Parameters:**
 - `prompt` (string, required): Text or transcript to synthesize
-- `model` (string, optional): Speech model. Options: `gemini-3.1-flash-tts-preview` (default), `gemini-2.5-flash-preview-tts`, `gemini-2.5-pro-preview-tts`
+- `model` (string, optional): Speech model. `gemini-3.1-flash-tts-preview` (default) works on both backends. The 2.5 tiers differ per backend: Vertex AI uses `gemini-2.5-flash-tts` / `gemini-2.5-pro-tts`; Google AI Studio uses `gemini-2.5-flash-preview-tts` / `gemini-2.5-pro-preview-tts`
 - `voiceName` (string, optional): Prebuilt voice for single-speaker TTS. Default: `Kore`
 - `languageCode` (string, optional): BCP-47 language code
 - `speakers` (array, optional): Exactly two `{ speaker, voiceName }` entries for multi-speaker TTS
@@ -495,6 +497,41 @@ referenceImagePaths: ["/path/to/style1.jpg", "/path/to/style2.jpg"]
 generate_video: "Follow the subject as the scene continues into the hallway"
 videoPath: "/path/to/previous-veo-output.mp4"
 resolution: "720p"
+```
+
+### generate_omni_video
+
+Generate or conversationally edit short videos with Gemini Omni Flash (`gemini-omni-flash-preview`). This is a **non-Veo** video model on the Google AI Studio (Gemini API) backend, using the Interactions API. Unlike `generate_video`/`check_video`, it is **synchronous** — a single call returns the finished, saved video (no operation ID, no polling).
+
+**Parameters:**
+- `prompt` (string, required): Video prompt for a new generation (oneshot), or a natural-language edit instruction when `previousInteractionId` is set
+- `model` (string, optional): Omni video model. Options: `gemini-omni-flash-preview` (default)
+- `aspectRatio` (string, optional): Aspect ratio. Default: `16:9`. Options: `16:9`, `9:16`
+- `durationSeconds` (number, optional): Video duration in seconds. Options: `3`–`10`. Output is 720p only
+- `imagePaths` (array, optional): Local file paths of source/reference images for image-to-video or reference-to-video (max 7). Supported file types: PNG (`.png`), JPEG (`.jpg`, `.jpeg`), WEBP (`.webp`). Omit for interactive edits
+- `previousInteractionId` (string, optional): Interaction ID from a prior `generate_omni_video` call. When set, conversationally edits that video (no image re-upload) instead of generating a new one
+- `systemInstruction` (string, optional): System instruction to steer generation or editing
+
+**Behavior:**
+- Two paths: (1) **oneshot** generation — text-to-video, or image/reference-to-video via `imagePaths`; (2) **interactive** editing — set `previousInteractionId` to edit a prior video with a natural-language instruction (no image re-upload; chain up to 3 sequential edits)
+- 720p output only; a synced audio track is generated automatically (audio reference inputs are not accepted — describe dialogue, sound effects, and ambience in `prompt`)
+- Generated videos are saved to `GEMINI_VIDEO_OUTPUT_DIR` (defaults to `~/Movies/gemini-generated` on macOS, `~/Videos/gemini-generated` on Windows/Linux)
+- The response includes `interactionId` (pass it back as `previousInteractionId` to edit) and the saved video file path
+
+**Examples:**
+```
+# Oneshot text-to-video
+generate_omni_video: "A golden retriever surfing a wave at sunset"
+aspectRatio: "16:9"
+durationSeconds: 8
+
+# Image-to-video
+generate_omni_video: "Animate this scene with gentle camera motion"
+imagePaths: ["/path/to/frame.png"]
+
+# Interactive edit of a prior result
+generate_omni_video: "Make it night time and add rain"
+previousInteractionId: "<interactionId from previous call>"
 ```
 
 ## Security

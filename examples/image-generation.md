@@ -40,13 +40,14 @@ The response contains:
 
 ## Model Selection
 
-Three image generation models are available:
+Four image generation models are available:
 
 | Model | Description |
 |-------|-------------|
 | `gemini-3-pro-image` | Default. Professional asset production, supports up to 4K resolution |
 | `gemini-3.1-flash-image` | High-efficiency with 0.5K-4K, reference images, and new aspect ratios |
-| `gemini-2.5-flash-image` | Fast 1K image generation and editing (retiring 2026-10-02; prefer gemini-3.1-flash-image) |
+| `gemini-3.1-flash-lite-image` | Nano Banana 2 Lite. Fast, low-cost GA tier: 1K only, standard aspect ratios, no thinking, up to 14 reference images, editing |
+| `gemini-2.5-flash-image` | Fast 1K image generation and editing (retiring 2026-10-02; prefer gemini-3.1-flash-lite-image) |
 
 ```typescript
 const request = {
@@ -54,6 +55,19 @@ const request = {
   arguments: {
     prompt: "A photorealistic portrait of a red fox in a forest",
     model: "gemini-3.1-flash-image"
+  }
+};
+```
+
+For fast, low-cost 1K images, use `gemini-3.1-flash-lite-image`. It outputs 1K only, so omit `imageSize` (or set it to `1K`), and it accepts standard aspect ratios only.
+
+```typescript
+const request = {
+  name: "generate_image",
+  arguments: {
+    prompt: "A friendly cartoon mascot waving, flat vector style",
+    model: "gemini-3.1-flash-lite-image",
+    aspectRatio: "1:1"
   }
 };
 ```
@@ -110,7 +124,7 @@ The `imageSize` parameter sets the output resolution. Defaults to `1K`.
 | Value | Resolution | Supported Models |
 |-------|------------|-----------------|
 | `0.5K` | ~512px | `gemini-3.1-flash-image` |
-| `1K` | ~1024px (default) | `gemini-3-pro-image`, `gemini-3.1-flash-image`; omit `imageSize` for `gemini-2.5-flash-image` |
+| `1K` | ~1024px (default) | `gemini-3-pro-image`, `gemini-3.1-flash-image`, `gemini-3.1-flash-lite-image` (only 1K); omit `imageSize` for `gemini-2.5-flash-image` |
 | `2K` | ~2048px | `gemini-3-pro-image`, `gemini-3.1-flash-image` |
 | `4K` | ~4096px | `gemini-3-pro-image` or `gemini-3.1-flash-image` |
 
