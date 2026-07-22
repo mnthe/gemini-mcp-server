@@ -43,9 +43,9 @@ Inspired by OpenAI Agents SDK, the server operates as an autonomous agent:
 
 ### 🔮 Gemini 3 Model Support
 Full support for Gemini 3 generation models:
-- **gemini-3.5-flash**: Default model — fast and capable
+- **gemini-3.6-flash**: Default model — efficient agentic and multimodal workhorse
 - **gemini-3.1-pro-preview**: High-capability reasoning model
-- **gemini-3.1-flash-lite**: Cost-efficient multimodal model for high-volume workloads
+- **gemini-3.5-flash-lite**: Fast, cost-efficient multimodal model for high-volume workloads
 - **gemini-3.1-pro-preview-customtools**: Agentic endpoint optimized for custom tools
 - **thinkingLevel**: Per-query thinking budget control for Gemini 3 models
 - **GEMINI_MEDIA_RESOLUTION**: Control media quality for multimodal inputs
@@ -154,12 +154,14 @@ export GOOGLE_GENAI_USE_VERTEXAI="false"
 
 **Optional Model Settings:**
 ```bash
-export GEMINI_MODEL="gemini-3.5-flash"  # Default model
+export GEMINI_MODEL="gemini-3.6-flash"  # Default model
 export GEMINI_TEMPERATURE="1.0"
 export GEMINI_MAX_TOKENS="8192"
 export GEMINI_TOP_P="0.95"
 export GEMINI_TOP_K="40"
 ```
+
+Sampling overrides are sent only to older models that support them. Gemini 3.6 Flash and Gemini 3.5 Flash-Lite use their model defaults.
 
 **Optional Agentic Features:**
 ```bash
@@ -224,7 +226,7 @@ Add to your MCP client configuration:
       "env": {
         "GOOGLE_CLOUD_PROJECT": "your-gcp-project-id",
         "GOOGLE_CLOUD_LOCATION": "us-central1",
-        "GEMINI_MODEL": "gemini-3.5-flash",
+        "GEMINI_MODEL": "gemini-3.6-flash",
         "GEMINI_ENABLE_CONVERSATIONS": "true"
       }
     }
@@ -242,7 +244,7 @@ Add to your MCP client configuration:
       "env": {
         "GOOGLE_CLOUD_PROJECT": "your-gcp-project-id",
         "GOOGLE_CLOUD_LOCATION": "us-central1",
-        "GEMINI_MODEL": "gemini-3.5-flash"
+        "GEMINI_MODEL": "gemini-3.6-flash"
       }
     }
   }
@@ -302,7 +304,7 @@ Main agentic entrypoint that handles multi-turn execution with automatic tool se
 **Parameters:**
 - `prompt` (string, required): The text prompt to send
 - `sessionId` (string, optional): Conversation session ID
-- `model` (string, optional): Model override (e.g., `gemini-3.5-flash`, `gemini-3.1-pro-preview`, `gemini-3.1-flash-lite`, `gemini-3.1-pro-preview-customtools`)
+- `model` (string, optional): Model override (e.g., `gemini-3.6-flash`, `gemini-3.5-flash-lite`, `gemini-3.1-pro-preview`, `gemini-3.1-pro-preview-customtools`)
 - `backend` (string, optional): Request backend override, `vertex` or `ai-studio` (advertised when both backends are configured)
 - `thinkingLevel` (string, optional): Gemini 3 thinking level. Options: `minimal`, `low`, `medium`, `high`
 - `mediaResolution` (string, optional): Global media resolution for multimodal inputs. Options: `low`, `medium`, `high`

@@ -65,7 +65,7 @@ export function loadConfig(): GeminiAIConfig {
   const location = process.env.GOOGLE_CLOUD_LOCATION || "global";
 
   // Model and parameters - use GEMINI_* environment variables
-  const model = process.env.GEMINI_MODEL || "gemini-3.5-flash";
+  const model = process.env.GEMINI_MODEL || "gemini-3.6-flash";
   const temperature = parseFloat(process.env.GEMINI_TEMPERATURE || "1.0");
   const maxTokens = parseInt(process.env.GEMINI_MAX_TOKENS || "8192", 10);
   const topP = parseFloat(process.env.GEMINI_TOP_P || "0.95");

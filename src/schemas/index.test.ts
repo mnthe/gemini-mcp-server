@@ -14,15 +14,15 @@ import {
 } from './index.js';
 
 describe('QuerySchema model controls', () => {
-  it('accepts Gemini 3.1 Flash-Lite and request-level controls', () => {
+  it('accepts Gemini 3.5 Flash-Lite and request-level controls', () => {
     const parsed = QuerySchema.parse({
       prompt: 'Summarize this image',
-      model: 'gemini-3.1-flash-lite',
+      model: 'gemini-3.5-flash-lite',
       thinkingLevel: 'medium',
       mediaResolution: 'high',
     });
 
-    expect(parsed.model).toBe('gemini-3.1-flash-lite');
+    expect(parsed.model).toBe('gemini-3.5-flash-lite');
     expect(parsed.thinkingLevel).toBe('medium');
     expect(parsed.mediaResolution).toBe('high');
   });

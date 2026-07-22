@@ -384,15 +384,15 @@ const response = await client.callTool({
 
 Multimodal support requires using a Gemini model that supports multimodal inputs. Recommended models:
 
-- `gemini-3.5-flash` (default, strong multimodal and agentic support)
+- `gemini-3.6-flash` (default, strong multimodal and agentic support)
 - `gemini-3.1-pro-preview` (high-capability reasoning and multimodal support)
-- `gemini-3.1-flash-lite` (cost-efficient multimodal support)
+- `gemini-3.5-flash-lite` (fast, cost-efficient multimodal support)
 - `gemini-2.5-pro` (stable production-ready multimodal support)
 
 Set your model in the environment:
 
 ```bash
-export GEMINI_MODEL="gemini-3.5-flash"
+export GEMINI_MODEL="gemini-3.6-flash"
 ```
 
 ## File Size Limits
@@ -417,7 +417,7 @@ export GEMINI_MODEL="gemini-3.5-flash"
 
 3. **Batch Related Queries**: Send multiple related files in one query rather than separate queries
 
-4. **Choose the Right Model**: Use models with multimodal capabilities (e.g., `gemini-3.5-flash`, `gemini-3.1-pro-preview`, `gemini-3.1-flash-lite`)
+4. **Choose the Right Model**: Use models with multimodal capabilities (e.g., `gemini-3.6-flash`, `gemini-3.1-pro-preview`, `gemini-3.5-flash-lite`)
 
 5. **Validate MIME Types**: Ensure you're using supported MIME types from the list above
 

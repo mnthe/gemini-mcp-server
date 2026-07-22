@@ -677,7 +677,7 @@ Validates the `query` tool input:
 z.object({
   prompt: z.string(),
   sessionId: z.string().optional(),
-  model: z.string().optional(),  // e.g., 'gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite'
+  model: z.string().optional(),  // e.g., 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro-preview'
   thinkingLevel: z.enum(['minimal','low','medium','high']).optional(),
   mediaResolution: z.enum(['low','medium','high']).optional(),
   parts: z.array(MultimodalPartSchema).optional(),
@@ -970,7 +970,7 @@ Each runs as separate process with independent:
 - `errors/` folder (SecurityError, ModelBehaviorError)
 - `utils/` folder (Logger, generated file savers, security validators)
 - `handlers/` folder (QueryHandler, SearchHandler, FetchHandler, generation handlers)
-- Gemini 3 model support (`gemini-3.5-flash` default, `thinkingLevel` API)
+- Gemini 3 model support (`gemini-3.6-flash` default, `thinkingLevel` API)
 - File-output generation tools (`generate_image`, `generate_video`, `check_video`, `generate_omni_video`, `generate_speech`, `generate_music`)
 
 **Benefits**:

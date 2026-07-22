@@ -22,8 +22,8 @@ describe('isGemini3Model regex pattern', () => {
     expect(isGemini3Pattern.test('gemini-3-flash-preview')).toBe(true);
   });
 
-  it('matches gemini-3.5-flash', () => {
-    expect(isGemini3Pattern.test('gemini-3.5-flash')).toBe(true);
+  it('matches gemini-3.6-flash', () => {
+    expect(isGemini3Pattern.test('gemini-3.6-flash')).toBe(true);
   });
 
   it('matches gemini-3-pro-image', () => {
@@ -62,7 +62,7 @@ describe('ThinkingLevel enum from SDK', () => {
 });
 
 describe('default model configuration', () => {
-  it('defaults to gemini-3.5-flash', async () => {
+  it('defaults to gemini-3.6-flash', async () => {
     // Save and clear env
     const savedModel = process.env.GEMINI_MODEL;
     const savedProject = process.env.GOOGLE_CLOUD_PROJECT;
@@ -75,7 +75,7 @@ describe('default model configuration', () => {
       // Dynamic import to get fresh module
       const { loadConfig } = await import('../config/index.js');
       const config = loadConfig();
-      expect(config.model).toBe('gemini-3.5-flash');
+      expect(config.model).toBe('gemini-3.6-flash');
       expect(config.useVertexAI).toBe(true);
     } finally {
       // Restore env
@@ -93,6 +93,84 @@ describe('default model configuration', () => {
         delete process.env.GOOGLE_GENAI_USE_VERTEXAI;
       }
     }
+  });
+});
+
+describe('query sampling parameter compatibility', () => {
+  function createService(model: string) {
+    const service = new GeminiAIService({
+      projectId: 'test-project',
+      location: 'global',
+      useVertexAI: true,
+      defaultBackend: 'vertex',
+      availableBackends: ['vertex'],
+      model,
+      temperature: 0.7,
+      maxTokens: 8192,
+      topP: 0.95,
+      topK: 40,
+      enableConversations: false,
+      sessionTimeout: 3600000,
+      maxHistory: 100,
+      enableReasoning: false,
+      maxReasoningSteps: 5,
+      disableLogging: true,
+      logToStderr: false,
+      allowFileUris: false,
+    });
+    const generateContent = vi.fn().mockResolvedValue({ text: 'ok' });
+    (service as any).clientFor = () => ({ models: { generateContent } });
+    return { service, generateContent };
+  }
+
+  it.each(['gemini-3.6-flash', 'gemini-3.5-flash-lite'])(
+    'omits deprecated sampling parameters for %s',
+    async (model) => {
+      const { service, generateContent } = createService(model);
+
+      await service.query('hello');
+
+      const config = generateContent.mock.calls[0][0].config;
+      expect(config).not.toHaveProperty('temperature');
+      expect(config).not.toHaveProperty('topP');
+      expect(config).not.toHaveProperty('topK');
+      expect(config.maxOutputTokens).toBe(8192);
+    }
+  );
+
+  it('keeps supported sampling parameters for earlier models', async () => {
+    const { service, generateContent } = createService('gemini-2.5-flash');
+
+    await service.query('hello');
+
+    expect(generateContent.mock.calls[0][0].config).toMatchObject({
+      temperature: 0.7,
+      topP: 0.95,
+      topK: 40,
+      maxOutputTokens: 8192,
+    });
+  });
+
+  it('keeps temperature and topP but omits fixed topK for earlier Gemini 3 models', async () => {
+    const { service, generateContent } = createService('gemini-3.5-flash');
+
+    await service.query('hello');
+
+    const config = generateContent.mock.calls[0][0].config;
+    expect(config).toMatchObject({ temperature: 0.7, topP: 0.95, maxOutputTokens: 8192 });
+    expect(config).not.toHaveProperty('topK');
+  });
+
+  it('uses the request-level model override for sampling compatibility', async () => {
+    const { service, generateContent } = createService('gemini-2.5-flash');
+
+    await service.query('hello', { model: 'gemini-3.6-flash' });
+
+    const request = generateContent.mock.calls[0][0];
+    expect(request.model).toBe('gemini-3.6-flash');
+    expect(request.config).not.toHaveProperty('temperature');
+    expect(request.config).not.toHaveProperty('topP');
+    expect(request.config).not.toHaveProperty('topK');
   });
 });
 
@@ -255,7 +333,7 @@ describe('generateVideo backend compatibility', () => {
       location: 'us-central1',
       apiKey: 'test-api-key',
       useVertexAI: true,
-      model: 'gemini-3.5-flash',
+      model: 'gemini-3.6-flash',
       temperature: 0.7,
       maxTokens: 8192,
       topP: 0.95,
@@ -397,7 +475,7 @@ describe('generateOmniVideo (Interactions API)', () => {
       useVertexAI: false,
       defaultBackend: 'ai-studio',
       availableBackends: ['ai-studio'],
-      model: 'gemini-3.5-flash',
+      model: 'gemini-3.6-flash',
       temperature: 0.7,
       maxTokens: 8192,
       topP: 0.95,
@@ -512,7 +590,7 @@ describe('referenceSearch (Google Search grounding)', () => {
       location: 'us-central1',
       apiKey: 'test-api-key',
       useVertexAI: true,
-      model: 'gemini-3.5-flash',
+      model: 'gemini-3.6-flash',
       temperature: 0.7,
       maxTokens: 8192,
       topP: 0.95,
@@ -569,6 +647,7 @@ describe('referenceSearch (Google Search grounding)', () => {
 
     const params = generateContent.mock.calls[0][0];
     const googleSearch = params.config.tools[0].googleSearch;
+    expect(params.config).not.toHaveProperty('temperature');
     expect(googleSearch.excludeDomains).toEqual(['reddit.com']);
     expect(googleSearch.blockingConfidence).toBe('BLOCK_MEDIUM_AND_ABOVE');
     expect(googleSearch.searchTypes).toEqual({ webSearch: {}, imageSearch: {} });

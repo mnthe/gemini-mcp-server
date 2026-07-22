@@ -236,6 +236,26 @@ export class GeminiAIService {
   }
 
   /**
+   * Gemini 3.6 Flash, 3.5 Flash-Lite, and later model generations ignore
+   * sampling overrides and may reject them in future API revisions.
+   */
+  private supportsSamplingParameters(modelOverride?: string): boolean {
+    const model = (modelOverride || this.config.model).toLowerCase();
+    if (/^gemini[-_]?3\.5-flash-lite(?:-|$)/.test(model)) {
+      return false;
+    }
+
+    const version = model.match(/^gemini[-_]?(\d+)(?:\.(\d+))?/);
+    if (!version) {
+      return true;
+    }
+
+    const major = Number(version[1]);
+    const minor = Number(version[2] || 0);
+    return major < 3 || (major === 3 && minor < 6);
+  }
+
+  /**
    * Query Gemini with a prompt and optional multimodal content
    */
   async query(
@@ -247,15 +267,18 @@ export class GeminiAIService {
       const effectiveModel = options.model || this.config.model;
 
       const config: GenerateContentConfig = {
-        temperature: this.config.temperature,
         maxOutputTokens: this.config.maxTokens,
-        topP: this.config.topP,
       };
 
-      // Gemini 3 exposes topK as a fixed model default. Sending a custom value
-      // can be rejected by newer model endpoints, so only send it to older models.
-      if (!this.isGemini3Model(effectiveModel)) {
-        config.topK = this.config.topK;
+      if (this.supportsSamplingParameters(effectiveModel)) {
+        config.temperature = this.config.temperature;
+        config.topP = this.config.topP;
+
+        // Gemini 3 exposes topK as a fixed model default. Sending a custom value
+        // can be rejected by newer model endpoints, so only send it to older models.
+        if (!this.isGemini3Model(effectiveModel)) {
+          config.topK = this.config.topK;
+        }
       }
 
       const mediaResolution = this.resolveMediaResolution(
@@ -1030,10 +1053,12 @@ export class GeminiAIService {
     }
 
     const config: GenerateContentConfig = {
-      temperature: this.config.temperature,
       maxOutputTokens: this.config.maxTokens,
       tools,
     };
+    if (this.supportsSamplingParameters(model)) {
+      config.temperature = this.config.temperature;
+    }
     if (options.systemInstruction) {
       config.systemInstruction = options.systemInstruction;
     }
