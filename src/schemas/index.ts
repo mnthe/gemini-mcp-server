@@ -55,7 +55,7 @@ const MultimodalPartSchema = z.object({
 export const QuerySchema = z.object({
   prompt: z.string().describe("The text prompt to send to the model"),
   sessionId: z.string().optional().describe("Optional conversation session ID for multi-turn conversations"),
-  model: z.string().optional().describe("Optional model override (e.g., gemini-3.5-flash, gemini-3.1-pro-preview, gemini-3.1-flash-lite, gemini-3.1-pro-preview-customtools)"),
+  model: z.string().optional().describe("Optional model override (e.g., gemini-3.6-flash, gemini-3.5-flash-lite, gemini-3.1-pro-preview, gemini-3.1-pro-preview-customtools)"),
   backend: z.enum(['vertex', 'ai-studio']).optional()
     .describe("Optional backend override ('vertex' | 'ai-studio'); defaults to the server's configured backend"),
   thinkingLevel: z.enum(['minimal', 'low', 'medium', 'high', 'MINIMAL', 'LOW', 'MEDIUM', 'HIGH']).optional()
