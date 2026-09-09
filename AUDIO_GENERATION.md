@@ -3,7 +3,7 @@
 The server provides two file-based audio generation tools:
 
 - `generate_speech`: Gemini TTS text-to-speech output, saved as WAV
-- `generate_music`: Lyria music generation output, saved as MP3; Gemini API/AI Studio mode can request WAV for `lyria-3-pro-preview`
+- `generate_music`: Lyria music generation output, saved as MP3; Gemini API/AI Studio mode can request WAV for `lyria-3-pro-preview` or `lyria-3.5`
 
 Both tools save generated files to disk and return MCP `audio` content blocks with base64-encoded audio data.
 
@@ -98,6 +98,7 @@ Use `generate_music` for Lyria music generation.
 |-------|--------|-------|
 | `lyria-3-clip-preview` | MP3 | Default. Short 30-second clips, loops, and previews |
 | `lyria-3-pro-preview` | MP3; WAV in Gemini API/AI Studio mode | Full-length songs with more structure; Vertex AI mode supports MP3 only |
+| `lyria-3.5` | MP3 or WAV | AI Studio only; uses the Interactions API for full songs, lyrics, and optional image inputs |
 
 ### Clip
 

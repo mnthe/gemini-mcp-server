@@ -337,7 +337,7 @@ async handleCheck(
 **Location**: `src/handlers/OmniVideoHandler.ts`
 
 **Responsibilities**:
-- Validate and route `generate_omni_video` requests (model `gemini-omni-flash-preview`)
+- Validate and route `generate_omni_video` requests (model `gemini-omni-1.1-flash`)
 - Coordinate with GeminiAIService via the Interactions API (`client.interactions.create`)
 - Save the finished video to local filesystem via videoSaver
 - Surface the `interactionId` so callers can chain conversational edits
@@ -677,7 +677,7 @@ Validates the `query` tool input:
 z.object({
   prompt: z.string(),
   sessionId: z.string().optional(),
-  model: z.string().optional(),  // e.g., 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro-preview'
+  model: z.string().optional(),  // e.g., 'gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-pro-preview'
   thinkingLevel: z.enum(['minimal','low','medium','high']).optional(),
   mediaResolution: z.enum(['low','medium','high']).optional(),
   parts: z.array(MultimodalPartSchema).optional(),
@@ -751,12 +751,13 @@ z.object({
 
 ### OmniVideoGenerationSchema
 
-Validates the `generate_omni_video` tool input. `gemini-omni-flash-preview` is a non-Veo video model driven through the Interactions API, so this schema is separate from `VideoGenerationSchema`:
+Validates the `generate_omni_video` tool input. `gemini-omni-1.1-flash` is a non-Veo video model driven through the Interactions API, so this schema is separate from `VideoGenerationSchema`:
 
 ```typescript
 z.object({
   prompt: z.string(),
-  model: z.enum(['gemini-omni-flash-preview']).optional(),
+  model: z.enum(['gemini-omni-1.1-flash', 'gemini-omni-flash-preview']).optional(),
+  resolution: z.enum(['360p', '720p', '1080p', '4k']).optional(), // Omni 1.1 only
   backend: z.enum(['vertex', 'ai-studio']).optional(),     // defaults to ai-studio (Vertex not supported yet)
   aspectRatio: z.enum(['16:9', '9:16']).optional(),
   imagePaths: z.array(z.string()).max(7).optional(),      // image/reference-to-video
@@ -765,7 +766,7 @@ z.object({
 ```
 
 **Notes**:
-- Output is 720p only; audio is auto-generated. Clips run a few seconds — Omni Flash exposes no structured `duration` or `system_instruction` (both unsupported by the model), so steer timing/tone within `prompt`
+- Output defaults to 720p; Omni 1.1 also supports 360p, 1080p, and 4k (1080p/4k are upscaled); audio is auto-generated. Clips run a few seconds — Omni Flash exposes no structured `duration` or `system_instruction` (both unsupported by the model), so steer timing/tone within `prompt`
 - Oneshot vs interactive editing: omit `previousInteractionId` for a new generation; set it to a prior call's `interactionId` to edit that video without re-uploading source media
 - Runs on the Google AI Studio (Gemini API) backend only, and defaults to it regardless of the server's default backend (Vertex AI availability is deferred until it rolls out)
 
@@ -801,7 +802,7 @@ Validates the `generate_music` tool input:
 ```typescript
 z.object({
   prompt: z.string(),
-  model: z.enum(['lyria-3-clip-preview', 'lyria-3-pro-preview']).optional(),
+  model: z.enum(['lyria-3-clip-preview', 'lyria-3-pro-preview', 'lyria-3.5']).optional(),
   outputMimeType: z.enum(['audio/mp3', 'audio/wav']).optional(),
   imagePaths: z.array(z.string()).max(10).optional(),
   lyrics: z.string().optional(),
@@ -814,8 +815,9 @@ z.object({
 ```
 
 **Validation Refines**:
-- `outputMimeType: 'audio/wav'` requires `model: 'lyria-3-pro-preview'`
-- `durationSeconds` requires `model: 'lyria-3-pro-preview'`
+- `outputMimeType: 'audio/wav'` requires `model: 'lyria-3-pro-preview'` or `model: 'lyria-3.5'` (AI Studio only)
+- `durationSeconds` requires `model: 'lyria-3-pro-preview'` or `model: 'lyria-3.5'` (AI Studio only)
+- `lyria-3.5` is advertised only when AI Studio is configured and uses the Interactions API; other music models use GenerateContent
 - `instrumental` cannot be combined with `lyrics` or `vocalStyle`
 
 ### SearchSchema / FetchSchema
@@ -970,7 +972,7 @@ Each runs as separate process with independent:
 - `errors/` folder (SecurityError, ModelBehaviorError)
 - `utils/` folder (Logger, generated file savers, security validators)
 - `handlers/` folder (QueryHandler, SearchHandler, FetchHandler, generation handlers)
-- Gemini 3 model support (`gemini-3.6-flash` default, `thinkingLevel` API)
+- Gemini 3 model support (`gemini-3.8-flash` default, `thinkingLevel` API)
 - File-output generation tools (`generate_image`, `generate_video`, `check_video`, `generate_omni_video`, `generate_speech`, `generate_music`)
 
 **Benefits**:

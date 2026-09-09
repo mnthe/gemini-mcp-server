@@ -28,6 +28,7 @@ export class OmniVideoHandler {
     const result = await this.geminiService.generateOmniVideo(input.prompt, {
       model: input.model,
       aspectRatio: input.aspectRatio,
+      resolution: input.resolution,
       imagePaths: input.imagePaths,
       previousInteractionId: input.previousInteractionId,
       backend: input.backend,

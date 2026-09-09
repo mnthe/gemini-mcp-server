@@ -60,6 +60,7 @@ export interface GeneratedVideo {
 export interface OmniVideoGenerationOptions {
   model?: string;
   aspectRatio?: string;
+  resolution?: string;
   imagePaths?: string[];
   previousInteractionId?: string;
   backend?: Backend;
@@ -145,7 +146,7 @@ export interface QueryOptions {
    * - MINIMAL: Absolute minimum thinking
    * - LOW: Minimizes latency and cost
    * - MEDIUM: Balanced reasoning
-   * - HIGH: Maximizes reasoning depth (default for Gemini 3)
+   * - HIGH: Maximizes reasoning depth (server default except Flash 3.8, which uses MEDIUM)
    * Note: For Gemini 2.5 models, use enableThinking with thinkingBudget
    */
   thinkingLevel?: ThinkingLevel | string;
@@ -227,12 +228,20 @@ export class GeminiAIService {
   }
 
   /**
-   * Check if the model is a Gemini 3 series model
-   * Gemini 3 models use thinkingLevel instead of thinkingBudget
+   * Gemini 3 and Robotics ER 2 use thinkingLevel instead of thinkingBudget.
    */
-  private isGemini3Model(modelOverride?: string): boolean {
+  private supportsThinkingLevel(modelOverride?: string): boolean {
     const model = (modelOverride || this.config.model).toLowerCase();
-    return /gemini[-_]?3/.test(model);
+    return /gemini[-_]?3/.test(model) || model === 'gemini-robotics-er-2-preview';
+  }
+
+  private resolveQueryThinkingLevel(model: string, level?: ThinkingLevel | string): ThinkingLevel {
+    const normalizedModel = model.toLowerCase();
+    const resolved = this.resolveThinkingLevel(level);
+    if (/gemini-3\.[78]-flash(?:-|$)/.test(normalizedModel) && resolved === ThinkingLevel.MINIMAL) {
+      throw new Error(`thinkingLevel='minimal' is not supported by ${model}; use low, medium, or high.`);
+    }
+    return resolved ?? (/gemini-3\.8-flash(?:-|$)/.test(normalizedModel) ? ThinkingLevel.MEDIUM : ThinkingLevel.HIGH);
   }
 
   /**
@@ -276,7 +285,7 @@ export class GeminiAIService {
 
         // Gemini 3 exposes topK as a fixed model default. Sending a custom value
         // can be rejected by newer model endpoints, so only send it to older models.
-        if (!this.isGemini3Model(effectiveModel)) {
+        if (!this.supportsThinkingLevel(effectiveModel)) {
           config.topK = this.config.topK;
         }
       }
@@ -290,11 +299,11 @@ export class GeminiAIService {
 
       // Enable thinking mode if requested
       if (options.enableThinking) {
-        if (this.isGemini3Model(effectiveModel)) {
+        if (this.supportsThinkingLevel(effectiveModel)) {
           // Gemini 3 models use thinkingLevel instead of thinkingBudget
           // Note: Cannot disable thinking for Gemini 3 Pro
           config.thinkingConfig = {
-            thinkingLevel: this.resolveThinkingLevel(options.thinkingLevel) ?? ThinkingLevel.HIGH,
+            thinkingLevel: this.resolveQueryThinkingLevel(effectiveModel, options.thinkingLevel),
           };
         } else {
           // Gemini 2.5 and earlier use thinkingBudget
@@ -611,6 +620,34 @@ export class GeminiAIService {
     options: MusicGenerationOptions = {}
   ): Promise<{ audios: GeneratedAudio[]; text?: string }> {
     const model = options.model || 'lyria-3-clip-preview';
+    const backend = this.resolveBackend(options.backend);
+    if (model === 'lyria-3.5' && backend !== 'ai-studio') {
+      throw new Error('lyria-3.5 requires the Google AI Studio backend; set backend=ai-studio.');
+    }
+    const client = this.clientFor(backend);
+    const contents = this.buildContentsWithInlineFiles(this.buildMusicPrompt(prompt, options), options.imagePaths);
+    if (model === 'lyria-3.5') {
+      // The GenerateContent SDK drops responseFormat on AI Studio. Interactions
+      // supports explicit MP3/WAV formatting and inline audio delivery.
+      const input = typeof contents === 'string' ? contents : contents[0].parts.map((part: Part) =>
+        part.inlineData
+          ? { type: 'image', data: part.inlineData.data, mime_type: part.inlineData.mimeType }
+          : { type: 'text', text: part.text }
+      );
+      const interaction = await client.interactions.create({
+        model,
+        input,
+        response_format: { type: 'audio', mime_type: options.outputMimeType || 'audio/mp3', delivery: 'inline' },
+      });
+      const audio = interaction.output_audio;
+      if (!audio?.data) {
+        throw new Error(`Lyria 3.5 returned no audio (status: ${interaction.status ?? 'unknown'})`);
+      }
+      return {
+        audios: [{ data: Buffer.from(audio.data, 'base64'), mimeType: audio.mime_type || options.outputMimeType || 'audio/mp3' }],
+        text: interaction.output_text,
+      };
+    }
     const config: GenerateContentConfig = {
       responseModalities: ['AUDIO', 'TEXT'],
     };
@@ -619,13 +656,9 @@ export class GeminiAIService {
       config.responseMimeType = options.outputMimeType;
     }
 
-    const client = this.clientFor(this.resolveBackend(options.backend));
     const response = await client.models.generateContent({
       model,
-      contents: this.buildContentsWithInlineFiles(
-        this.buildMusicPrompt(prompt, options),
-        options.imagePaths
-      ),
+      contents,
       config,
     });
 
@@ -929,20 +962,22 @@ export class GeminiAIService {
     prompt: string,
     options: OmniVideoGenerationOptions = {}
   ): Promise<GeneratedOmniVideo> {
-    // Omni Flash (gemini-omni-flash-preview) is served on Google AI Studio
+    // Omni Flash is served on Google AI Studio
     // (Gemini API) only; it is not available on Vertex AI yet. Default to
     // ai-studio rather than the server default backend so a Vertex-default setup
     // still reaches Omni; an explicit backend override is honored for when Vertex
     // availability rolls out.
     const backend = options.backend ?? 'ai-studio';
     const client = this.clientFor(backend);
-    const model = options.model || 'gemini-omni-flash-preview';
+    const model = options.model || 'gemini-omni-1.1-flash';
 
-    // Video output format. Omni Flash documents only type and aspect_ratio here;
-    // duration is not a structured field (steer clip timing within the prompt).
+    // Duration is steered within the prompt, not through a structured field.
     const responseFormat: any = { type: 'video' };
     if (options.aspectRatio) {
       responseFormat.aspect_ratio = options.aspectRatio;
+    }
+    if (options.resolution) {
+      responseFormat.resolution = options.resolution;
     }
 
     // Input is a plain string for text-to-video / interactive edits, or text plus
@@ -1062,9 +1097,9 @@ export class GeminiAIService {
     if (options.systemInstruction) {
       config.systemInstruction = options.systemInstruction;
     }
-    if (this.isGemini3Model(model)) {
+    if (this.supportsThinkingLevel(model)) {
       config.thinkingConfig = {
-        thinkingLevel: this.resolveThinkingLevel(options.thinkingLevel) ?? ThinkingLevel.HIGH,
+        thinkingLevel: this.resolveQueryThinkingLevel(model, options.thinkingLevel),
       };
     }
 

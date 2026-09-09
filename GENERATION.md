@@ -110,14 +110,14 @@ Detailed guide: [AUDIO_GENERATION.md](AUDIO_GENERATION.md)
 | Parameter | Type | Notes |
 |-----------|------|-------|
 | `prompt` | string | Required |
-| `model` | enum | `lyria-3-clip-preview`, `lyria-3-pro-preview` |
-| `outputMimeType` | enum | Vertex AI: `audio/mp3` only. Gemini API/AI Studio: `audio/mp3`, or `audio/wav` with `lyria-3-pro-preview` |
+| `model` | enum | `lyria-3-clip-preview` (default), `lyria-3-pro-preview`, `lyria-3.5` (AI Studio only) |
+| `outputMimeType` | enum | Vertex AI: `audio/mp3` only. Gemini API/AI Studio: `audio/mp3`, or `audio/wav` with `lyria-3-pro-preview` or `lyria-3.5` |
 | `imagePaths` | string[] | Optional image-guided Lyria inputs, max 10. Supported file types: PNG (`.png`), JPEG (`.jpg`, `.jpeg`), WEBP (`.webp`), HEIC (`.heic`), HEIF (`.heif`) |
 | `lyrics` | string | Optional user-provided lyrics |
 | `instrumental` | boolean | Requests instrumental-only output; cannot be combined with lyrics/vocals |
 | `vocalStyle` | string | Optional vocal direction |
 | `language` | enum | Optional output language direction: English, German, Spanish, French, Hindi, Japanese, Korean, Portuguese |
-| `durationSeconds` | number | Optional target duration; requires `lyria-3-pro-preview`; max 184 seconds |
+| `durationSeconds` | number | Optional target duration; requires `lyria-3-pro-preview` or `lyria-3.5`; server limit 184 seconds |
 | `bpm` | number | Optional tempo direction |
 | `intensity` | enum | `low`, `medium`, `high` |
 
@@ -221,12 +221,13 @@ More examples: [examples/video-generation.md](examples/video-generation.md)
 
 ## generate_omni_video
 
-`generate_omni_video` generates or conversationally edits short videos with Gemini Omni Flash (`gemini-omni-flash-preview`). This is a NON-Veo model on the Google AI Studio (Gemini API) backend and does not use `generate_video`/`check_video`: it returns the finished, saved video synchronously in one call, with no `operationId` and no `check_video` polling.
+`generate_omni_video` generates or conversationally edits short videos with Gemini Omni Flash (`gemini-omni-1.1-flash`). This is a NON-Veo model on the Google AI Studio (Gemini API) backend and does not use `generate_video`/`check_video`: it returns the finished, saved video synchronously in one call, with no `operationId` and no `check_video` polling.
 
 | Parameter | Type | Notes |
 |-----------|------|-------|
 | `prompt` | string | Required. Generation prompt (oneshot) or a natural-language edit instruction when `previousInteractionId` is set |
-| `model` | enum | `gemini-omni-flash-preview` |
+| `model` | enum | `gemini-omni-1.1-flash` (default), `gemini-omni-flash-preview` (deprecated on 2026-09-30) |
+| `resolution` | enum | Omni 1.1 only: `360p`, `720p` (default), `1080p`, `4k`; 1080p/4k are upscaled |
 | `backend` | enum | Optional override. Defaults to `ai-studio`; Vertex AI availability is rolling out |
 | `aspectRatio` | enum | `16:9`, `9:16` |
 | `imagePaths` | string[] | Optional source/reference images for image-to-video or reference-to-video, max 7. Supported file types: PNG (`.png`), JPEG (`.jpg`, `.jpeg`), WEBP (`.webp`) |
@@ -237,7 +238,7 @@ Two paths:
 - Oneshot: text-to-video, or image/reference-to-video with `imagePaths`. Omit `previousInteractionId`.
 - Interactive editing: set `previousInteractionId` to an id returned by a prior call to edit that video with a natural-language instruction. No image re-upload; chain up to 3 sequential edits.
 
-Output is 720p only and clips run a few seconds; Omni Flash has no structured duration parameter, so steer pacing/timing within `prompt`. A synced audio track is generated automatically; audio reference inputs are not accepted, so describe dialogue, sound effects, and ambience in `prompt` as text. The response text includes `interactionId` (pass it back as `previousInteractionId` to edit) and the saved file path.
+Output defaults to 720p; Omni 1.1 also supports 360p, 1080p, and 4k (1080p/4k are upscaled) and clips run a few seconds; Omni Flash has no structured duration parameter, so steer pacing/timing within `prompt`. A synced audio track is generated automatically; audio reference inputs are not accepted, so describe dialogue, sound effects, and ambience in `prompt` as text. The response text includes `interactionId` (pass it back as `previousInteractionId` to edit) and the saved file path.
 
 Oneshot:
 
