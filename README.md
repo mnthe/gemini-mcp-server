@@ -43,10 +43,12 @@ Inspired by OpenAI Agents SDK, the server operates as an autonomous agent:
 
 ### 🔮 Gemini 3 Model Support
 Full support for Gemini 3 generation models:
-- **gemini-3.6-flash**: Default model — efficient agentic and multimodal workhorse
+- **gemini-3.8-flash**: Default model for coding, reasoning, and multimodal tasks
+- **gemini-3.7-flash**: Previous Flash generation, selectable per request
 - **gemini-3.1-pro-preview**: High-capability reasoning model
 - **gemini-3.5-flash-lite**: Fast, cost-efficient multimodal model for high-volume workloads
 - **gemini-3.1-pro-preview-customtools**: Agentic endpoint optimized for custom tools
+- **gemini-robotics-er-2-preview**: Spatial reasoning through `query` with `backend: "ai-studio"`
 - **thinkingLevel**: Per-query thinking budget control for Gemini 3 models
 - **GEMINI_MEDIA_RESOLUTION**: Control media quality for multimodal inputs
 
@@ -66,7 +68,7 @@ Generate images directly from text prompts using Gemini image models:
 ### 🎧 Audio Generation
 Generate file-based audio outputs:
 - **generate_speech**: Gemini TTS single-speaker or two-speaker speech, saved as WAV
-- **generate_music**: Lyria 3 music generation, saved as MP3; Gemini API/AI Studio mode can request WAV for `lyria-3-pro-preview`
+- **generate_music**: Lyria 3 music generation, saved as MP3; Gemini API/AI Studio mode can request WAV for `lyria-3-pro-preview` or `lyria-3.5`
 - Speech defaults to `~/Music/gemini-generated/speech`; music defaults to `~/Music/gemini-generated/music`
 - Generation failures return structured MCP error content with `status`, `tool`, `errorType`, `message`, and validation `issues` when available
 - See [GENERATION.md](GENERATION.md), [AUDIO_GENERATION.md](AUDIO_GENERATION.md), [examples/audio-generation.md](examples/audio-generation.md), and [examples/video-generation.md](examples/video-generation.md)
@@ -154,14 +156,14 @@ export GOOGLE_GENAI_USE_VERTEXAI="false"
 
 **Optional Model Settings:**
 ```bash
-export GEMINI_MODEL="gemini-3.6-flash"  # Default model
+export GEMINI_MODEL="gemini-3.8-flash"  # Default model
 export GEMINI_TEMPERATURE="1.0"
 export GEMINI_MAX_TOKENS="8192"
 export GEMINI_TOP_P="0.95"
 export GEMINI_TOP_K="40"
 ```
 
-Sampling overrides are sent only to older models that support them. Gemini 3.6 Flash and Gemini 3.5 Flash-Lite use their model defaults.
+Sampling overrides are sent only to older models that support them. Gemini 3.6/3.7/3.8 Flash and Gemini 3.5 Flash-Lite use their model defaults.
 
 **Optional Agentic Features:**
 ```bash
@@ -225,8 +227,8 @@ Add to your MCP client configuration:
       "args": ["-y", "github:mnthe/gemini-mcp-server"],
       "env": {
         "GOOGLE_CLOUD_PROJECT": "your-gcp-project-id",
-        "GOOGLE_CLOUD_LOCATION": "us-central1",
-        "GEMINI_MODEL": "gemini-3.6-flash",
+        "GOOGLE_CLOUD_LOCATION": "global",
+        "GEMINI_MODEL": "gemini-3.8-flash",
         "GEMINI_ENABLE_CONVERSATIONS": "true"
       }
     }
@@ -243,8 +245,8 @@ Add to your MCP client configuration:
       "args": ["-y", "github:mnthe/gemini-mcp-server"],
       "env": {
         "GOOGLE_CLOUD_PROJECT": "your-gcp-project-id",
-        "GOOGLE_CLOUD_LOCATION": "us-central1",
-        "GEMINI_MODEL": "gemini-3.6-flash"
+        "GOOGLE_CLOUD_LOCATION": "global",
+        "GEMINI_MODEL": "gemini-3.8-flash"
       }
     }
   }
@@ -272,7 +274,7 @@ You can run multiple Gemini servers with different personas for specialized task
       "args": ["-y", "github:mnthe/gemini-mcp-server"],
       "env": {
         "GOOGLE_CLOUD_PROJECT": "your-project-id",
-        "GOOGLE_CLOUD_LOCATION": "us-central1",
+        "GOOGLE_CLOUD_LOCATION": "global",
         "GEMINI_SYSTEM_PROMPT": "You are a code review specialist. Focus on code quality, security, and best practices. You have access to the following tools:"
       }
     },
@@ -281,7 +283,7 @@ You can run multiple Gemini servers with different personas for specialized task
       "args": ["-y", "github:mnthe/gemini-mcp-server"],
       "env": {
         "GOOGLE_CLOUD_PROJECT": "your-project-id",
-        "GOOGLE_CLOUD_LOCATION": "us-central1",
+        "GOOGLE_CLOUD_LOCATION": "global",
         "GEMINI_SYSTEM_PROMPT": "You are an academic research assistant. Cite sources and provide comprehensive analysis. You have access to the following tools:"
       }
     }
@@ -304,9 +306,9 @@ Main agentic entrypoint that handles multi-turn execution with automatic tool se
 **Parameters:**
 - `prompt` (string, required): The text prompt to send
 - `sessionId` (string, optional): Conversation session ID
-- `model` (string, optional): Model override (e.g., `gemini-3.6-flash`, `gemini-3.5-flash-lite`, `gemini-3.1-pro-preview`, `gemini-3.1-pro-preview-customtools`)
+- `model` (string, optional): Model override (e.g., `gemini-3.8-flash`, `gemini-3.7-flash`, `gemini-3.5-flash-lite`, `gemini-3.1-pro-preview`, `gemini-3.1-pro-preview-customtools`)
 - `backend` (string, optional): Request backend override, `vertex` or `ai-studio` (advertised when both backends are configured)
-- `thinkingLevel` (string, optional): Gemini 3 thinking level. Options: `minimal`, `low`, `medium`, `high`
+- `thinkingLevel` (string, optional): Gemini 3 thinking level. Options: `minimal`, `low`, `medium`, `high`; Flash 3.7/3.8 reject `minimal`. Flash 3.8 defaults to `medium`
 - `mediaResolution` (string, optional): Global media resolution for multimodal inputs. Options: `low`, `medium`, `high`
 - `parts` (array, optional): Multimodal content parts (images, audio, video, documents)
 
@@ -437,15 +439,15 @@ Generate music using Lyria 3 models.
 
 **Parameters:**
 - `prompt` (string, required): Music generation prompt
-- `model` (string, optional): Music model. Options: `lyria-3-clip-preview` (default), `lyria-3-pro-preview`
+- `model` (string, optional): Music model. Options: `lyria-3-clip-preview` (default), `lyria-3-pro-preview`, `lyria-3.5` (AI Studio only)
 - `backend` (string, optional): Request backend override, `vertex` or `ai-studio` (advertised when both backends are configured)
-- `outputMimeType` (string, optional): Vertex AI mode supports `audio/mp3` only. Gemini API/AI Studio mode supports `audio/mp3`, or `audio/wav` with `lyria-3-pro-preview`
+- `outputMimeType` (string, optional): Vertex AI mode supports `audio/mp3` only. Gemini API/AI Studio mode supports `audio/mp3`, or `audio/wav` with `lyria-3-pro-preview` or `lyria-3.5`
 - `imagePaths` (array, optional): Local image paths for multimodal music generation inputs (max 10). Supported file types: PNG (`.png`), JPEG (`.jpg`, `.jpeg`), WEBP (`.webp`), HEIC (`.heic`), HEIF (`.heif`)
 - `lyrics` (string, optional): User-provided lyrics
 - `instrumental` (boolean, optional): Request instrumental-only output; cannot be combined with `lyrics` or `vocalStyle`
 - `vocalStyle` (string, optional): Vocal generation direction
 - `language` (string, optional): Output language direction. Options: English, German, Spanish, French, Hindi, Japanese, Korean, Portuguese
-- `durationSeconds` (number, optional): Target duration in seconds; requires `lyria-3-pro-preview`; max 184 seconds
+- `durationSeconds` (number, optional): Target duration in seconds; requires `lyria-3-pro-preview` or `lyria-3.5`; server limit 184 seconds
 - `bpm` (number, optional): Tempo direction in beats per minute
 - `intensity` (string, optional): `low`, `medium`, or `high`
 
@@ -527,19 +529,20 @@ resolution: "720p"
 
 ### generate_omni_video
 
-Generate or conversationally edit short videos with Gemini Omni Flash (`gemini-omni-flash-preview`). This is a **non-Veo** video model on the Google AI Studio (Gemini API) backend, using the Interactions API. Unlike `generate_video`/`check_video`, it is **synchronous** — a single call returns the finished, saved video (no operation ID, no polling).
+Generate or conversationally edit short videos with Gemini Omni Flash (`gemini-omni-1.1-flash`). This is a **non-Veo** video model on the Google AI Studio (Gemini API) backend, using the Interactions API. Unlike `generate_video`/`check_video`, it is **synchronous** — a single call returns the finished, saved video (no operation ID, no polling).
 
 **Parameters:**
 - `prompt` (string, required): Video prompt for a new generation (oneshot), or a natural-language edit instruction when `previousInteractionId` is set
-- `model` (string, optional): Omni video model. Options: `gemini-omni-flash-preview` (default)
+- `model` (string, optional): Omni video model. Options: `gemini-omni-1.1-flash` (default), `gemini-omni-flash-preview` (deprecated on 2026-09-30)
 - `backend` (string, optional): Request backend override. Omni Flash defaults to Google AI Studio (`ai-studio`); Vertex AI availability is rolling out
-- `aspectRatio` (string, optional): Aspect ratio. Default: `16:9`. Options: `16:9`, `9:16`. Output is 720p only; clips run a few seconds — steer timing within the `prompt` (Omni Flash has no structured duration parameter)
+- `aspectRatio` (string, optional): Aspect ratio. Default: `16:9`. Options: `16:9`, `9:16`. Clips run a few seconds — steer timing within the `prompt` (Omni Flash has no structured duration parameter)
 - `imagePaths` (array, optional): Local file paths of source/reference images for image-to-video or reference-to-video (max 7). Supported file types: PNG (`.png`), JPEG (`.jpg`, `.jpeg`), WEBP (`.webp`). Omit for interactive edits
+- `resolution` (string, optional): `360p`, `720p` (default), `1080p`, or `4k`; requires Omni 1.1. 1080p/4k are upscaled.
 - `previousInteractionId` (string, optional): Interaction ID from a prior `generate_omni_video` call. When set, conversationally edits that video (no image re-upload) instead of generating a new one
 
 **Behavior:**
 - Two paths: (1) **oneshot** generation — text-to-video, or image/reference-to-video via `imagePaths`; (2) **interactive** editing — set `previousInteractionId` to edit a prior video with a natural-language instruction (no image re-upload; chain up to 3 sequential edits)
-- 720p output only; a synced audio track is generated automatically (audio reference inputs are not accepted — describe dialogue, sound effects, and ambience in `prompt`)
+- 720p by default; a synced audio track is generated automatically (audio reference inputs are not accepted — describe dialogue, sound effects, and ambience in `prompt`)
 - Generated videos are saved to `GEMINI_VIDEO_OUTPUT_DIR` (defaults to `~/Movies/gemini-generated` on macOS, `~/Videos/gemini-generated` on Windows/Linux)
 - The response includes `interactionId` (pass it back as `previousInteractionId` to edit) and the saved video file path
 
@@ -572,7 +575,7 @@ AI-assisted reference search: answer a question from live web sources using Gemi
 - `includeImages` (boolean, optional): Also enable image-search grounding in addition to web search
 - `urls` (array, optional): Specific http(s) URLs to ground the answer on via URL context (max 20). **Google AI Studio backend only** — the URL context tool is not available on Vertex AI
 - `systemInstruction` (string, optional): System instruction to steer the tone, depth, or scope of the answer
-- `thinkingLevel` (string, optional): Gemini 3 thinking level override. Options: `minimal`, `low`, `medium`, `high`
+- `thinkingLevel` (string, optional): Gemini 3 thinking level override. Options: `minimal`, `low`, `medium`, `high`; Flash 3.7/3.8 reject `minimal`. Flash 3.8 defaults to `medium`
 
 **Behavior:**
 - Returns a JSON payload: `answer` (synthesized text), `citations` (deduped `{index,title,uri,domain}` sources), `supports` (answer segments mapped to citation indices with confidence scores), `searchQueries` (the queries the model actually ran), and `searchSuggestionsHtml` (Google's required Search Suggestions markup to display alongside the answer)

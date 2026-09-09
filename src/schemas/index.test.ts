@@ -476,6 +476,19 @@ describe('buildSpeechGenerationSchema per-backend TTS models', () => {
 });
 
 describe('OmniVideoGenerationSchema', () => {
+  it('accepts Omni 1.1 and retains the preview model', () => {
+    for (const model of ['gemini-omni-1.1-flash', 'gemini-omni-flash-preview']) {
+      expect(OmniVideoGenerationSchema.parse({ prompt: 'a fox running', model }).model).toBe(model);
+    }
+  });
+
+  it('accepts GA resolutions but rejects resolution controls on the preview model', () => {
+    for (const resolution of ['360p', '720p', '1080p', '4k']) {
+      expect(OmniVideoGenerationSchema.parse({ prompt: 'x', resolution }).resolution).toBe(resolution);
+    }
+    expect(() => OmniVideoGenerationSchema.parse({ prompt: 'x', model: 'gemini-omni-flash-preview', resolution: '1080p' })).toThrow();
+    expect(() => OmniVideoGenerationSchema.parse({ prompt: 'x', resolution: '8k' })).toThrow();
+  });
   it('accepts a oneshot generation with reference images', () => {
     const parsed = OmniVideoGenerationSchema.parse({
       prompt: 'a fox darting through snow',
@@ -645,6 +658,14 @@ describe('buildReferenceSearchSchema per-backend tuning', () => {
 });
 
 describe('MusicGenerationSchema Lyria models', () => {
+  it('accepts Lyria 3.5 with duration and WAV on AI Studio only', () => {
+    const input = { prompt: 'a full song', model: 'lyria-3.5', durationSeconds: 120, outputMimeType: 'audio/wav' };
+    expect(buildMusicGenerationSchema(false).parse(input).model).toBe('lyria-3.5');
+    expect(() => MusicGenerationSchema.parse({ prompt: 'song', model: 'lyria-3.5' })).toThrow();
+    const dual = buildMusicGenerationSchema(true, ['vertex', 'ai-studio']);
+    expect(dual.parse({ ...input, backend: 'ai-studio' }).model).toBe('lyria-3.5');
+    expect(() => dual.parse({ prompt: 'song', model: 'lyria-3.5', backend: 'vertex' })).toThrow();
+  });
   it('accepts Vertex Lyria 3 MP3 output and supported language', () => {
     const parsed = MusicGenerationSchema.parse({
       prompt: 'A cinematic orchestral track',

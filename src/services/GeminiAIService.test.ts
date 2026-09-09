@@ -62,7 +62,7 @@ describe('ThinkingLevel enum from SDK', () => {
 });
 
 describe('default model configuration', () => {
-  it('defaults to gemini-3.6-flash', async () => {
+  it('defaults to gemini-3.8-flash', async () => {
     // Save and clear env
     const savedModel = process.env.GEMINI_MODEL;
     const savedProject = process.env.GOOGLE_CLOUD_PROJECT;
@@ -75,7 +75,7 @@ describe('default model configuration', () => {
       // Dynamic import to get fresh module
       const { loadConfig } = await import('../config/index.js');
       const config = loadConfig();
-      expect(config.model).toBe('gemini-3.6-flash');
+      expect(config.model).toBe('gemini-3.8-flash');
       expect(config.useVertexAI).toBe(true);
     } finally {
       // Restore env
@@ -123,7 +123,7 @@ describe('query sampling parameter compatibility', () => {
     return { service, generateContent };
   }
 
-  it.each(['gemini-3.6-flash', 'gemini-3.5-flash-lite'])(
+  it.each(['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite'])(
     'omits deprecated sampling parameters for %s',
     async (model) => {
       const { service, generateContent } = createService(model);
@@ -171,6 +171,29 @@ describe('query sampling parameter compatibility', () => {
     expect(request.config).not.toHaveProperty('temperature');
     expect(request.config).not.toHaveProperty('topP');
     expect(request.config).not.toHaveProperty('topK');
+  });
+
+  it.each(['gemini-3.8-flash', 'gemini-3.7-flash'])('rejects minimal thinking for %s before the API call', async (model) => {
+    const { service, generateContent } = createService('gemini-2.5-flash');
+    await expect(service.query('hello', { model, enableThinking: true, thinkingLevel: 'minimal' }))
+      .rejects.toThrow(/minimal.*not supported/);
+    expect(generateContent).not.toHaveBeenCalled();
+  });
+
+  it('uses medium thinking by default for Flash 3.8 and honors explicit high', async () => {
+    const { service, generateContent } = createService('gemini-3.8-flash');
+    await service.query('hello', { enableThinking: true });
+    expect(generateContent.mock.calls[0][0].config.thinkingConfig).toEqual({ thinkingLevel: 'MEDIUM' });
+    await service.query('hello', { enableThinking: true, thinkingLevel: 'high' });
+    expect(generateContent.mock.calls[1][0].config.thinkingConfig).toEqual({ thinkingLevel: 'HIGH' });
+  });
+
+  it('uses thinkingLevel and omits fixed topK for Robotics ER 2', async () => {
+    const { service, generateContent } = createService('gemini-robotics-er-2-preview');
+    await service.query('find the cup', { enableThinking: true, thinkingLevel: 'low' });
+    const config = generateContent.mock.calls[0][0].config;
+    expect(config.thinkingConfig).toEqual({ thinkingLevel: 'LOW' });
+    expect(config).not.toHaveProperty('topK');
   });
 });
 
@@ -513,7 +536,7 @@ describe('generateOmniVideo (Interactions API)', () => {
     });
 
     const params = create.mock.calls[0][0];
-    expect(params.model).toBe('gemini-omni-flash-preview');
+    expect(params.model).toBe('gemini-omni-1.1-flash');
     expect(params.input).toBe('a fox running through snow');
     // Omni Flash does not support a structured duration field on response_format.
     expect(params.response_format).toEqual({ type: 'video', aspect_ratio: '9:16' });

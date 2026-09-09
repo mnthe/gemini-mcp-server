@@ -312,7 +312,8 @@ describe('GeminiAIMCPServer generate_image wiring', () => {
 
     expect(omniTool).toBeDefined();
     expect(omniTool.inputSchema.required).toContain('prompt');
-    expect(omniTool.inputSchema.properties.model.enum).toEqual(['gemini-omni-flash-preview']);
+    expect(omniTool.inputSchema.properties.model.enum).toEqual(['gemini-omni-1.1-flash', 'gemini-omni-flash-preview']);
+    expect(omniTool.inputSchema.properties.resolution.enum).toEqual(['360p', '720p', '1080p', '4k']);
     expect(omniTool.inputSchema.properties.aspectRatio.enum).toEqual(['16:9', '9:16']);
     // Omni Flash does not support a structured duration or system instruction.
     expect(omniTool.inputSchema.properties.durationSeconds).toBeUndefined();
@@ -370,6 +371,22 @@ describe('GeminiAIMCPServer generate_image wiring', () => {
       prompt: 'short folk loop',
       model: 'lyria-3-clip-preview',
     });
+  });
+
+  it('advertises and routes Lyria 3.5 only when AI Studio is configured', async () => {
+    const server = new GeminiAIMCPServer(createTestConfig({
+      useVertexAI: true, defaultBackend: 'vertex', availableBackends: ['vertex', 'ai-studio'],
+    }));
+    const handlers = getHandlers((server as any).server);
+    const tools = (await handlers.listHandler()).tools;
+    expect(tools.find((t: any) => t.name === 'generate_music').inputSchema.properties.model.enum).toContain('lyria-3.5');
+    const args = { prompt: 'a song', model: 'lyria-3.5', backend: 'ai-studio', outputMimeType: 'audio/wav', durationSeconds: 120 };
+    await handlers.callHandler({ params: { name: 'generate_music', arguments: args } });
+    expect(mockMusicGenHandle).toHaveBeenCalledWith(args);
+    mockMusicGenHandle.mockClear();
+    const rejected = await handlers.callHandler({ params: { name: 'generate_music', arguments: { ...args, backend: 'vertex' } } });
+    expect(rejected.isError).toBe(true);
+    expect(mockMusicGenHandle).not.toHaveBeenCalled();
   });
 
   it('uses Gemini API music output schema when Vertex mode is disabled', async () => {

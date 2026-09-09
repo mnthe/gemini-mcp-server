@@ -55,11 +55,11 @@ const MultimodalPartSchema = z.object({
 export const QuerySchema = z.object({
   prompt: z.string().describe("The text prompt to send to the model"),
   sessionId: z.string().optional().describe("Optional conversation session ID for multi-turn conversations"),
-  model: z.string().optional().describe("Optional model override (e.g., gemini-3.6-flash, gemini-3.5-flash-lite, gemini-3.1-pro-preview, gemini-3.1-pro-preview-customtools)"),
+  model: z.string().optional().describe("Optional model override (e.g., gemini-3.8-flash, gemini-3.7-flash, gemini-3.5-flash-lite, gemini-3.1-pro-preview, gemini-3.1-pro-preview-customtools, gemini-robotics-er-2-preview)"),
   backend: z.enum(['vertex', 'ai-studio']).optional()
     .describe("Optional backend override ('vertex' | 'ai-studio'); defaults to the server's configured backend"),
   thinkingLevel: z.enum(['minimal', 'low', 'medium', 'high', 'MINIMAL', 'LOW', 'MEDIUM', 'HIGH']).optional()
-    .describe("Optional Gemini 3 thinking level override"),
+    .describe("Optional thinking level override; Flash 3.7/3.8 support low, medium, high only (Flash 3.8 defaults to medium)"),
   mediaResolution: z.enum(['low', 'medium', 'high', 'LOW', 'MEDIUM', 'HIGH']).optional()
     .describe("Optional global media resolution for multimodal inputs"),
   parts: z.array(MultimodalPartSchema).optional().describe("Optional multimodal content parts (images, audio, video, documents)"),
@@ -226,6 +226,10 @@ const ALLOWED_MUSIC_MODELS = [
   'lyria-3-pro-preview',
 ] as const;
 
+export function getAllowedMusicModels(useVertexAI: boolean = true): readonly string[] {
+  return useVertexAI ? ALLOWED_MUSIC_MODELS : [...ALLOWED_MUSIC_MODELS, 'lyria-3.5'];
+}
+
 export const ALLOWED_LYRIA_LANGUAGES = [
   'English',
   'German',
@@ -247,14 +251,15 @@ export function buildMusicGenerationSchema(
 ) {
   const defaultBackend: Backend = useVertexAI ? 'vertex' : 'ai-studio';
   const isVertex = (data: { backend?: Backend }): boolean => (data.backend ?? defaultBackend) === 'vertex';
+  const allowedModels = getAllowedMusicModels(!availableBackends.includes('ai-studio'));
   return z.object({
     prompt: z.string().describe("Music generation prompt"),
     backend: z.enum(availableBackends as [Backend, ...Backend[]]).optional()
-      .describe(`Backend for this request (default: ${defaultBackend}; available: ${availableBackends.join(', ')}). Vertex AI supports audio/mp3 only; Google AI Studio adds audio/wav for lyria-3-pro-preview.`),
-    model: z.enum(ALLOWED_MUSIC_MODELS).optional()
+      .describe(`Backend for this request (default: ${defaultBackend}; available: ${availableBackends.join(', ')}). Vertex AI supports audio/mp3 only; Google AI Studio adds audio/wav for lyria-3-pro-preview and lyria-3.5.`),
+    model: z.enum(allowedModels as [string, ...string[]]).optional()
       .describe("Music model (default: lyria-3-clip-preview)"),
     outputMimeType: z.enum(['audio/mp3', 'audio/wav']).optional()
-      .describe("Optional output MIME type. Vertex AI supports audio/mp3 only; Google AI Studio supports audio/wav for lyria-3-pro-preview."),
+      .describe("Optional output MIME type. Vertex AI supports audio/mp3 only; Google AI Studio supports audio/wav for lyria-3-pro-preview and lyria-3.5."),
     imagePaths: z.array(GeminiImageInputPathSchema).max(10).optional()
       .describe(`Optional local image paths to use as multimodal Lyria music generation inputs (max 10). Supported Gemini image input file types: ${GEMINI_IMAGE_INPUT_FILE_TYPES}. Audio/video reference files are not accepted by Lyria 3.`),
     lyrics: z.string().optional()
@@ -266,14 +271,17 @@ export function buildMusicGenerationSchema(
     language: z.enum(ALLOWED_LYRIA_LANGUAGES).optional()
       .describe("Optional output language direction. Vertex AI model card languages: English, German, Spanish, French, Hindi, Japanese, Korean, Portuguese"),
     durationSeconds: z.number().int().min(1).max(184).optional()
-      .describe("Optional target duration in seconds; requires lyria-3-pro-preview; maximum 184 seconds per Vertex AI model card. lyria-3-clip-preview is fixed at 30 seconds and does not support duration controls"),
+      .describe("Optional target duration in seconds for lyria-3-pro-preview or lyria-3.5; server limit 184 seconds. lyria-3-clip-preview is fixed at 30 seconds"),
     bpm: z.number().int().min(40).max(240).optional()
       .describe("Optional tempo direction in beats per minute"),
     intensity: z.enum(['low', 'medium', 'high', 'LOW', 'MEDIUM', 'HIGH']).optional()
       .describe("Optional musical intensity direction"),
   }).strict().refine(
-    (data) => data.durationSeconds === undefined || data.model === 'lyria-3-pro-preview',
-    { message: "durationSeconds requires model='lyria-3-pro-preview'" }
+    (data) => data.durationSeconds === undefined || data.model === 'lyria-3-pro-preview' || data.model === 'lyria-3.5',
+    { message: "durationSeconds requires model='lyria-3-pro-preview' or model='lyria-3.5'" }
+  ).refine(
+    (data) => data.model !== 'lyria-3.5' || !isVertex(data),
+    { message: "lyria-3.5 requires the Google AI Studio backend; set backend='ai-studio'" }
   ).refine(
     (data) => !data.instrumental || (!data.lyrics && !data.vocalStyle),
     { message: "instrumental cannot be combined with lyrics or vocalStyle" }
@@ -281,8 +289,8 @@ export function buildMusicGenerationSchema(
     (data) => !isVertex(data) || data.outputMimeType === undefined || data.outputMimeType === 'audio/mp3',
     { message: "the Vertex AI backend supports outputMimeType='audio/mp3' only for Lyria 3" }
   ).refine(
-    (data) => isVertex(data) || data.outputMimeType !== 'audio/wav' || data.model === 'lyria-3-pro-preview',
-    { message: "outputMimeType='audio/wav' requires model='lyria-3-pro-preview' on the Google AI Studio backend" }
+    (data) => isVertex(data) || data.outputMimeType !== 'audio/wav' || data.model === 'lyria-3-pro-preview' || data.model === 'lyria-3.5',
+    { message: "outputMimeType='audio/wav' requires model='lyria-3-pro-preview' or model='lyria-3.5' on the Google AI Studio backend" }
   );
 }
 
@@ -462,6 +470,7 @@ export const VideoGenerationSchema = buildVideoGenerationSchema(true);
 // pipeline. It returns the finished video synchronously (no check_video polling)
 // and supports stateful conversational editing via previousInteractionId.
 const ALLOWED_OMNI_VIDEO_MODELS = [
+  'gemini-omni-1.1-flash',
   'gemini-omni-flash-preview',
 ] as const;
 
@@ -472,16 +481,21 @@ export const OmniVideoGenerationSchema = z.object({
     "Video prompt for a new generation (oneshot), or a natural-language edit instruction when previousInteractionId is set (interactive editing). Describe dialogue/SFX/ambience as text; audio reference files are not accepted."
   ),
   model: z.enum(ALLOWED_OMNI_VIDEO_MODELS).optional()
-    .describe("Omni video model (default: gemini-omni-flash-preview)"),
+    .describe("Omni video model (default: gemini-omni-1.1-flash; legacy gemini-omni-flash-preview is deprecated on 2026-09-30)"),
   backend: z.enum(['vertex', 'ai-studio']).optional()
     .describe("Optional backend override. Gemini Omni Flash runs on the Google AI Studio (Gemini API) backend and defaults to it; Vertex AI is not supported yet (availability rolling out)."),
   aspectRatio: z.enum(['16:9', '9:16']).optional()
-    .describe("Aspect ratio (default: 16:9). Omni Flash supports 16:9 and 9:16 only. Output is 720p only; clips run a few seconds — steer timing within the prompt."),
+    .describe("Aspect ratio (default: 16:9). Omni Flash supports 16:9 and 9:16 only; steer clip timing within the prompt."),
+  resolution: z.enum(['360p', '720p', '1080p', '4k']).optional()
+    .describe("Output resolution for gemini-omni-1.1-flash (default: 720p; 1080p and 4k are upscaled). Omit for the legacy preview model."),
   imagePaths: z.array(VeoImageInputPathSchema).max(7).optional()
     .describe(`Local file paths of source/reference images for image-to-video or reference-to-video (max 7). Supported file types: ${VEO_IMAGE_INPUT_FILE_TYPES}. Omit for interactive edits — previousInteractionId reuses the prior video without re-uploading.`),
   previousInteractionId: z.string().min(1).optional()
     .describe("Interaction ID returned by a prior generate_omni_video call. When set, conversationally edits that video (no image re-upload) instead of generating a new one. Chain up to 3 sequential edits."),
-}).strict();
+}).strict().refine(
+  (data) => data.resolution === undefined || data.model !== 'gemini-omni-flash-preview',
+  { message: "resolution requires model='gemini-omni-1.1-flash' (the default)" }
+);
 
 // AI-assisted reference search. Composes an answer from live web sources via
 // Gemini's Google Search grounding (config.tools = [{ googleSearch }]) and
@@ -524,7 +538,7 @@ export function buildReferenceSearchSchema(
     systemInstruction: z.string().optional()
       .describe("Optional system instruction to steer the tone, depth, or scope of the composed answer."),
     thinkingLevel: z.enum(['minimal', 'low', 'medium', 'high', 'MINIMAL', 'LOW', 'MEDIUM', 'HIGH']).optional()
-      .describe("Optional Gemini 3 thinking level override for the reasoning depth of the answer."),
+      .describe("Reasoning depth: Flash 3.7/3.8 support low, medium, high only; Flash 3.8 defaults to medium."),
   }).strict().refine(
     (data) => isVertex(data) || (!data.excludeDomains && !data.blockingConfidence),
     { message: "excludeDomains and blockingConfidence are supported by the Vertex AI backend only" }

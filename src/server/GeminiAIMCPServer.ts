@@ -28,6 +28,7 @@ import {
   getDefaultVideoModel,
   getAllowedSpeechModels,
   getAllowedMusicOutputMimeTypes,
+  getAllowedMusicModels,
   ALLOWED_LYRIA_LANGUAGES,
   VEO_IMAGE_INPUT_FILE_TYPES,
   VEO_EXTENSION_VIDEO_FILE_TYPES,
@@ -164,10 +165,10 @@ export class GeminiAIMCPServer {
         : getAllowedSpeechModels(this.config.useVertexAI);
       const musicOutputMimeTypes = dual ? ['audio/mp3', 'audio/wav'] : getAllowedMusicOutputMimeTypes(this.config.useVertexAI);
       const musicOutputMimeDescription = dual
-        ? "Optional output MIME type. Vertex AI supports audio/mp3 only; Google AI Studio supports audio/wav for lyria-3-pro-preview."
+        ? "Optional output MIME type. Vertex AI supports audio/mp3 only; Google AI Studio supports audio/wav for lyria-3-pro-preview and lyria-3.5."
         : (this.config.useVertexAI
           ? "Optional output MIME type; Vertex AI Lyria 3 model card supports audio/mp3 only"
-          : "Optional output MIME type; Gemini API/AI Studio defaults to audio/mp3 and supports audio/wav only with lyria-3-pro-preview");
+          : "Optional output MIME type; Gemini API/AI Studio defaults to audio/mp3 and supports audio/wav with lyria-3-pro-preview or lyria-3.5");
 
       const tools = [
         {
@@ -193,12 +194,12 @@ export class GeminiAIMCPServer {
               },
               model: {
                 type: "string",
-                description: "Optional model override (e.g., gemini-3.6-flash, gemini-3.5-flash-lite, gemini-3.1-pro-preview, gemini-3.1-pro-preview-customtools)",
+                description: "Optional model override (e.g., gemini-3.8-flash, gemini-3.7-flash, gemini-3.5-flash-lite, gemini-3.1-pro-preview, gemini-3.1-pro-preview-customtools, gemini-robotics-er-2-preview)",
               },
               thinkingLevel: {
                 type: "string",
                 enum: ["minimal", "low", "medium", "high", "MINIMAL", "LOW", "MEDIUM", "HIGH"],
-                description: "Optional Gemini 3 thinking level override",
+                description: "Optional thinking level override; Flash 3.7/3.8 support low, medium, high only (Flash 3.8 defaults to medium)",
               },
               mediaResolution: {
                 type: "string",
@@ -402,11 +403,11 @@ export class GeminiAIMCPServer {
           name: "generate_music",
           description:
             "Generate music using Lyria models. " +
-            "Supports lyria-3-clip-preview fixed 30-second clips and lyria-3-pro-preview full songs up to 184 seconds. " +
+            "Supports lyria-3-clip-preview fixed 30-second clips and lyria-3-pro-preview full songs up to 184 seconds. Lyria 3.5 (lyria-3.5) is available with backend=ai-studio using the Interactions API. " +
             "Lyria 3 supports one clip per prompt; language directions follow the model-card set: English, German, Spanish, French, Hindi, Japanese, Korean, Portuguese. " +
             (this.config.useVertexAI
               ? "Vertex AI mode supports 44.1 kHz, 192 kbps audio/mp3 output only. "
-              : "Gemini API/AI Studio mode supports 44.1 kHz stereo audio/mp3 output, and audio/wav only for lyria-3-pro-preview. ") +
+              : "Gemini API/AI Studio mode supports 44.1 kHz stereo audio/mp3 output, and audio/wav for lyria-3-pro-preview or lyria-3.5. ") +
             "Negative prompting is not supported. " +
             `Lyria 3 accepts text prompts and optional imagePaths (${GEMINI_IMAGE_INPUT_FILE_TYPES}); audio/video reference files are not accepted. ` +
             `Audio is saved to ${this.musicGenerationHandler.getMusicOutputDir()} and returned as MCP audio content.`,
@@ -420,7 +421,7 @@ export class GeminiAIMCPServer {
               },
               model: {
                 type: "string",
-                enum: ["lyria-3-clip-preview", "lyria-3-pro-preview"],
+                enum: getAllowedMusicModels(!availableBackends.includes('ai-studio')),
                 description: "Music model (default: lyria-3-clip-preview)",
               },
               outputMimeType: {
@@ -455,7 +456,7 @@ export class GeminiAIMCPServer {
                 type: "number",
                 minimum: 1,
                 maximum: 184,
-                description: "Optional target duration in seconds; requires lyria-3-pro-preview; maximum 184 seconds. lyria-3-clip-preview is fixed at 30 seconds",
+                description: "Optional target duration in seconds for lyria-3-pro-preview or lyria-3.5; server limit 184 seconds. lyria-3-clip-preview is fixed at 30 seconds",
               },
               bpm: {
                 type: "number",
@@ -593,11 +594,11 @@ export class GeminiAIMCPServer {
         {
           name: "generate_omni_video",
           description:
-            "Generate or conversationally edit short videos with Gemini Omni Flash (gemini-omni-flash-preview). " +
+            "Generate or conversationally edit short videos with Gemini Omni Flash (gemini-omni-1.1-flash). " +
             "This is a NON-Veo model on the Google AI Studio (Gemini API) backend and does NOT use generate_video/check_video: it returns the finished video synchronously in one call (no operationId polling). " +
             "Two paths: (1) ONESHOT generation — text-to-video, or image/reference-to-video via imagePaths (max 7); " +
             "(2) INTERACTIVE editing — set previousInteractionId to an id returned by a prior call to edit that video with a natural-language instruction (no image re-upload; chain up to 3 sequential edits). " +
-            "Constraints: 720p output only; aspect ratio 16:9 or 9:16; clips run a few seconds (steer pacing/timing within the prompt — duration is not a parameter); a synced audio track is generated automatically (audio reference inputs are not accepted — describe dialogue/SFX/ambience in the prompt). " +
+            "Output resolution: 360p, 720p (default), 1080p, or 4k; 1080p and 4k are upscaled. Aspect ratio: 16:9 or 9:16. Steer clip timing in the prompt; a synced audio track is generated automatically (audio reference inputs are not accepted). " +
             `Image source file types: ${OMNI_VIDEO_INPUT_FILE_TYPES}. ` +
             `The response includes interactionId (pass it back as previousInteractionId to edit) and the saved file path. Videos are saved to ${this.omniVideoHandler.getVideoOutputDir()}.`,
           inputSchema: {
@@ -610,13 +611,18 @@ export class GeminiAIMCPServer {
               },
               model: {
                 type: "string",
-                enum: ["gemini-omni-flash-preview"],
-                description: "Omni video model (default: gemini-omni-flash-preview)",
+                enum: ["gemini-omni-1.1-flash", "gemini-omni-flash-preview"],
+                description: "Omni video model (default: gemini-omni-1.1-flash; legacy preview is deprecated on 2026-09-30)",
               },
               aspectRatio: {
                 type: "string",
                 enum: ["16:9", "9:16"],
-                description: "Aspect ratio (default: 16:9). Omni Flash supports 16:9 and 9:16 only. Output is 720p only.",
+                description: "Aspect ratio (default: 16:9). Omni Flash supports 16:9 and 9:16 only.",
+              },
+              resolution: {
+                type: "string",
+                enum: ["360p", "720p", "1080p", "4k"],
+                description: "Output resolution for gemini-omni-1.1-flash (default: 720p; 1080p and 4k are upscaled). Omit for the legacy preview model.",
               },
               imagePaths: {
                 type: "array",
@@ -689,7 +695,7 @@ export class GeminiAIMCPServer {
               thinkingLevel: {
                 type: "string",
                 enum: ["minimal", "low", "medium", "high"],
-                description: "Optional Gemini 3 thinking level override for the reasoning depth of the answer.",
+                description: "Reasoning depth: Flash 3.7/3.8 support low, medium, high only; Flash 3.8 defaults to medium.",
               },
             },
             required: ["prompt"],
